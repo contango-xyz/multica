@@ -8,6 +8,7 @@ import { RealtimeProvider } from "@/data/realtime/realtime-provider";
 import { useInboxRealtime } from "@/data/realtime/use-inbox-realtime";
 import { useIssuesRealtime } from "@/data/realtime/use-issues-realtime";
 import { useMyIssuesRealtime } from "@/data/realtime/use-my-issues-realtime";
+import { usePushNotifications } from "@/lib/use-push-notifications";
 import { useChatSessionsRealtime } from "@/data/realtime/use-chat-sessions-realtime";
 import { useProjectsRealtime } from "@/data/realtime/use-projects-realtime";
 import { usePinsRealtime } from "@/data/realtime/use-pins-realtime";
@@ -77,6 +78,7 @@ function RealtimeSubscriptions() {
   useInboxRealtime();
   useIssuesRealtime();
   useMyIssuesRealtime();
+  usePushNotifications();
   useChatSessionsRealtime();
   useProjectsRealtime();
   usePinsRealtime();
