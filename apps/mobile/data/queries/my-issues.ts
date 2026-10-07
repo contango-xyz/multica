@@ -22,20 +22,6 @@ import {
   type MyIssuesScope,
 } from "./issue-keys";
 
-export function buildMyIssuesFilter(
-  scope: MyIssuesScope,
-  userId: string,
-): MyIssuesFilter {
-  switch (scope) {
-    case "assigned":
-      return { assignee_id: userId };
-    case "created":
-      return { creator_id: userId };
-    case "agents":
-      return { involves_user_id: userId };
-  }
-}
-
 export const myIssueListOptions = (
   wsId: string | null,
   scope: MyIssuesScope,

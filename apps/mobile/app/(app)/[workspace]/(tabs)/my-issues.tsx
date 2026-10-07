@@ -1,20 +1,15 @@
 /**
- * "My Issues" tab. Three scopes — assigned / created / agents — mirroring
- * web's `packages/views/my-issues/components/my-issues-page.tsx:48-65`. The
- * `agents` scope label is "Agents and Squads" because the backend predicate
- * (`involves_user_id`, MUL-2397) surfaces both the user's owned agents and
- * squads they're involved in (member / leader / has an owned agent inside).
+ * Issues tab: "All" + the workspace's saved views (web order, minus views
+ * hidden on web). A view's filters are evaluated by the server via
+ * POST /api/issues/table/rows — the same query web builds — so a view lists
+ * the same issues on both clients. Status + priority quick filters
+ * (useMyIssuesViewStore) narrow whatever chip is selected.
  *
- * Issues are grouped by concrete status key; empty sections are omitted.
- * Category controls lifecycle behavior and ordering, not section identity.
- *
- * Status + Priority filters mirror web's MyIssuesHeader filter sub-menus.
- * Filter state lives in `useMyIssuesViewStore` and is cleared on workspace
- * change via the shared `useClearFiltersOnWorkspaceChange` hook.
+ * The route stays `my-issues` so existing links keep working.
  */
-import { useMemo } from "react";
-import { Pressable, SectionList, View } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { Pressable, ScrollView, SectionList, View } from "react-native";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,42 +25,69 @@ import { StatusIcon } from "@/components/ui/status-icon";
 import { IssueRow } from "@/components/issue/issue-row";
 import { IssuesLoading } from "@/components/issue/issues-loading";
 import {
-  buildMyIssuesFilter,
-  myIssueListOptions,
-} from "@/data/queries/my-issues";
-import type { MyIssuesScope } from "@/data/queries/issue-keys";
-import { useAuthStore } from "@/data/auth-store";
+  issueTableRowsInfiniteOptions,
+  issueViewListOptions,
+  issueViewPrefOptions,
+} from "@/data/queries/issue-views";
 import { useWorkspaceStore } from "@/data/workspace-store";
 import { useMyIssuesViewStore } from "@/data/stores/my-issues-view-store";
+import { useIssuesChipStore } from "@/data/stores/issues-chip-store";
 import { useClearFiltersOnWorkspaceChange } from "@/lib/use-clear-filters-on-workspace-change";
 import { PRIORITY_LABEL } from "@/lib/issue-status";
 import { useT } from "@/lib/i18n";
 import { useIssueStatuses } from "@/lib/use-issue-statuses";
 import { groupIssuesByStatus } from "@/lib/group-issues-by-status";
-import { filterIssues } from "@/lib/filter-issues";
+import { composeIssuesChips, resolveSelectedChip, type IssuesChip } from "@/lib/issues-chips";
+import { buildIssueTableQuery } from "@/lib/view-table-query";
 import { useColorScheme } from "@/lib/use-color-scheme";
 import { THEME } from "@/lib/theme";
 
-// Mobile pill row has tight width on SE3 (375pt). Three pills + Filter icon
-// must fit in 343pt usable space, so the agents scope renders "Agents" — the
-// full "Agents and Squads" label (~135pt) blows past safe limits and breaks
-// under Dynamic Type. Semantics unchanged: same backend predicate
-// (`involves_user_id`, MUL-2397) covers owned agents + related squads; the
-// empty state copy still says "agents or squads".
-const SCOPES: MyIssuesScope[] = ["assigned", "created", "agents"];
-
-export default function MyIssues() {
+export default function IssuesTab() {
   const isFocused = useIsFocused();
-  const userId = useAuthStore((s) => s.user?.id ?? null);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const wsSlug = useWorkspaceStore((s) => s.currentWorkspaceSlug);
   const { t } = useT("issues");
 
-  const scope = useMyIssuesViewStore((s) => s.scope);
-  const setScope = useMyIssuesViewStore((s) => s.setScope);
   const statusFilters = useMyIssuesViewStore((s) => s.statusFilters);
   const priorityFilters = useMyIssuesViewStore((s) => s.priorityFilters);
+  useClearFiltersOnWorkspaceChange(useMyIssuesViewStore.getState().clearFilters, wsId);
 
+  const views = useQuery(issueViewListOptions(wsId));
+  const prefs = useQuery(issueViewPrefOptions(wsId));
+  const chips = useMemo(
+    () => composeIssuesChips(views.data, prefs.data?.prefs),
+    [views.data, prefs.data],
+  );
+
+  const remembered = useIssuesChipStore((s) => (wsId ? s.rememberedByWs[wsId] ?? null : null));
+  useEffect(() => {
+    if (wsId) void useIssuesChipStore.getState().hydrate(wsId);
+  }, [wsId]);
+  const selected = resolveSelectedChip(chips, remembered);
+  const selectChip = (chip: IssuesChip) => {
+    if (wsId) useIssuesChipStore.getState().remember(wsId, chip.id);
+  };
+
+  const spec = useMemo(
+    () =>
+      buildIssueTableQuery(
+        selected.kind === "all" ? { kind: "all" } : { kind: "view", view: selected.view },
+        { statuses: statusFilters, priorities: priorityFilters },
+      ),
+    [selected, statusFilters, priorityFilters],
+  );
+
+  const rows = useInfiniteQuery(issueTableRowsInfiniteOptions(wsId, spec));
+  const issues = useMemo(
+    () => rows.data?.pages.flatMap((page) => page.rows.map((row) => row.issue)) ?? [],
+    [rows.data],
+  );
+
+  // Catalog labels and ordering enhance exact-key sections without blocking rows.
+  const catalog = useIssueStatuses();
+  const sections = useMemo(() => groupIssuesByStatus(issues, catalog.statuses), [issues, catalog.statuses]);
+
+  const hasActiveFilters = statusFilters.length > 0 || priorityFilters.length > 0;
   const openFilter = () => {
     if (!wsSlug) return;
     router.push({
@@ -73,51 +95,27 @@ export default function MyIssues() {
       params: { workspace: wsSlug, scope: "my" },
     });
   };
+  const refreshAll = () => {
+    void views.refetch();
+    void prefs.refetch();
+    void rows.refetch();
+  };
 
-  useClearFiltersOnWorkspaceChange(
-    useMyIssuesViewStore.getState().clearFilters,
-    wsId,
-  );
-
-  const filter = useMemo(
-    () => (userId ? buildMyIssuesFilter(scope, userId) : { assignee_id: "" }),
-    [scope, userId],
-  );
-
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    ...myIssueListOptions(wsId, scope, filter),
-    enabled: !!wsId && !!userId,
-  });
-
-  // Catalog labels and ordering enhance exact-key sections without blocking rows.
-  const catalog = useIssueStatuses();
-
-  // Apply client-side status + priority filter. Mirrors the predicate at
-  // packages/views/issues/utils/filter.ts:30-34 via filterIssues().
-  const filtered = useMemo(
-    () => filterIssues(data ?? [], statusFilters, priorityFilters),
-    [data, statusFilters, priorityFilters],
-  );
-
-  const sections = useMemo(() => groupIssuesByStatus(filtered, catalog.statuses), [filtered, catalog.statuses]);
-
-  const hasActiveFilters =
-    statusFilters.length > 0 || priorityFilters.length > 0;
-  const scopeItems = SCOPES.map((value) => ({
-    value,
-    label: t(`tabs.${value}`),
-  }));
-
-  const showEmptyState =
-    !isLoading && !error && filtered.length === 0;
+  const showEmptyState = !rows.isLoading && !rows.error && issues.length === 0;
+  const emptyMessage = hasActiveFilters
+    ? t("empty.filtered")
+    : selected.kind === "all"
+      ? t("empty.all")
+      : t("empty.view");
 
   return (
     <View className="flex-1 bg-background">
-      <Header title={t("navigation:tabs.my_issues")} right={<HeaderActions />} />
-      <ScopeToolbar
-        scopes={scopeItems}
-        scope={scope}
-        onChange={(v) => setScope(v)}
+      <Header title={t("navigation:tabs.issues")} right={<HeaderActions />} />
+      <ChipToolbar
+        chips={chips}
+        selectedId={selected.id}
+        allLabel={t("tabs.all")}
+        onSelect={selectChip}
         onOpenFilter={openFilter}
         hasActiveFilters={hasActiveFilters}
       />
@@ -134,27 +132,21 @@ export default function MyIssues() {
           }
         />
       ) : null}
-      {isLoading ? (
+      {rows.isLoading ? (
         <IssuesLoading />
-      ) : error ? (
+      ) : rows.error ? (
         <View className="px-4 gap-3 pt-4">
           <Text className="text-sm text-destructive">
             {t("errors.load_failed", {
-              message: error instanceof Error ? error.message : "unknown",
+              message: rows.error instanceof Error ? rows.error.message : "unknown",
             })}
           </Text>
-          <Button variant="outline" onPress={() => refetch()}>
+          <Button variant="outline" onPress={() => rows.refetch()}>
             <Text>{t("common:actions.retry")}</Text>
           </Button>
         </View>
       ) : showEmptyState ? (
-        <EmptyState
-          message={
-            hasActiveFilters
-              ? t("empty.filtered")
-              : t(`empty.${scope}`)
-          }
-        />
+        <EmptyState message={emptyMessage} />
       ) : (
         <SectionList
           sections={sections}
@@ -178,11 +170,14 @@ export default function MyIssues() {
               }}
             />
           )}
-          refreshing={isFocused && isRefetching}
-          onRefresh={refetch}
+          onEndReached={() => {
+            if (rows.hasNextPage && !rows.isFetchingNextPage) void rows.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          refreshing={isFocused && rows.isRefetching && !rows.isFetchingNextPage}
+          onRefresh={refreshAll}
         />
       )}
-
     </View>
   );
 }
@@ -230,37 +225,41 @@ function FilterButton({
 }
 
 /**
- * Toolbar row mirroring web `MyIssuesHeader` / `IssuesHeader`
- * (`packages/views/my-issues/components/my-issues-header.tsx:138-163`):
- * left-aligned scope pill group + right-side Filter icon (red dot when
- * filters are active). Replaces the previous full-width segmented tabs +
- * Filter-in-title-bar split — keeps scope and the filter affordance in the
- * same row, because they both control the list directly below.
+ * Horizontally scrolling chip row ("All" + saved views) with the Filter
+ * button pinned on the right — same pill styling as the old scope toolbar.
  */
-function ScopeToolbar<S extends string>({
-  scopes,
-  scope,
-  onChange,
+function ChipToolbar({
+  chips,
+  selectedId,
+  allLabel,
+  onSelect,
   onOpenFilter,
   hasActiveFilters,
 }: {
-  scopes: { value: S; label: string }[];
-  scope: S;
-  onChange: (value: S) => void;
+  chips: IssuesChip[];
+  selectedId: string;
+  allLabel: string;
+  onSelect: (chip: IssuesChip) => void;
   onOpenFilter: () => void;
   hasActiveFilters: boolean;
 }) {
   return (
-    <View className="flex-row items-center justify-between px-4 pt-2 pb-2">
-      <View className="flex-row items-center gap-1 flex-shrink min-w-0">
-        {scopes.map((s) => {
-          const active = scope === s.value;
+    <View className="flex-row items-center px-4 pt-2 pb-2">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="flex-1"
+        contentContainerClassName="gap-1 pr-2"
+      >
+        {chips.map((chip) => {
+          const active = chip.id === selectedId;
+          const label = chip.kind === "all" ? allLabel : chip.view.name;
           return (
             <Button
-              key={s.value}
+              key={chip.id}
               variant="outline"
               size="sm"
-              onPress={() => onChange(s.value)}
+              onPress={() => onSelect(chip)}
               className={active ? "bg-accent" : ""}
               accessibilityState={{ selected: active }}
             >
@@ -268,12 +267,12 @@ function ScopeToolbar<S extends string>({
                 numberOfLines={1}
                 className={active ? "text-accent-foreground" : "text-muted-foreground"}
               >
-                {s.label}
+                {label}
               </Text>
             </Button>
           );
         })}
-      </View>
+      </ScrollView>
       <FilterButton
         onPress={onOpenFilter}
         hasActiveFilters={hasActiveFilters}

@@ -4,7 +4,8 @@
     "inbox": "Inbox",
     "my_issues": "My Issues",
     "chat": "Chat",
-    "more": "More"
+    "more": "More",
+    "issues": "Issues"
   },
   "more_menu": {
     "pinned": "Pinned",
