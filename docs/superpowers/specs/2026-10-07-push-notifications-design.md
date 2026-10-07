@@ -31,8 +31,7 @@ enabled device of that user.
 - Title: the inbox item's `title`; body: its `body` (same fields the desktop banner uses, see
   `packages/core/realtime/use-realtime-sync.ts` `handleInboxNew`). Truncate body to 180 characters.
 - Payload data: `{ kind: "inbox", workspace_slug, item_id, issue_id?, comment_id? }`.
-- Notification preferences need no extra handling: muted groups never create inbox items
-  (`notification_listeners.go` `isNotifMuted`).
+- Notification preferences: see **Preferences** below.
 
 **Chat push.** On every `chat:done` bus event: push to the chat session's owner when the finished turn
 produced an assistant message. If the event payload lacks the owner or message text, the dispatcher
@@ -40,6 +39,17 @@ loads the session and its newest assistant message by id (sqlc) before sending.
 - Title: the agent's name; body: the first line of the assistant message, truncated to 180 characters.
 - Payload data: `{ kind: "chat", workspace_slug, session_id }`.
 - `thread-id` = session id so iOS groups a conversation.
+
+**Preferences — same as desktop.** Push follows the user's existing notification settings
+(`notification_preference`, per workspace), exactly like the desktop app:
+1. Event-group toggles (assignments, status changes, comments, mentions, updates, agent activity): a
+   muted group never creates an inbox item (`notification_listeners.go` `isNotifMuted`), so it never
+   pushes either.
+2. `system_notifications` — desktop's "system notifications" switch, checked before every OS banner
+   (`use-realtime-sync.ts` `handleInboxNew`): when it is `muted` for the item's (or chat session's)
+   workspace, no push is sent. Chat replies have no group of their own on desktop and obey this
+   switch only.
+Preferences are read at send time, so changing them on web or mobile applies to the next push.
 
 **Badge.** Every push carries `badge` = the recipient's unread inbox count across workspaces, computed
 with the same query as `GET /api/inbox/unread-summary` (`CountUnreadInboxByWorkspace`, summed). The app
@@ -122,6 +132,8 @@ accept registrations): `MULTICA_APNS_KEY_PATH` (or `MULTICA_APNS_KEY` PEM conten
 
 ## Testing
 
+- Go: preference tests — `system_notifications: muted` in the item's workspace → no push (inbox and
+  chat); muted in another workspace → still pushes.
 - Go: endpoint tests with `testutil` fixtures (register, re-register same token by another user moves
   ownership, unregister own vs other's, validation, auth). Dispatcher tests with a fake `Sender`:
   inbox item → push to all enabled devices of the member recipient only; agent recipient ignored;
