@@ -38,3 +38,65 @@ describe("api.deleteComment", () => {
     expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ method: "DELETE" }));
   });
 });
+
+describe("api issue views + table rows", () => {
+  const json = (body: unknown) =>
+    new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("listIssues serialises object params as JSON", async () => {
+    fetchMock.mockResolvedValue(json({ issues: [], total: 0 }));
+    await api.listIssues({ properties: { "def-1": ["u-1"] } } as never);
+    const url = new URL(fetchMock.mock.calls[0]![0] as string);
+    expect(JSON.parse(url.searchParams.get("properties")!)).toEqual({ "def-1": ["u-1"] });
+  });
+
+  it("listIssueViews GETs workspace views and tolerates a non-array body", async () => {
+    fetchMock.mockResolvedValueOnce(json([{ id: "v1", name: "Needs me", query: {}, display: {} }]));
+    const views = await api.listIssueViews({ scope_type: "workspace" });
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://api.example.test/api/issue-views?scope_type=workspace");
+    expect(views.map((v) => v.name)).toEqual(["Needs me"]);
+
+    fetchMock.mockResolvedValueOnce(json({ unexpected: true }));
+    expect(await api.listIssueViews({ scope_type: "workspace" })).toEqual([]);
+  });
+
+  it("getIssueViewPreference falls back to empty prefs on garbage", async () => {
+    fetchMock.mockResolvedValueOnce(json("nope"));
+    const pref = await api.getIssueViewPreference({ scope_type: "workspace" });
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://api.example.test/api/issue-view-preferences?scope_type=workspace",
+    );
+    expect(pref.prefs).toEqual({ hidden: [], order: [] });
+  });
+
+  it("listIssueTableRows POSTs the request body", async () => {
+    fetchMock.mockResolvedValueOnce(
+      json({ query_fingerprint: "f", group_key: null, parent_id: null, total: 0, rows: [], branch_total: 0, next_cursor: null }),
+    );
+    const req = {
+      query: { scope: { kind: "workspace" as const }, filters: {}, sort: { field: "created_at" as const, direction: "desc" as const } },
+      group: { kind: "none" as const },
+      group_key: null,
+      hierarchy: { enabled: false },
+      parent_id: null,
+      page: { limit: 100, cursor: null },
+    };
+    const res = await api.listIssueTableRows(req);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://api.example.test/api/issues/table/rows");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual(req);
+    expect(res.total).toBe(0);
+  });
+});

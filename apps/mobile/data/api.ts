@@ -57,6 +57,8 @@ import type {
   UpdateMeRequest,
   UpdateProjectRequest,
   User,
+  IssueTableRowsRequest,
+  IssueTableRowsResponse,
   Workspace,
   WorkspaceSubscriptionSummary,
 } from "@multica/core/types";
@@ -67,7 +69,12 @@ import {
   RefreshSessionResponseSchema,
   EMPTY_LIST_ISSUE_STATUSES_RESPONSE,
   EMPTY_LIST_ISSUES_RESPONSE,
+  EMPTY_ISSUE_TABLE_ROWS_RESPONSE,
+  EMPTY_ISSUE_VIEW_PREFERENCE,
   EMPTY_TIMELINE_ENTRIES,
+  IssueTableRowsResponseSchema,
+  IssueViewListSchema,
+  IssueViewPreferenceSchema,
   IssueSchema,
   ListIssuesResponseSchema,
   ListIssueStatusesResponseSchema,
@@ -76,6 +83,8 @@ import {
 } from "@multica/core/api/schemas";
 import type {
   AppConfigResponse,
+  IssueView,
+  IssueViewPreference,
   RefreshSessionResponse,
 } from "@multica/core/api/schemas";
 import {
@@ -639,6 +648,10 @@ class ApiClient {
         // in packages/core/api/client.ts:407 — repeated keys would silently
         // collapse to the first value only.
         if (v.length > 0) search.set(k, v.map(String).join(","));
+      } else if (typeof v === "object") {
+        // Map-shaped params (e.g. `properties`) are JSON on the wire, same as
+        // web's client (packages/core/api/client.ts).
+        search.set(k, JSON.stringify(v));
       } else {
         search.set(k, String(v));
       }
@@ -651,6 +664,45 @@ class ApiClient {
     return parseWithFallback(raw, ListIssuesResponseSchema, EMPTY_LIST_ISSUES_RESPONSE, {
       endpoint: "GET /api/issues",
     });
+  }
+
+  // --- Saved issue views (read-only on mobile) ---
+  // Mirrors packages/core/api/client.ts listIssueViews / getIssueViewPreference.
+  async listIssueViews(
+    scope: { scope_type: "workspace" },
+    opts?: { signal?: AbortSignal },
+  ): Promise<IssueView[]> {
+    return this.fetchValidated(
+      `/api/issue-views?scope_type=${scope.scope_type}`,
+      IssueViewListSchema,
+      [] as IssueView[],
+      { ...opts, endpoint: "GET /api/issue-views" },
+    );
+  }
+
+  async getIssueViewPreference(
+    scope: { scope_type: "workspace" },
+    opts?: { signal?: AbortSignal },
+  ): Promise<IssueViewPreference> {
+    return this.fetchValidated(
+      `/api/issue-view-preferences?scope_type=${scope.scope_type}`,
+      IssueViewPreferenceSchema,
+      EMPTY_ISSUE_VIEW_PREFERENCE,
+      { ...opts, endpoint: "GET /api/issue-view-preferences" },
+    );
+  }
+
+  async listIssueTableRows(
+    req: IssueTableRowsRequest,
+    opts?: { signal?: AbortSignal },
+  ): Promise<IssueTableRowsResponse> {
+    return this.fetchValidatedWith(
+      "/api/issues/table/rows",
+      IssueTableRowsResponseSchema,
+      EMPTY_ISSUE_TABLE_ROWS_RESPONSE,
+      { method: "POST", body: JSON.stringify(req) },
+      { ...opts, endpoint: "POST /api/issues/table/rows" },
+    );
   }
 
   /** Workspace-wide issue search. Backend `GET /api/issues/search` with
