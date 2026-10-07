@@ -91,9 +91,18 @@ func (s *DBStore) UnreadInboxCount(ctx context.Context, userID string) (int, err
 	return total, nil
 }
 
+// ChatSessionTarget returns the chat's owner and agent name; an empty owner
+// with a nil error means the chat must not be pushed.
 func (s *DBStore) ChatSessionTarget(ctx context.Context, sessionID string) (string, string, error) {
 	sid, err := util.ParseUUID(sessionID)
 	if err != nil {
+		return "", "", err
+	}
+	// Chats driven from Slack/Lark/Telegram/... already deliver the reply in
+	// that app; pushing it to the phone too would double every message.
+	if _, err := s.q.GetChannelChatSessionBindingBySessionAny(ctx, sid); err == nil {
+		return "", "", nil
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return "", "", err
 	}
 	sess, err := s.q.GetChatSession(ctx, sid)
