@@ -34,6 +34,6 @@
     "empty": "No pinned items yet.",
     "unavailable_issue": "This pinned issue is unavailable.",
     "unavailable_project": "This pinned project is unavailable.",
-    "unavailable_view": "Saved view unavailable"
+    "unavailable_view": "Saved view (open on web)"
   }
 }

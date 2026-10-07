@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type {
   IssuePriority,
   IssueStatus,
+  IssueTableQuerySpec,
 } from "@multica/core/types";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,13 @@ import { composeIssuesChips, resolveSelectedChip, type IssuesChip } from "@/lib/
 import { buildIssueTableQuery } from "@/lib/view-table-query";
 import { useColorScheme } from "@/lib/use-color-scheme";
 import { THEME } from "@/lib/theme";
+
+// Key filler for a disabled rows query (plan is "empty" / "pending").
+const PLACEHOLDER_SPEC: IssueTableQuerySpec = {
+  scope: { kind: "workspace" },
+  filters: {},
+  sort: { field: "created_at", direction: "desc" },
+};
 
 export default function IssuesTab() {
   const isFocused = useIsFocused();
@@ -68,23 +76,32 @@ export default function IssuesTab() {
     if (wsId) useIssuesChipStore.getState().remember(wsId, chip.id);
   };
 
-  const spec = useMemo(
+  // The catalog also decides which status columns a list-mode view loads
+  // (cancelled / archived hidden, as on web), so the rows wait for it.
+  const catalog = useIssueStatuses();
+  const plan = useMemo(
     () =>
       buildIssueTableQuery(
         selected.kind === "all" ? { kind: "all" } : { kind: "view", view: selected.view },
         { statuses: statusFilters, priorities: priorityFilters },
+        catalog,
       ),
-    [selected, statusFilters, priorityFilters],
+    [selected, statusFilters, priorityFilters, catalog],
   );
 
-  const rows = useInfiniteQuery(issueTableRowsInfiniteOptions(wsId, spec));
+  const rows = useInfiniteQuery({
+    // A match-nothing or catalog-pending plan never reaches the server: an
+    // empty filter list would be read as "no filter".
+    ...issueTableRowsInfiniteOptions(wsId, plan.kind === "query" ? plan.spec : PLACEHOLDER_SPEC),
+    enabled: !!wsId && plan.kind === "query",
+  });
   const issues = useMemo(
-    () => rows.data?.pages.flatMap((page) => page.rows.map((row) => row.issue)) ?? [],
-    [rows.data],
+    () =>
+      plan.kind === "query"
+        ? rows.data?.pages.flatMap((page) => page.rows.map((row) => row.issue)) ?? []
+        : [],
+    [plan.kind, rows.data],
   );
-
-  // Catalog labels and ordering enhance exact-key sections without blocking rows.
-  const catalog = useIssueStatuses();
   const sections = useMemo(() => groupIssuesByStatus(issues, catalog.statuses), [issues, catalog.statuses]);
 
   const hasActiveFilters = statusFilters.length > 0 || priorityFilters.length > 0;
@@ -101,7 +118,8 @@ export default function IssuesTab() {
     void rows.refetch();
   };
 
-  const showEmptyState = !rows.isLoading && !rows.error && issues.length === 0;
+  const loading = plan.kind === "pending" || (plan.kind === "query" && rows.isLoading);
+  const showEmptyState = !loading && !rows.error && issues.length === 0;
   const emptyMessage = hasActiveFilters
     ? t("empty.filtered")
     : selected.kind === "all"
@@ -132,9 +150,9 @@ export default function IssuesTab() {
           }
         />
       ) : null}
-      {rows.isLoading ? (
+      {loading ? (
         <IssuesLoading />
-      ) : rows.error ? (
+      ) : plan.kind === "query" && rows.error ? (
         <View className="px-4 gap-3 pt-4">
           <Text className="text-sm text-destructive">
             {t("errors.load_failed", {
@@ -174,7 +192,7 @@ export default function IssuesTab() {
             if (rows.hasNextPage && !rows.isFetchingNextPage) void rows.fetchNextPage();
           }}
           onEndReachedThreshold={0.5}
-          refreshing={isFocused && rows.isRefetching && !rows.isFetchingNextPage}
+          refreshing={isFocused && plan.kind === "query" && rows.isRefetching && !rows.isFetchingNextPage}
           onRefresh={refreshAll}
         />
       )}
