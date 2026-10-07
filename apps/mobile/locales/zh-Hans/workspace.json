@@ -34,6 +34,6 @@
     "empty": "还没有固定项。",
     "unavailable_issue": "该固定任务不可用。",
     "unavailable_project": "该固定项目不可用。",
-    "unavailable_view": "保存的视图不可用"
+    "unavailable_view": "保存的视图（请在网页端打开）"
   }
 }
