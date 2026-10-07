@@ -45,6 +45,7 @@ import { issueDetailOptions } from "@/data/queries/issues";
 import { projectDetailOptions } from "@/data/queries/projects";
 import { issueViewListOptions } from "@/data/queries/issue-views";
 import { useIssuesChipStore } from "@/data/stores/issues-chip-store";
+import { viewPinState } from "@/lib/view-pin-state";
 import { useAuthStore } from "@/data/auth-store";
 import { useWorkspaceStore } from "@/data/workspace-store";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -199,7 +200,11 @@ function ProjectPinRow({
   );
 }
 
-/** A pinned saved view opens the Issues tab with that view selected. */
+/**
+ * A pinned saved view opens the Issues tab with that view selected. A view
+ * mobile can't resolve renders a plain, non-destructive row (see
+ * lib/view-pin-state.ts) — unpinning stays a web action.
+ */
 function ViewPinRow({
   pin,
   wsId,
@@ -210,18 +215,20 @@ function ViewPinRow({
   wsSlug: string | null;
 }) {
   const { colorScheme } = useColorScheme();
-  const { data, isLoading } = useQuery(issueViewListOptions(wsId));
-  const view = data?.find((v) => v.id === pin.item_id);
+  const { t } = useT("workspace");
+  const views = useQuery(issueViewListOptions(wsId));
+  const state = viewPinState(views, pin.item_id);
 
-  if (isLoading) return <SkeletonRow />;
-  if (!view) return <MissingPinRow itemType="view" itemId={pin.item_id} />;
+  if (state.kind === "loading") return <SkeletonRow />;
+  const available = state.kind === "view";
 
   return (
     <Pressable
-      className="px-4 py-3 flex-row items-center gap-3 active:bg-secondary"
+      disabled={!available}
+      className={`px-4 py-3 flex-row items-center gap-3 active:bg-secondary${available ? "" : " opacity-60"}`}
       onPress={() => {
         if (!wsId || !wsSlug) return;
-        useIssuesChipStore.getState().remember(wsId, `view:${view.id}`);
+        useIssuesChipStore.getState().remember(wsId, `view:${pin.item_id}`);
         router.navigate(`/${wsSlug}/my-issues`);
       }}
     >
@@ -230,8 +237,11 @@ function ViewPinRow({
         size={18}
         color={THEME[colorScheme].mutedForeground}
       />
-      <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
-        {view.name}
+      <Text
+        className={`flex-1 text-sm ${available ? "text-foreground" : "text-muted-foreground"}`}
+        numberOfLines={1}
+      >
+        {available ? state.name : t("pins.unavailable_view")}
       </Text>
     </Pressable>
   );
@@ -247,7 +257,7 @@ function SkeletonRow() {
 }
 
 /**
- * Renders for pins whose target issue/project/view was deleted or revoked.
+ * Renders for pins whose target issue/project was deleted or revoked.
  * Tapping triggers unpin so the user can clean it up; no destination
  * navigation since there's nothing to navigate to. Subtle styling so
  * it doesn't dominate the list of live pins.
@@ -256,7 +266,7 @@ function MissingPinRow({
   itemType,
   itemId,
 }: {
-  itemType: "issue" | "project" | "view";
+  itemType: "issue" | "project";
   itemId: string;
 }) {
   const { colorScheme } = useColorScheme();
@@ -265,9 +275,7 @@ function MissingPinRow({
   const missingLabel =
     itemType === "issue"
       ? t("pins.unavailable_issue")
-      : itemType === "view"
-        ? t("pins.unavailable_view")
-        : t("pins.unavailable_project");
+      : t("pins.unavailable_project");
   return (
     <Pressable
       onPress={() => deletePin.mutate({ itemType, itemId })}
