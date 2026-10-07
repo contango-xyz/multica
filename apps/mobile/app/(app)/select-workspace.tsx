@@ -1,3 +1,4 @@
+import { unregisterForPush } from "@/data/push-registration";
 import { ActivityIndicator, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -82,7 +83,7 @@ export default function SelectWorkspace() {
         </View>
 
         <View className="pt-4 border-t border-border">
-          <Button variant="outline" onPress={() => logout()}>
+          <Button variant="outline" onPress={() => void unregisterForPush().then(() => logout())}>
             <Text>{t("actions.sign_out")}</Text>
           </Button>
         </View>
