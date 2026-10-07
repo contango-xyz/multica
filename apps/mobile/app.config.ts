@@ -36,6 +36,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // Expo keeps the top-level portrait policy for iPhone while adding all
       // iPad orientations required for multitasking when tablet support is on.
       supportsTablet: true,
+      // Only OS-provided HTTPS (exempt encryption): sets ITSAppUsesNonExemptEncryption=false
+      // so App Store Connect stops asking the export-compliance question per build.
+      config: { usesNonExemptEncryption: false },
       // Pins DEVELOPMENT_TEAM on every prebuild. Leaving it unset is the normal
       // path — `expo run:ios` then resolves a signing identity from the Keychain
       // itself, which is right when the Apple ID owns exactly one team. With
