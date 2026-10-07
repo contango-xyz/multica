@@ -122,7 +122,8 @@
     "created": "You haven't created any issues.",
     "agents": "No issues assigned to agents or squads.",
     "all": "No issues in this workspace.",
-    "members": "No issues assigned to a member."
+    "members": "No issues assigned to a member.",
+    "view": "No issues match this view."
   },
   "menu": {
     "pin": "Pin",
