@@ -148,9 +148,12 @@ func (d *Dispatcher) onChatDone(e events.Event) {
 func (d *Dispatcher) process(ctx context.Context, j job) {
 	if j.kind == "chat" {
 		owner, agent, err := d.store.ChatSessionTarget(ctx, j.sessionID)
-		if err != nil || owner == "" {
+		if err != nil {
 			slog.Warn("push: chat session lookup failed", "session_id", j.sessionID, "error", err)
 			return
+		}
+		if owner == "" {
+			return // e.g. a chat driven from an IM channel
 		}
 		j.userID, j.title = owner, agent
 	}

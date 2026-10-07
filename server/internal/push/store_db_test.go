@@ -82,3 +82,49 @@ func TestDBStoreDevicesAndPrefs(t *testing.T) {
 		t.Fatalf("slug=%q err=%v", slug, err)
 	}
 }
+
+func TestDBStoreSkipsStaleDevices(t *testing.T) {
+	q, pool := testQueries(t)
+	ctx := context.Background()
+	var userID string
+	if err := pool.QueryRow(ctx, `INSERT INTO "user" (name, email) VALUES ('push-stale-test', 'push-stale-test@example.test')
+		ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name RETURNING id::text`).Scan(&userID); err != nil {
+		t.Fatalf("user fixture: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM push_device WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM "user" WHERE id = $1`, userID)
+	})
+	if _, err := pool.Exec(ctx, `INSERT INTO push_device (user_id, platform, token, bundle_id, environment, last_seen_at)
+		VALUES ($1,'ios','stale-tok','b','sandbox', now() - interval '31 days'),
+		       ($1,'ios','fresh-tok','b','sandbox', now() - interval '1 day')`, userID); err != nil {
+		t.Fatal(err)
+	}
+	devs, err := NewDBStore(q).ListEnabledDevices(ctx, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].Token != "fresh-tok" {
+		t.Fatalf("devices = %+v, want only fresh-tok", devs)
+	}
+}
+
+func TestDBStoreChannelBoundChatHasNoPushTarget(t *testing.T) {
+	q, pool := testQueries(t)
+	ctx := context.Background()
+	var sessionID string
+	if err := pool.QueryRow(ctx, `SELECT gen_random_uuid()::text`).Scan(&sessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO channel_chat_session_binding (chat_session_id, installation_id, channel_type, channel_chat_id, chat_type)
+		VALUES ($1, gen_random_uuid(), 'slack', 'push-test-chat', 'p2p')`, sessionID); err != nil {
+		t.Skipf("binding fixture unavailable: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM channel_chat_session_binding WHERE chat_session_id = $1`, sessionID)
+	})
+	owner, _, err := NewDBStore(q).ChatSessionTarget(ctx, sessionID)
+	if err != nil || owner != "" {
+		t.Fatalf("owner=%q err=%v, want no target for a channel-bound chat", owner, err)
+	}
+}

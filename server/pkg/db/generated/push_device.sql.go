@@ -38,9 +38,12 @@ func (q *Queries) DisablePushDeviceByToken(ctx context.Context, token string) er
 const listEnabledPushDevicesByUser = `-- name: ListEnabledPushDevicesByUser :many
 SELECT id, user_id, platform, token, bundle_id, environment, created_at, last_seen_at, disabled_at FROM push_device
 WHERE user_id = $1 AND disabled_at IS NULL
+  AND last_seen_at > now() - interval '30 days'
 ORDER BY created_at
 `
 
+// The app re-registers on every launch, which bumps last_seen_at. A device
+// silent for 30 days (lost phone, revoked or expired session) gets nothing.
 func (q *Queries) ListEnabledPushDevicesByUser(ctx context.Context, userID pgtype.UUID) ([]PushDevice, error) {
 	rows, err := q.db.Query(ctx, listEnabledPushDevicesByUser, userID)
 	if err != nil {

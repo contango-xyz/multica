@@ -11,8 +11,11 @@ ON CONFLICT (token) DO UPDATE SET
 RETURNING *;
 
 -- name: ListEnabledPushDevicesByUser :many
+-- The app re-registers on every launch, which bumps last_seen_at. A device
+-- silent for 30 days (lost phone, revoked or expired session) gets nothing.
 SELECT * FROM push_device
 WHERE user_id = $1 AND disabled_at IS NULL
+  AND last_seen_at > now() - interval '30 days'
 ORDER BY created_at;
 
 -- name: DeletePushDeviceForUser :exec
