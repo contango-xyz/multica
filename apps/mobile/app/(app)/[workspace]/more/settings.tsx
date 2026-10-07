@@ -12,6 +12,7 @@
  *
  * Theme picker stays inline (3 fixed options, fits in one section).
  */
+import { unregisterForPush } from "@/data/push-registration";
 import { Alert, ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -84,6 +85,8 @@ export default function SettingsPage() {
           text: t("account.sign_out"),
           style: "destructive",
           onPress: async () => {
+            // Unregister while still authenticated, before logout clears the token.
+            await unregisterForPush();
             await clearWorkspace();
             await logout();
           },
