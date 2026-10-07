@@ -27,6 +27,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/maintenance"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/profiling"
+	"github.com/multica-ai/multica/server/internal/push"
 	"github.com/multica-ai/multica/server/internal/realtime"
 	"github.com/multica-ai/multica/server/internal/scheduler"
 	"github.com/multica-ai/multica/server/internal/selfhosttelemetry"
@@ -615,6 +616,20 @@ func main() {
 	registerSubscriberListeners(bus, pool)
 	registerActivityListeners(bus, queries)
 	registerNotificationListeners(bus, queries)
+
+	// Native push (APNs): inert unless MULTICA_APNS_* is configured.
+	if cfg, ok, err := push.ConfigFromEnv(); err != nil {
+		slog.Error("push notifications disabled: invalid APNs config", "error", err)
+	} else if !ok {
+		slog.Info("push notifications not configured")
+	} else if client, err := push.NewAPNsClient(cfg); err != nil {
+		slog.Error("push notifications disabled: APNs client", "error", err)
+	} else {
+		dispatcher := push.NewDispatcher(push.NewDBStore(queries), client, 1000)
+		dispatcher.Register(bus)
+		dispatcher.Start(4)
+		slog.Info("push notifications enabled")
+	}
 
 	metricsConfig := obsmetrics.ConfigFromEnv()
 	var metricsServer *http.Server
