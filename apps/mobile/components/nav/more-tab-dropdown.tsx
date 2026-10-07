@@ -76,7 +76,6 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { labelKey: "more_menu.pinned", icon: "pin", path: "/more/pins" },
-  { labelKey: "more_menu.issues", icon: "list.bullet", path: "/more/issues" },
   { labelKey: "more_menu.projects", icon: "square.stack", path: "/more/projects" },
 ];
 
