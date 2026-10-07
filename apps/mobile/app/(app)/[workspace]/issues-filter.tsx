@@ -1,21 +1,13 @@
 /**
  * Status + Priority filter sheet — presented as a formSheet by the parent
- * Stack. Shared by My Issues and the workspace-wide Issues page; which
- * view-store to read/write is selected by the `scope` URL param.
- *
- * Routes that open this sheet:
- *   - /[workspace]/issues-filter?scope=my   →  useMyIssuesViewStore
- *   - /[workspace]/issues-filter?scope=all  →  useIssuesViewStore
- *
- * Self-contained: reads/writes the store directly, no callback passing.
+ * Stack. Opened from the Issues tab (`/[workspace]/issues-filter?scope=my`);
+ * reads/writes useMyIssuesViewStore directly, no callback passing.
  */
 import { Pressable, ScrollView, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
 import type { IssuePriority, IssueStatus } from "@multica/core/types";
 import { Text } from "@/components/ui/text";
 import { StatusIcon } from "@/components/ui/status-icon";
 import { PriorityIcon } from "@/components/ui/priority-icon";
-import { useIssuesViewStore } from "@/data/stores/issues-view-store";
 import { useMyIssuesViewStore } from "@/data/stores/my-issues-view-store";
 import { statusOptions } from "@/lib/issue-status";
 import { useIssueStatuses } from "@/lib/use-issue-statuses";
@@ -39,40 +31,24 @@ const PRIORITY_LABEL: Record<IssuePriority, string> = {
   none: "issues:priority.none",
 };
 
-type Scope = "my" | "all";
-
 export default function IssuesFilterRoute() {
-  const { scope } = useLocalSearchParams<{ scope?: string }>();
   const { t } = useT("issues");
-  const resolvedScope: Scope = scope === "all" ? "all" : "my";
 
-  const statusFilters = useScopedFilters(resolvedScope, "status");
-  const priorityFilters = useScopedFilters(resolvedScope, "priority");
+  const statusFilters = useMyIssuesViewStore((s) => s.statusFilters);
+  const priorityFilters = useMyIssuesViewStore((s) => s.priorityFilters);
   // Same option list the status picker offers, so every status a user can set
   // is also a status they can filter by. (MUL-6243)
   const catalog = useIssueStatuses();
   const statusChoices = statusOptions(catalog);
 
   const onToggleStatus = (s: IssueStatus) => {
-    if (resolvedScope === "all") {
-      useIssuesViewStore.getState().toggleStatusFilter(s);
-    } else {
-      useMyIssuesViewStore.getState().toggleStatusFilter(s);
-    }
+    useMyIssuesViewStore.getState().toggleStatusFilter(s);
   };
   const onTogglePriority = (p: IssuePriority) => {
-    if (resolvedScope === "all") {
-      useIssuesViewStore.getState().togglePriorityFilter(p);
-    } else {
-      useMyIssuesViewStore.getState().togglePriorityFilter(p);
-    }
+    useMyIssuesViewStore.getState().togglePriorityFilter(p);
   };
   const onClearFilters = () => {
-    if (resolvedScope === "all") {
-      useIssuesViewStore.getState().clearFilters();
-    } else {
-      useMyIssuesViewStore.getState().clearFilters();
-    }
+    useMyIssuesViewStore.getState().clearFilters();
   };
 
   const hasActive = statusFilters.length > 0 || priorityFilters.length > 0;
@@ -145,28 +121,6 @@ export default function IssuesFilterRoute() {
       </ScrollView>
     </View>
   );
-}
-
-function useScopedFilters(
-  scope: Scope,
-  kind: "status",
-): IssueStatus[];
-function useScopedFilters(
-  scope: Scope,
-  kind: "priority",
-): IssuePriority[];
-function useScopedFilters(
-  scope: Scope,
-  kind: "status" | "priority",
-): IssueStatus[] | IssuePriority[] {
-  const allStatus = useIssuesViewStore((s) => s.statusFilters);
-  const allPriority = useIssuesViewStore((s) => s.priorityFilters);
-  const myStatus = useMyIssuesViewStore((s) => s.statusFilters);
-  const myPriority = useMyIssuesViewStore((s) => s.priorityFilters);
-  if (scope === "all") {
-    return kind === "status" ? allStatus : allPriority;
-  }
-  return kind === "status" ? myStatus : myPriority;
 }
 
 function SectionLabel({ children }: { children: string }) {

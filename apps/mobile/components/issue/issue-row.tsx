@@ -1,6 +1,6 @@
 /**
  * Shared issue row used by every list-style issue surface on mobile —
- * (tabs)/my-issues, more/issues (workspace-wide), and project detail's
+ * the (tabs)/my-issues Issues tab (All + saved views), and project detail's
  * related-issues bucket.
  *
  * Layout mirrors web's `packages/views/issues/components/list-row.tsx`:

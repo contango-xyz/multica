@@ -13,7 +13,7 @@
  * top comment.
  *
  * Rendering split by `item_type`:
- *   - issue → existing `<IssueRow>` (used by my-issues / more/issues /
+ *   - issue → existing `<IssueRow>` (used by the Issues tab /
  *     project-related-issues), `showStatus` because pins are heterogeneous
  *     (no section grouping by status).
  *   - project → existing `<ProjectRow>` (used by more/projects).
@@ -43,6 +43,8 @@ import { pinListOptions } from "@/data/queries/pins";
 import { useDeletePin } from "@/data/mutations/pins";
 import { issueDetailOptions } from "@/data/queries/issues";
 import { projectDetailOptions } from "@/data/queries/projects";
+import { issueViewListOptions } from "@/data/queries/issue-views";
+import { useIssuesChipStore } from "@/data/stores/issues-chip-store";
 import { useAuthStore } from "@/data/auth-store";
 import { useWorkspaceStore } from "@/data/workspace-store";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -135,6 +137,9 @@ function PinRow({
       <IssuePinRow pin={pin} wsId={wsId} wsSlug={wsSlug} />
     );
   }
+  if (pin.item_type === "view") {
+    return <ViewPinRow pin={pin} wsId={wsId} wsSlug={wsSlug} />;
+  }
   return <ProjectPinRow pin={pin} wsId={wsId} wsSlug={wsSlug} />;
 }
 
@@ -194,6 +199,44 @@ function ProjectPinRow({
   );
 }
 
+/** A pinned saved view opens the Issues tab with that view selected. */
+function ViewPinRow({
+  pin,
+  wsId,
+  wsSlug,
+}: {
+  pin: PinnedItem;
+  wsId: string | null;
+  wsSlug: string | null;
+}) {
+  const { colorScheme } = useColorScheme();
+  const { data, isLoading } = useQuery(issueViewListOptions(wsId));
+  const view = data?.find((v) => v.id === pin.item_id);
+
+  if (isLoading) return <SkeletonRow />;
+  if (!view) return <MissingPinRow itemType="view" itemId={pin.item_id} />;
+
+  return (
+    <Pressable
+      className="px-4 py-3 flex-row items-center gap-3 active:bg-secondary"
+      onPress={() => {
+        if (!wsId || !wsSlug) return;
+        useIssuesChipStore.getState().remember(wsId, `view:${view.id}`);
+        router.navigate(`/${wsSlug}/my-issues`);
+      }}
+    >
+      <Ionicons
+        name="albums-outline"
+        size={18}
+        color={THEME[colorScheme].mutedForeground}
+      />
+      <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
+        {view.name}
+      </Text>
+    </Pressable>
+  );
+}
+
 function SkeletonRow() {
   return (
     <View className="px-4 py-3 flex-row items-center gap-3">
@@ -204,7 +247,7 @@ function SkeletonRow() {
 }
 
 /**
- * Renders for pins whose target issue/project was deleted or revoked.
+ * Renders for pins whose target issue/project/view was deleted or revoked.
  * Tapping triggers unpin so the user can clean it up; no destination
  * navigation since there's nothing to navigate to. Subtle styling so
  * it doesn't dominate the list of live pins.
@@ -213,20 +256,24 @@ function MissingPinRow({
   itemType,
   itemId,
 }: {
-  itemType: "issue" | "project";
+  itemType: "issue" | "project" | "view";
   itemId: string;
 }) {
   const { colorScheme } = useColorScheme();
   const deletePin = useDeletePin();
   const { t } = useT("workspace");
+  const missingLabel =
+    itemType === "issue"
+      ? t("pins.unavailable_issue")
+      : itemType === "view"
+        ? t("pins.unavailable_view")
+        : t("pins.unavailable_project");
   return (
     <Pressable
       onPress={() => deletePin.mutate({ itemType, itemId })}
       className="px-4 py-3 flex-row items-center gap-3 active:bg-secondary opacity-60"
       accessibilityLabel={
-        itemType === "issue"
-          ? t("pins.unavailable_issue")
-          : t("pins.unavailable_project")
+        missingLabel
       }
     >
       <Ionicons
@@ -235,9 +282,7 @@ function MissingPinRow({
         color={THEME[colorScheme].mutedForeground}
       />
       <Text className="flex-1 text-sm text-muted-foreground" numberOfLines={1}>
-        {itemType === "issue"
-          ? t("pins.unavailable_issue")
-          : t("pins.unavailable_project")}
+        {missingLabel}
       </Text>
     </Pressable>
   );
