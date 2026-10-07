@@ -1193,7 +1193,7 @@ git commit -m "feat(mobile): retire More→Issues; view pins open the Issues tab
 
 **Files:** none (native `ios/` is generated and git-ignored).
 
-- [ ] **Step 1: Full checks** — `pnpm typecheck && pnpm --filter @multica/core test && pnpm --filter @multica/mobile typecheck && pnpm --filter @multica/mobile lint && pnpm --filter @multica/mobile test`. Expected: PASS. `git diff contango/mobile-saved-views@{u} --stat` must show no `.env*`, `ios/` or hostnames (`rg -n "contangov3|8NJBJWSGJ4" $(git diff --name-only @{u})` → no hits).
+- [ ] **Step 1: Full checks** — `pnpm typecheck && pnpm --filter @multica/core test && pnpm --filter @multica/mobile typecheck && pnpm --filter @multica/mobile lint && pnpm --filter @multica/mobile test`. Expected: PASS. `git diff contango/mobile-saved-views@{u} --stat` must show no `.env*`, `ios/` or hostnames (grep the changed files for internal hostnames and the signing team id → no hits).
 
 - [ ] **Step 2: Device build.** From `apps/mobile/ios`: `xcodebuild -workspace Multica.xcworkspace -scheme Multica -configuration Release -destination 'id=<phone udid>' -derivedDataPath <scratch>/dd-dev -allowProvisioningUpdates build`, then `xcrun devicectl device install app --device <udid> <app>` and launch. (The local iOS 27 fixes in generated `ios/` must still be present: SceneDelegate in `AppDelegate.swift`, scene manifest, deployment target 16.0, script sandboxing NO.)
 
