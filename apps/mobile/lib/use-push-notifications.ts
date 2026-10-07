@@ -12,7 +12,7 @@ import { registerForPush } from "@/data/push-registration";
 import { inboxUnreadSummaryOptions } from "@/data/queries/inbox";
 import { useChatSessionPickerStore } from "@/data/stores/chat-session-picker-store";
 import { useWorkspaceStore } from "@/data/workspace-store";
-import { parsePushData, pushTarget, shouldPresentInForeground } from "@/lib/push-routing";
+import { createOnceGate, parsePushData, pushTarget, shouldPresentInForeground } from "@/lib/push-routing";
 
 let currentPathname = "";
 
@@ -27,8 +27,12 @@ Notifications.setNotificationHandler({
   },
 });
 
+// Module-level so it survives workspace-layout remounts (one per app run).
+const handledTap = createOnceGate();
+
 function openFromResponse(response: Notifications.NotificationResponse | null) {
-  const data = parsePushData(response?.notification.request.content.data);
+  if (!response || !handledTap(response.notification.request.identifier)) return;
+  const data = parsePushData(response.notification.request.content.data);
   if (!data) return;
   const target = pushTarget(data);
   if (target.pathname === "/[workspace]/chat") {

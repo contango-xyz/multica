@@ -68,3 +68,17 @@ export function shouldPresentInForeground(
   if (data?.kind !== "chat") return true;
   return !(ctx.onChatTab && ctx.activeChatSessionId === data.session_id);
 }
+
+/**
+ * Returns a gate that admits each key once. Notification taps are keyed by
+ * the notification id: getLastNotificationResponseAsync keeps returning the
+ * last tap, and the workspace layout remounts on every workspace switch.
+ */
+export function createOnceGate(): (key: string) => boolean {
+  const seen = new Set<string>();
+  return (key) => {
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  };
+}
