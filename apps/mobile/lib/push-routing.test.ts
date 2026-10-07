@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePushData, pushTarget, shouldPresentInForeground } from "./push-routing";
+import { createOnceGate, parsePushData, pushTarget, shouldPresentInForeground } from "./push-routing";
 
 describe("parsePushData", () => {
   it("reads data nested under body (server/expo convention)", () => {
@@ -46,5 +46,14 @@ describe("shouldPresentInForeground", () => {
   it("always shows inbox pushes and unknown payloads", () => {
     expect(shouldPresentInForeground({ kind: "inbox", workspace_slug: "w", item_id: "i" }, { activeChatSessionId: null, onChatTab: false })).toBe(true);
     expect(shouldPresentInForeground(null, { activeChatSessionId: null, onChatTab: true })).toBe(true);
+  });
+});
+
+describe("createOnceGate", () => {
+  it("lets each notification response through only once", () => {
+    const once = createOnceGate();
+    expect(once("n1")).toBe(true);
+    expect(once("n1")).toBe(false); // remount of the workspace layout re-reads the same response
+    expect(once("n2")).toBe(true);
   });
 });
