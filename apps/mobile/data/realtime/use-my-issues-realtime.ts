@@ -16,12 +16,15 @@
  *                     the issue isn't in any cached list).
  * onReconnect       — invalidate myAll(wsId) since we may have missed
  *                     a create/delete while disconnected.
+ * issue:* + reconnect also refetch the Issues-tab table rows (throttled).
  *
  * Inbox realtime (use-inbox-realtime.ts) handles its own keys and runs
  * in parallel; the two are independent.
  */
 import { useQueryClient } from "@tanstack/react-query";
 import { issueKeys } from "@/data/queries/issue-keys";
+import { issueViewKeys } from "@/data/queries/issue-views";
+import { createTrailingThrottle } from "@/lib/trailing-throttle";
 import { useWSSubscriptions } from "@/lib/use-ws-subscriptions";
 import {
   patchIssueLabels,
@@ -36,16 +39,27 @@ export function useMyIssuesRealtime() {
     (ws, wsId) => {
       const invalidateMyAll = () =>
         qc.invalidateQueries({ queryKey: issueKeys.myAll(wsId) });
+      // Issues-tab rows (saved views / All) are server-filtered: refetch the
+      // active ones, collapsing bursts of issue events into one request.
+      const refreshRows = createTrailingThrottle(
+        () => void qc.invalidateQueries({ queryKey: issueViewKeys.rowsAll(wsId) }),
+        1500,
+      );
 
       return [
         // Server is the authority on which scopes/filters a new issue lands
         // in — we don't need to read the payload, just refetch.
-        ws.on("issue:created", () => invalidateMyAll()),
+        ws.on("issue:created", () => {
+          invalidateMyAll();
+          refreshRows();
+        }),
         ws.on("issue:updated", (payload) => {
           patchMyIssuesList(qc, wsId, payload.issue);
+          refreshRows();
         }),
         ws.on("issue:deleted", (payload) => {
           removeFromMyIssuesList(qc, wsId, payload.issue_id);
+          refreshRows();
         }),
         ws.on("issue_labels:changed", (payload) => {
           patchIssueLabels(
@@ -56,7 +70,10 @@ export function useMyIssuesRealtime() {
             payload.issue_revision,
           );
         }),
-        ws.onReconnect(invalidateMyAll),
+        ws.onReconnect(() => {
+          invalidateMyAll();
+          refreshRows();
+        }),
       ];
     },
     [qc],
