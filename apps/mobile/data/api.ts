@@ -666,6 +666,25 @@ class ApiClient {
     });
   }
 
+  // --- Native push (APNs device tokens) ---
+  async registerPushDevice(body: {
+    platform: "ios";
+    token: string;
+    bundle_id: string;
+    environment: "sandbox" | "production";
+  }): Promise<void> {
+    await this.fetch<void>("/api/push/devices", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async unregisterPushDevice(token: string): Promise<void> {
+    await this.fetch<void>(`/api/push/devices/${encodeURIComponent(token)}`, {
+      method: "DELETE",
+    });
+  }
+
   // --- Saved issue views (read-only on mobile) ---
   // Mirrors packages/core/api/client.ts listIssueViews / getIssueViewPreference.
   async listIssueViews(
