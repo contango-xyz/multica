@@ -100,3 +100,32 @@ describe("api issue views + table rows", () => {
     expect(res.total).toBe(0);
   });
 });
+
+describe("api push devices", () => {
+  const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+  beforeEach(() => {
+    fetchMock.mockClear();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("registers a device", async () => {
+    const body = { platform: "ios" as const, token: "abc", bundle_id: "com.example.app", environment: "production" as const };
+    await api.registerPushDevice(body);
+    const [url, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.example.test/api/push/devices");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  it("unregisters a device by token", async () => {
+    await api.unregisterPushDevice("a/b");
+    const [url, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.example.test/api/push/devices/a%2Fb");
+    expect(init.method).toBe("DELETE");
+  });
+});
