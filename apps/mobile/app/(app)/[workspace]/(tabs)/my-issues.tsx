@@ -40,6 +40,7 @@ import { useIssueStatuses } from "@/lib/use-issue-statuses";
 import { groupIssuesByStatus } from "@/lib/group-issues-by-status";
 import { composeIssuesChips, resolveSelectedChip, type IssuesChip } from "@/lib/issues-chips";
 import { buildIssueTableQuery } from "@/lib/view-table-query";
+import { applyCollapsed } from "@/lib/collapsed-sections";
 import { useColorScheme } from "@/lib/use-color-scheme";
 import { THEME } from "@/lib/theme";
 
@@ -102,7 +103,11 @@ export default function IssuesTab() {
         : [],
     [plan.kind, rows.data],
   );
-  const sections = useMemo(() => groupIssuesByStatus(issues, catalog.statuses), [issues, catalog.statuses]);
+  const collapsed = useIssuesChipStore((s) => (wsId ? s.collapsedByWs[wsId]?.[selected.id] : undefined));
+  const sections = useMemo(
+    () => applyCollapsed(groupIssuesByStatus(issues, catalog.statuses), collapsed ?? []),
+    [issues, catalog.statuses, collapsed],
+  );
 
   const hasActiveFilters = statusFilters.length > 0 || priorityFilters.length > 0;
   const openFilter = () => {
@@ -176,7 +181,11 @@ export default function IssuesTab() {
           renderSectionHeader={({ section }) => (
             <SectionHeader
               status={section.status}
-              count={section.data.length}
+              count={section.count}
+              collapsed={section.collapsed}
+              onToggle={() => {
+                if (wsId) useIssuesChipStore.getState().toggleSection(wsId, selected.id, section.status);
+              }}
             />
           )}
           contentContainerClassName="pb-6"
@@ -343,24 +352,40 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   );
 }
 
-// The section header names its concrete built-in or custom status.
+// The section header names its concrete built-in or custom status. Tapping it
+// collapses / expands the section (remembered per chip on the device).
 function SectionHeader({
   status,
   count,
+  collapsed,
+  onToggle,
 }: {
   status: IssueStatus;
   count: number;
+  collapsed: boolean;
+  onToggle: () => void;
 }) {
   const catalog = useIssueStatuses();
+  const { colorScheme } = useColorScheme();
   return (
-    <View className="flex-row items-center gap-2 px-4 py-2 bg-background">
+    <Pressable
+      onPress={onToggle}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: !collapsed }}
+      className="flex-row items-center gap-2 px-4 py-2 bg-background active:bg-secondary"
+    >
+      <Ionicons
+        name={collapsed ? "chevron-forward" : "chevron-down"}
+        size={12}
+        color={THEME[colorScheme].mutedForeground}
+      />
       {/* Category keys resolve to their canonical lifecycle glyph. */}
       <StatusIcon status={status} category={catalog.categoryOf(status)} icon={catalog.iconOf(status)} color={catalog.colorOf(status)} size={14} />
       <Text className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
         {catalog.labelOf(status)}
       </Text>
       <Text className="text-xs text-muted-foreground/60">{count}</Text>
-    </View>
+    </Pressable>
   );
 }
 
