@@ -2026,6 +2026,20 @@ func isNoteComment(content string) bool {
 	return strings.EqualFold(firstToken, noteCommentPrefix)
 }
 
+// agentAnswersMemberWhoNamedIt reports whether a comment by agentID replies to a
+// live human comment that mentions agentID (Contango, CTG-839).
+func agentAnswersMemberWhoNamedIt(parent *db.Comment, agentID string) bool {
+	if parent == nil || parent.DeletedAt.Valid || parent.AuthorType != "member" {
+		return false
+	}
+	for _, m := range util.ParseMentions(parent.Content) {
+		if m.Type == "agent" && m.ID == agentID {
+			return true
+		}
+	}
+	return false
+}
+
 // triggerTasksForComment resolves and enqueues the comment's agent triggers and
 // returns the per-target outcomes for explicit @agent / @squad mentions
 // (MUL-4525 §2): blocked mentions from resolution plus queued / coalesced /
@@ -2737,6 +2751,15 @@ func (h *Handler) computeCommentAgentTriggers(ctx context.Context, issue db.Issu
 	}
 
 	if actorType != "member" {
+		// Contango: an agent's untagged reply to a human who asked THAT agent by
+		// name is an answer to that human, not a handoff, so it does not fall back
+		// to the assigned squad's leader. Without this, every answer a PM agent
+		// gave a person woke the orchestrator for nothing (CTG-839). A worker's
+		// reply under a human's comment that did not name it (the leader delegated
+		// it) still wakes the leader: that is the worker→leader loop.
+		if actorType == "agent" && agentAnswersMemberWhoNamedIt(parentComment, actorID) {
+			return nil, nil
+		}
 		// Agent-authored comments do not participate in the member-driven
 		// conversation routing (parent-author / thread-root continuation) or
 		// the member assignee fallback. Worker-result comments retain the
