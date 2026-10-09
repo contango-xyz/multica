@@ -75,7 +75,7 @@ func TestAPNsSendBuildsRequest(t *testing.T) {
 	badge := 3
 	err := c.Send(context.Background(),
 		Device{Token: "abc123", BundleID: "com.example.app", Environment: "production"},
-		Notification{Title: "T", Body: "B", ThreadID: "issue-1", Badge: &badge, Data: map[string]any{"kind": "inbox"}})
+		Notification{Title: "T", Subtitle: "S", Body: "B", ThreadID: "issue-1", Badge: &badge, Data: map[string]any{"kind": "inbox"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestAPNsSendBuildsRequest(t *testing.T) {
 	}
 	aps := got.body["aps"].(map[string]any)
 	alert := aps["alert"].(map[string]any)
-	if alert["title"] != "T" || alert["body"] != "B" || aps["badge"].(float64) != 3 || aps["thread-id"] != "issue-1" {
+	if alert["title"] != "T" || alert["subtitle"] != "S" || alert["body"] != "B" || aps["badge"].(float64) != 3 || aps["thread-id"] != "issue-1" {
 		t.Fatalf("aps = %+v", aps)
 	}
 	if got.body["body"].(map[string]any)["kind"] != "inbox" {
