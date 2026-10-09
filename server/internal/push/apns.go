@@ -29,6 +29,7 @@ type Device struct {
 // Notification is what a user sees, plus routing data for the app.
 type Notification struct {
 	Title    string
+	Subtitle string
 	Body     string
 	ThreadID string
 	Badge    *int
@@ -97,10 +98,11 @@ func (c *APNsClient) Send(ctx context.Context, d Device, n Notification) error {
 	if !ok {
 		return fmt.Errorf("push: unknown APNs environment %q", d.Environment)
 	}
-	aps := map[string]any{
-		"alert": map[string]any{"title": n.Title, "body": n.Body},
-		"sound": "default",
+	alert := map[string]any{"title": n.Title, "body": n.Body}
+	if n.Subtitle != "" {
+		alert["subtitle"] = n.Subtitle
 	}
+	aps := map[string]any{"alert": alert, "sound": "default"}
 	if n.Badge != nil {
 		aps["badge"] = *n.Badge
 	}
