@@ -44,6 +44,11 @@ type TaskService struct {
 	Analytics analytics.Client
 	Metrics   *obsmetrics.BusinessMetrics
 	Wakeup    TaskWakeupNotifier
+	// FallbackCommentPosted, when set, receives the comment a completion
+	// synthesizes from a run's final output (the agent posted nothing itself).
+	// That comment never passes the create-time trigger path, so the handler
+	// dispatches its explicit mentions here (Contango, CTG-281). Nil: no-op.
+	FallbackCommentPosted func(ctx context.Context, comment db.Comment, task db.AgentTaskQueue)
 	// Entitlements supplies Cloud's workspace-scoped issue-count instruction.
 	// Nil keeps self-hosted and isolated test services unlimited.
 	Entitlements entitlement.Provider
@@ -4551,7 +4556,9 @@ func (s *TaskService) CompleteTaskWithTransition(ctx context.Context, taskID pgt
 						// Redact first, then bound: a runaway raw-stream Output (GH #5455)
 						// must never reach the issue thread, even as a clipped excerpt.
 						content := truncateFallbackCommentBody(redact.Text(body), maxSynthesizedFallbackCommentRunes)
-						s.createAgentComment(ctx, task.IssueID, task.AgentID, content, "comment", task.TriggerCommentID, task.ID)
+						if fc, ok := s.createAgentComment(ctx, task.IssueID, task.AgentID, content, "comment", task.TriggerCommentID, task.ID); ok && s.FallbackCommentPosted != nil {
+							s.FallbackCommentPosted(ctx, fc, task)
+						}
 					}
 				}
 			}
@@ -7497,14 +7504,14 @@ func commentEventFields(c db.Comment) map[string]any {
 	}
 }
 
-func (s *TaskService) createAgentComment(ctx context.Context, issueID, agentID pgtype.UUID, content, commentType string, parentID, sourceTaskID pgtype.UUID) {
+func (s *TaskService) createAgentComment(ctx context.Context, issueID, agentID pgtype.UUID, content, commentType string, parentID, sourceTaskID pgtype.UUID) (db.Comment, bool) {
 	if content == "" {
-		return
+		return db.Comment{}, false
 	}
 	// Look up issue to get workspace ID for mention expansion and broadcasting.
 	issue, err := s.Queries.GetIssue(ctx, issueID)
 	if err != nil {
-		return
+		return db.Comment{}, false
 	}
 	// Resolve the thread root for thread-level side effects without overwriting
 	// parentID. The stored parent_id must remain the exact comment being replied
@@ -7530,7 +7537,7 @@ func (s *TaskService) createAgentComment(ctx context.Context, issueID, agentID p
 		SourceTaskID: sourceTaskID,
 	})
 	if err != nil {
-		return
+		return db.Comment{}, false
 	}
 	comment := created.Comment()
 	commentFields := commentEventFields(comment)
@@ -7548,6 +7555,7 @@ func (s *TaskService) createAgentComment(ctx context.Context, issueID, agentID p
 		},
 	})
 	s.AutoUnresolveThreadOnReply(ctx, rootComment, util.UUIDToString(issue.WorkspaceID), "agent", util.UUIDToString(agentID), sourceTaskID)
+	return comment, true
 }
 
 // AutoUnresolveThreadOnReply clears resolved_at on the thread root when a

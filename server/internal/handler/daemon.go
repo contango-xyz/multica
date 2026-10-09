@@ -4612,6 +4612,44 @@ func (h *Handler) reconcileCommentsOnCompletion(ctx context.Context, task *db.Ag
 // accepted worker replies recorded in the completing run's plan. A timestamp
 // alone never authorizes replay of an implicit agent route. Member comments
 // retain their full routing and do not pass through this filter.
+// dispatchFallbackCommentMentions starts the agents a completion-fallback
+// comment names explicitly (Contango, CTG-281). The fallback is the run's final
+// output, posted by the server only when the agent posted nothing itself, so
+// it never passed CreateComment's trigger path: its @mentions woke nobody (22
+// of 35 lost over 14 days). Only explicit @agent / @squad mentions start a
+// run, through the same permission and self guards as a comment the agent
+// posts; an untagged final message still falls back to nobody.
+func (h *Handler) dispatchFallbackCommentMentions(ctx context.Context, comment db.Comment, task db.AgentTaskQueue) {
+	issue, err := h.Queries.GetIssue(ctx, comment.IssueID)
+	if err != nil {
+		slog.Warn("fallback comment mentions: load issue failed",
+			"issue_id", uuidToString(comment.IssueID), "comment_id", uuidToString(comment.ID), "error", err)
+		return
+	}
+	var parentComment *db.Comment
+	if comment.ParentID.Valid {
+		if parent, err := h.Queries.GetCommentInWorkspace(ctx, db.GetCommentInWorkspaceParams{
+			ID:          comment.ParentID,
+			WorkspaceID: issue.WorkspaceID,
+		}); err == nil {
+			parentComment = &parent
+		}
+	}
+	originator := uuidToString(h.TaskService.ResolveOriginatorFromTriggerComment(ctx, issue.WorkspaceID, comment.ID))
+	triggers, _ := h.computeCommentAgentTriggers(ctx, issue, comment.Content, parentComment, "agent", uuidToString(task.AgentID), commentTriggerComputeOptions{
+		ExcludeTriggerCommentID: comment.ID,
+		AuthoringTaskID:         comment.SourceTaskID,
+		OriginatorUserID:        originator,
+	})
+	triggers = keepReplayableAgentTriggers(triggers, false)
+	if len(triggers) == 0 {
+		return
+	}
+	h.enqueueCommentAgentTriggers(ctx, issue, comment.ID, triggers)
+	slog.Info("fallback comment mentions dispatched",
+		"issue_id", uuidToString(comment.IssueID), "comment_id", uuidToString(comment.ID), "targets", len(triggers))
+}
+
 func keepReplayableAgentTriggers(triggers []commentAgentTrigger, planned bool) []commentAgentTrigger {
 	if len(triggers) == 0 {
 		return triggers
