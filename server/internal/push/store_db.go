@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
@@ -114,4 +115,39 @@ func (s *DBStore) ChatSessionTarget(ctx context.Context, sessionID string) (stri
 		name = agent.Name
 	}
 	return util.UUIDToString(sess.CreatorID), name, nil
+}
+
+// IssueIdentifier returns the human key, e.g. "CTG-823".
+func (s *DBStore) IssueIdentifier(ctx context.Context, issueID string) (string, error) {
+	id, err := util.ParseUUID(issueID)
+	if err != nil {
+		return "", err
+	}
+	issue, err := s.q.GetIssue(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	ws, err := s.q.GetWorkspace(ctx, issue.WorkspaceID)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s-%d", ws.IssuePrefix, issue.Number), nil
+}
+
+// ActorName resolves an inbox item's actor: members by user id, agents by
+// agent id. Other actor types (e.g. system) have no name.
+func (s *DBStore) ActorName(ctx context.Context, actorType, actorID string) (string, error) {
+	id, err := util.ParseUUID(actorID)
+	if err != nil {
+		return "", err
+	}
+	switch actorType {
+	case "member":
+		u, err := s.q.GetUser(ctx, id)
+		return u.Name, err
+	case "agent":
+		a, err := s.q.GetAgent(ctx, id)
+		return a.Name, err
+	}
+	return "", nil
 }

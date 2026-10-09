@@ -17,6 +17,7 @@ type fakeStore struct {
 	disabled []string
 	owner    string
 	agent    string
+	lookups  []string // identifier/actor lookups, failing ones included
 }
 
 func (s *fakeStore) ListEnabledDevices(_ context.Context, userID string) ([]Device, error) {
@@ -34,6 +35,17 @@ func (s *fakeStore) SystemNotificationsMuted(_ context.Context, wsID, userID str
 }
 func (s *fakeStore) UnreadInboxCount(_ context.Context, userID string) (int, error) {
 	return s.unread[userID], nil
+}
+func (s *fakeStore) IssueIdentifier(_ context.Context, issueID string) (string, error) {
+	s.lookups = append(s.lookups, "issue:"+issueID)
+	if issueID == "missing" {
+		return "", errors.New("no rows")
+	}
+	return "MUL-1", nil
+}
+func (s *fakeStore) ActorName(_ context.Context, actorType, actorID string) (string, error) {
+	s.lookups = append(s.lookups, actorType+":"+actorID)
+	return "Ana", nil
 }
 func (s *fakeStore) ChatSessionTarget(context.Context, string) (string, string, error) {
 	return s.owner, s.agent, nil
@@ -80,8 +92,9 @@ func inboxEvent(item any) events.Event {
 func memberItem() map[string]any {
 	return map[string]any{
 		"id": "item1", "workspace_id": "ws1", "recipient_type": "member", "recipient_id": "u1",
-		"type": "mentioned", "title": "MUL-1 Fix login", "body": "Ana mentioned you",
+		"type": "mentioned", "title": "Fix login", "body": "hey @you",
 		"issue_id": "issue1", "details": map[string]any{"comment_id": "c9"},
+		"actor_type": "member", "actor_id": "u2",
 	}
 }
 
@@ -95,7 +108,7 @@ func TestInboxNewPushesToAllRecipientDevices(t *testing.T) {
 		t.Fatalf("sent %d, want 2", len(sender.got))
 	}
 	n := sender.got[0].n
-	if n.Title != "MUL-1 Fix login" || n.Body != "Ana mentioned you" || n.Badge == nil || *n.Badge != 4 || n.ThreadID != "issue1" {
+	if n.Title != "MUL-1 · Ana mentioned you" || n.Subtitle != "Fix login" || n.Body != "hey @you" || n.Badge == nil || *n.Badge != 4 || n.ThreadID != "issue1" {
 		t.Fatalf("notification = %+v", n)
 	}
 	want := map[string]any{"kind": "inbox", "workspace_slug": "slug-ws1", "item_id": "item1", "type": "mentioned", "issue_id": "issue1", "comment_id": "c9"}
@@ -103,6 +116,40 @@ func TestInboxNewPushesToAllRecipientDevices(t *testing.T) {
 		if n.Data[k] != v {
 			t.Fatalf("data[%s] = %v, want %v (data %+v)", k, n.Data[k], v, n.Data)
 		}
+	}
+}
+
+func TestInboxNewStatusChangeUsesDetails(t *testing.T) {
+	item := memberItem()
+	item["type"] = "status_changed"
+	item["body"] = nil
+	item["details"] = map[string]any{"from": "todo", "to": "in_review"}
+	store := &fakeStore{devices: map[string][]Device{"u1": {{Token: "a"}}}}
+	sender := &fakeSender{}
+	d := newTestDispatcher(store, sender)
+	d.onInboxNew(inboxEvent(item))
+	drain(d)
+	n := sender.got[0].n
+	if n.Title != "MUL-1 · Status → In review" || n.Subtitle != "Fix login" || n.Body != "by Ana" {
+		t.Fatalf("notification = %+v", n)
+	}
+}
+
+func TestInboxNewDegradesWhenLookupsFail(t *testing.T) {
+	item := memberItem()
+	item["issue_id"] = "missing"
+	delete(item, "actor_id")
+	store := &fakeStore{devices: map[string][]Device{"u1": {{Token: "a"}}}}
+	sender := &fakeSender{}
+	d := newTestDispatcher(store, sender)
+	d.onInboxNew(inboxEvent(item))
+	drain(d)
+	n := sender.got[0].n
+	if n.Title != "Mentioned" || n.Subtitle != "Fix login" {
+		t.Fatalf("notification = %+v", n)
+	}
+	if len(store.lookups) != 1 {
+		t.Fatalf("lookups = %v, want only the issue lookup", store.lookups)
 	}
 }
 
