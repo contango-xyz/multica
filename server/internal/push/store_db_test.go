@@ -128,3 +128,44 @@ func TestDBStoreChannelBoundChatHasNoPushTarget(t *testing.T) {
 		t.Fatalf("owner=%q err=%v, want no target for a channel-bound chat", owner, err)
 	}
 }
+
+func TestDBStoreIssueIdentifierAndActorName(t *testing.T) {
+	q, pool := testQueries(t)
+	ctx := context.Background()
+	var userID, wsID, issueID, agentID string
+	if err := pool.QueryRow(ctx, `INSERT INTO "user" (name, email) VALUES ('Push Text Ana', 'push-text-test@example.test')
+		ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name RETURNING id::text`).Scan(&userID); err != nil {
+		t.Fatalf("user fixture: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO workspace (name, slug, issue_prefix) VALUES ('Push Text Test', 'push-text-test', 'PTT')
+		ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name RETURNING id::text`).Scan(&wsID); err != nil {
+		t.Fatalf("workspace fixture: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM issue WHERE workspace_id = $1`, wsID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM agent WHERE workspace_id = $1`, wsID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM workspace WHERE id = $1`, wsID)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM "user" WHERE id = $1`, userID)
+	})
+	if err := pool.QueryRow(ctx, `INSERT INTO issue (workspace_id, title, number, creator_type, creator_id)
+		VALUES ($1, 'Fix login', 823, 'member', $2) RETURNING id::text`, wsID, userID).Scan(&issueID); err != nil {
+		t.Fatalf("issue fixture: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO agent (workspace_id, name, owner_id, runtime_mode)
+		VALUES ($1, 'Lenny', $2, 'local') RETURNING id::text`, wsID, userID).Scan(&agentID); err != nil {
+		t.Fatalf("agent fixture: %v", err)
+	}
+	s := NewDBStore(q)
+	if got, err := s.IssueIdentifier(ctx, issueID); err != nil || got != "PTT-823" {
+		t.Fatalf("identifier = %q, %v", got, err)
+	}
+	if got, err := s.ActorName(ctx, "member", userID); err != nil || got != "Push Text Ana" {
+		t.Fatalf("member = %q, %v", got, err)
+	}
+	if got, err := s.ActorName(ctx, "agent", agentID); err != nil || got != "Lenny" {
+		t.Fatalf("agent = %q, %v", got, err)
+	}
+	if got, err := s.ActorName(ctx, "system", userID); err != nil || got != "" {
+		t.Fatalf("system = %q, %v", got, err)
+	}
+}

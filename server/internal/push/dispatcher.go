@@ -22,6 +22,8 @@ type Store interface {
 	SystemNotificationsMuted(ctx context.Context, workspaceID, userID string) (bool, error)
 	UnreadInboxCount(ctx context.Context, userID string) (int, error)
 	ChatSessionTarget(ctx context.Context, sessionID string) (ownerID, agentName string, err error)
+	IssueIdentifier(ctx context.Context, issueID string) (string, error)
+	ActorName(ctx context.Context, actorType, actorID string) (string, error)
 }
 
 type job struct {
@@ -29,10 +31,15 @@ type job struct {
 	userID      string // chat: resolved in process
 	workspaceID string
 	title       string
+	subtitle    string
 	body        string
 	threadID    string
 	sessionID   string
 	data        map[string]any
+	inbox       inboxInfo
+	issueID     string
+	actorType   string
+	actorID     string
 }
 
 // Dispatcher turns inbox:new / chat:done bus events into pushes. Bus
@@ -104,8 +111,11 @@ func (d *Dispatcher) onInboxNew(e events.Event) {
 		Title         string  `json:"title"`
 		Body          *string `json:"body"`
 		IssueID       *string `json:"issue_id"`
+		ActorType     *string `json:"actor_type"`
+		ActorID       *string `json:"actor_id"`
 		Details       struct {
 			CommentID string `json:"comment_id"`
+			To        string `json:"to"`
 		} `json:"details"`
 	}
 	if !decode(payload["item"], &item) || item.RecipientType != "member" || item.RecipientID == "" {
@@ -128,8 +138,15 @@ func (d *Dispatcher) onInboxNew(e events.Event) {
 	if item.Body != nil {
 		body = *item.Body
 	}
-	d.enqueue(job{kind: "inbox", userID: item.RecipientID, workspaceID: wsID, title: item.Title,
-		body: truncate(body), threadID: thread, data: data})
+	j := job{kind: "inbox", userID: item.RecipientID, workspaceID: wsID, threadID: thread, data: data,
+		inbox: inboxInfo{typ: item.Type, title: item.Title, body: body, to: item.Details.To}}
+	if item.IssueID != nil {
+		j.issueID = *item.IssueID
+	}
+	if item.ActorType != nil && item.ActorID != nil {
+		j.actorType, j.actorID = *item.ActorType, *item.ActorID
+	}
+	d.enqueue(j)
 }
 
 func (d *Dispatcher) onChatDone(e events.Event) {
@@ -157,6 +174,9 @@ func (d *Dispatcher) process(ctx context.Context, j job) {
 		}
 		j.userID, j.title = owner, agent
 	}
+	if j.kind == "inbox" {
+		d.resolveInboxText(ctx, &j)
+	}
 	if muted, err := d.store.SystemNotificationsMuted(ctx, j.workspaceID, j.userID); err != nil || muted {
 		return
 	}
@@ -170,7 +190,7 @@ func (d *Dispatcher) process(ctx context.Context, j job) {
 		return
 	}
 	j.data["workspace_slug"] = slug
-	n := Notification{Title: j.title, Body: j.body, ThreadID: j.threadID, Data: j.data}
+	n := Notification{Title: j.title, Subtitle: j.subtitle, Body: j.body, ThreadID: j.threadID, Data: j.data}
 	if count, err := d.store.UnreadInboxCount(ctx, j.userID); err == nil {
 		n.Badge = &count
 	}
@@ -186,4 +206,25 @@ func (d *Dispatcher) process(ctx context.Context, j job) {
 			slog.Warn("push: send failed", "kind", j.kind, "error", err)
 		}
 	}
+}
+
+// resolveInboxText looks up the ticket identifier and actor name. A failed
+// lookup only drops that part of the text; the push still goes out.
+func (d *Dispatcher) resolveInboxText(ctx context.Context, j *job) {
+	if j.issueID != "" {
+		if id, err := d.store.IssueIdentifier(ctx, j.issueID); err == nil {
+			j.inbox.identifier = id
+		} else {
+			slog.Warn("push: issue lookup failed", "issue_id", j.issueID, "error", err)
+		}
+	}
+	if j.actorID != "" {
+		if name, err := d.store.ActorName(ctx, j.actorType, j.actorID); err == nil {
+			j.inbox.actor = name
+		} else {
+			slog.Warn("push: actor lookup failed", "actor_type", j.actorType, "error", err)
+		}
+	}
+	title, subtitle, body := inboxText(j.inbox)
+	j.title, j.subtitle, j.body = title, subtitle, truncate(body)
 }
