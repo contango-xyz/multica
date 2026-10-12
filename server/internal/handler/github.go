@@ -1107,6 +1107,11 @@ func (h *Handler) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		// never read for display. Each just asks the API pipeline to re-fetch
 		// the authoritative snapshot for the PR(s) it concerns.
 		h.triggerPRRefreshFromCIEvent(ctx, body)
+	case "pull_request_review", "pull_request_review_comment", "pull_request_review_thread", "issue_comment":
+		// Contango fork: reviews and comments are triggers too. The refresh bumps
+		// the PR row's updated_at, which is how our PR watcher learns that a PR
+		// changed within a minute instead of polling GitHub for every PR.
+		h.triggerPRRefreshFromReviewEvent(body)
 	default:
 		// Acknowledge every event so GitHub doesn't mark the endpoint failing,
 		// but ignore types we don't model.
@@ -1960,4 +1965,52 @@ func strPtrOrNil(s string) *string {
 	}
 	v := s
 	return &v
+}
+
+// prAddressFromReviewEvent extracts the PR a review or comment event concerns.
+// pull_request_review* events carry pull_request.number; issue_comment carries
+// issue.number and, only for a PR's conversation, issue.pull_request. Comments on
+// plain issues are not PR events and report ok=false.
+func prAddressFromReviewEvent(body []byte) (installationID int64, owner, repo string, number int32, ok bool) {
+	var p struct {
+		Installation struct {
+			ID int64 `json:"id"`
+		} `json:"installation"`
+		Repository struct {
+			Name  string `json:"name"`
+			Owner struct {
+				Login string `json:"login"`
+			} `json:"owner"`
+		} `json:"repository"`
+		PullRequest *struct {
+			Number int32 `json:"number"`
+		} `json:"pull_request"`
+		Issue *struct {
+			Number      int32           `json:"number"`
+			PullRequest json.RawMessage `json:"pull_request"`
+		} `json:"issue"`
+	}
+	if err := json.Unmarshal(body, &p); err != nil {
+		return 0, "", "", 0, false
+	}
+	switch {
+	case p.PullRequest != nil:
+		number = p.PullRequest.Number
+	case p.Issue != nil && len(p.Issue.PullRequest) > 0 && string(p.Issue.PullRequest) != "null":
+		number = p.Issue.Number
+	}
+	owner, repo = p.Repository.Owner.Login, p.Repository.Name
+	if p.Installation.ID == 0 || owner == "" || repo == "" || number == 0 {
+		return 0, "", "", 0, false
+	}
+	return p.Installation.ID, owner, repo, number, true
+}
+
+func (h *Handler) triggerPRRefreshFromReviewEvent(body []byte) {
+	if !h.PRRefresh.Enabled() {
+		return
+	}
+	if inst, owner, repo, number, ok := prAddressFromReviewEvent(body); ok {
+		h.PRRefresh.Enqueue(inst, owner, repo, number)
+	}
 }
