@@ -478,6 +478,11 @@ func (s *IssueWakeupService) save(ctx context.Context, issueID, member, source, 
 	if err != nil {
 		return out, err
 	}
+	// Capture ignores every event of the registering run, so a wakeup filtered
+	// on that run could only ever fire at expiry. Refuse it instead.
+	if filterTask.Valid && source.Valid && filterTask == source {
+		return out, fmt.Errorf("%w: a wakeup cannot wait for the run that creates it (its own events never fire); wait for another run or use a time wakeup", ErrWakeupInput)
+	}
 	filterActor, err := wakeupUUID(in.FilterActorID)
 	if err != nil {
 		return out, err
