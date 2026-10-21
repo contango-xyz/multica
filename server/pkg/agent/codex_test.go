@@ -1891,6 +1891,63 @@ func TestCodexDeliverableOutputExcludesNarration(t *testing.T) {
 	}
 }
 
+// TestCodexDeliverableOutputIgnoresPreambleBeforeTools pins the contango fix of
+// 2026-10-21: a v2 turn that narrates its plan, runs tools and ends without a
+// final_answer must not report the preamble as Result.Output. On seat-1 such
+// runs (e.g. "I'll check whether the agreement is already recorded", four
+// exec_command calls, turn/completed) read as if the agent had stopped after
+// one sentence. The wiring mirrors executeOnce.
+func TestCodexDeliverableOutputIgnoresPreambleBeforeTools(t *testing.T) {
+	t.Parallel()
+
+	const (
+		preamble    = `{"jsonrpc":"2.0","method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"I'll check the issue first."}}}`
+		commentary  = `{"jsonrpc":"2.0","method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"I'll check the issue first.","phase":"commentary"}}}`
+		toolStarted = `{"jsonrpc":"2.0","method":"item/started","params":{"item":{"type":"commandExecution","id":"c1","command":"multica issue get CTG-1"}}}`
+		mcpStarted  = `{"jsonrpc":"2.0","method":"item/started","params":{"item":{"type":"mcpToolCall","id":"t1","server":"buildkite","tool":"list_builds"}}}`
+		closing     = `{"jsonrpc":"2.0","method":"item/completed","params":{"item":{"type":"agentMessage","id":"m2","text":"Routed to Hopper."}}}`
+		final       = `{"jsonrpc":"2.0","method":"item/completed","params":{"item":{"type":"agentMessage","id":"m3","text":"Routed to Hopper.","phase":"final_answer"}}}`
+		legacyFirst = `{"jsonrpc":"2.0","method":"codex/event","params":{"msg":{"type":"agent_message","message":"I'll check the issue first."}}}`
+		legacyExec  = `{"jsonrpc":"2.0","method":"codex/event","params":{"msg":{"type":"exec_command_begin","call_id":"x1","command":"ls"}}}`
+	)
+
+	cases := []struct {
+		name     string
+		protocol string
+		lines    []string
+		want     string
+	}{
+		{"preamble then tools and no final answer is empty", "raw", []string{preamble, toolStarted}, ""},
+		{"a commentary message is never the output", "raw", []string{commentary}, ""},
+		{"commentary then an MCP tool is empty", "raw", []string{commentary, mcpStarted}, ""},
+		{"a message after the last tool is the output", "raw", []string{preamble, toolStarted, closing}, "Routed to Hopper."},
+		{"a final answer wins", "raw", []string{commentary, toolStarted, final}, "Routed to Hopper."},
+		{"legacy protocol keeps the last message", "legacy", []string{legacyFirst, legacyExec}, "I'll check the issue first."},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			c, _, _ := newTestCodexClient(t)
+			c.notificationProtocol = tc.protocol
+			var finalAnswer, lastAgentMessage string
+			c.onMessage = func(Message) {}
+			c.onAgentMessage = func(text string) { lastAgentMessage = text }
+			c.onToolActivity = func() { lastAgentMessage = "" }
+			c.onFinalAnswer = func(text string) { finalAnswer = text }
+
+			for _, line := range tc.lines {
+				c.handleLine(line)
+			}
+
+			if got := codexDeliverableOutput(finalAnswer, lastAgentMessage); got != tc.want {
+				t.Fatalf("Result.Output = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestCodexRawThreadStatusIdleWaitsForTurnCompleted(t *testing.T) {
 	t.Parallel()
 
