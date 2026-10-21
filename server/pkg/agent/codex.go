@@ -1290,6 +1290,11 @@ func (b *codexBackend) executeOnce(ctx context.Context, prompt string, opts Exec
 			lastAgentMessage = text
 			outputMu.Unlock()
 		},
+		onToolActivity: func() {
+			outputMu.Lock()
+			lastAgentMessage = ""
+			outputMu.Unlock()
+		},
 		onFinalAnswer: func(text string) {
 			outputMu.Lock()
 			finalAnswer = text
@@ -2326,9 +2331,10 @@ func trySendString(ch chan<- string, value string) {
 }
 
 // codexDeliverableOutput picks Result.Output from what the turn produced: the
-// message the app-server itself labelled `phase: "final_answer"`, or — for the
-// legacy `agent_message` protocol, which carries no phase — the most recent
-// agent message. Never every message joined: the intermediate ones narrate the
+// message the app-server itself labelled `phase: "final_answer"`, or else the
+// most recent agent message: on the v2 item protocol only a non-commentary one
+// with no tool started after it (onToolActivity clears it), on the legacy
+// `agent_message` protocol, which carries no phase, the last one as before. Never every message joined: the intermediate ones narrate the
 // work between tool calls, which belongs to the transcript and not to a chat or
 // IM reply (GH #6006).
 func codexDeliverableOutput(finalAnswer, lastAgentMessage string) string {
@@ -2401,7 +2407,14 @@ type codexClient struct {
 	// onAgentMessage receives the authoritative completed text for one agent
 	// message. onAgentMessageChunk may deliver that text incrementally, so
 	// Result.Output fallbacks must use this callback rather than the last chunk.
-	onAgentMessage     func(text string)
+	onAgentMessage func(text string)
+	// onToolActivity fires when the v2 item protocol starts a non-message item
+	// (a command, a file change, an MCP or other tool call). The Result.Output
+	// fallback is only the last thing the agent said if nothing ran after it:
+	// a turn that narrates "I'll check …", runs tools and ends without a
+	// final_answer has no deliverable, and shipping the preamble made finished
+	// runs read as if they had stopped after one sentence (contango, 2026-10-21).
+	onToolActivity     func()
 	onSemanticActivity func(description string)
 	onTurnDone         func(aborted bool)
 	// onFinalAnswer fires only for an agent message the app-server itself
@@ -3714,6 +3727,10 @@ func (c *codexClient) handleItemNotification(method string, params map[string]an
 		return
 	}
 
+	if method == "item/started" && isCodexToolItem(itemType) && c.onToolActivity != nil {
+		c.onToolActivity()
+	}
+
 	switch {
 	case method == "item/agentMessage/delta" && itemType == "agentMessage":
 		// JSON-RPC framing remains authoritative: handleLine invokes us only
@@ -3790,11 +3807,14 @@ func (c *codexClient) handleItemNotification(method string, params map[string]an
 
 	case method == "item/completed" && itemType == "agentMessage":
 		text, _ := item["text"].(string)
-		if text != "" && c.onAgentMessage != nil {
+		phase, _ := item["phase"].(string)
+		// A commentary-phase message narrates work in progress; it is never the
+		// turn's deliverable, so it stays out of the Result.Output fallback. It
+		// still reaches the transcript through completeAgentMessage.
+		if text != "" && phase != "commentary" && c.onAgentMessage != nil {
 			c.onAgentMessage(text)
 		}
 		c.completeAgentMessage(itemID, text)
-		phase, _ := item["phase"].(string)
 		if phase == "final_answer" {
 			// The gate exists so a subagent or a replayed history turn cannot
 			// end OUR turn early, and the thread guard at the top of this
@@ -3860,6 +3880,17 @@ func codexRawTokenUsageFromV2(usage map[string]any) codexRawTokenUsage {
 		CacheWriteInputTokens: codexInt64(usage, "cacheWriteInputTokens"),
 		ReasoningOutputTokens: codexInt64(usage, "reasoningOutputTokens"),
 	}
+}
+
+// isCodexToolItem reports whether a v2 item is work rather than conversation.
+// Unknown item types count as work: an empty Result.Output is safer than a
+// preamble that reads as the run's answer.
+func isCodexToolItem(itemType string) bool {
+	switch itemType {
+	case "", "agentMessage", "reasoning", "userMessage":
+		return false
+	}
+	return true
 }
 
 func isCodexItemProgressActivity(method string) bool {
