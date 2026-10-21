@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -68,6 +69,18 @@ func TestAgentUntaggedReplyToMemberDoesNotWakeSquadLeader(t *testing.T) {
 			t.Fatal("expected an explicit mention to keep routing to the named agent")
 		}
 	})
+	t.Run("an agent's untagged reply to multica-bot's post that named it still wakes the leader", func(t *testing.T) {
+		const bot = "c870104c-345e-4f87-b6c6-707218f9f298"
+		t.Setenv(botMemberIDsEnv, bot)
+		watch := &db.Comment{AuthorType: "member", AuthorID: util.MustParseUUID(bot),
+			Content: "[@Other](mention://agent/" + fx.OtherID + ") PR_WATCH:fix new feedback"}
+		if !shouldEnqueueSquadLeaderOnReplyForTest(ctx, fx.Issue, "Fixed and pushed.", watch, "agent", fx.OtherID) {
+			t.Fatal("expected the leader to wake: a bot's post is automation, the reply is a worker result")
+		}
+		if shouldEnqueueSquadLeaderOnReplyForTest(ctx, fx.Issue, "It is a child of CTG-731; closed.", member, "agent", fx.OtherID) {
+			t.Fatal("expected a human who named the agent to keep the CTG-839 exception with the bot list set")
+		}
+	})
 	t.Run("classification", func(t *testing.T) {
 		f := agentAnswersMemberWhoNamedIt
 		if f(nil, fx.OtherID) || !f(member, fx.OtherID) || f(member, fx.LeaderID) || f(delegated, fx.OtherID) ||
@@ -75,4 +88,22 @@ func TestAgentUntaggedReplyToMemberDoesNotWakeSquadLeader(t *testing.T) {
 			t.Fatal("agentAnswersMemberWhoNamedIt: wrong classification")
 		}
 	})
+}
+
+func TestIsBotMember(t *testing.T) {
+	const bot = "c870104c-345e-4f87-b6c6-707218f9f298"
+	human := util.MustParseUUID("11111111-2222-4333-8444-555555555555")
+	t.Setenv(botMemberIDsEnv, "")
+	if isBotMember(util.MustParseUUID(bot)) {
+		t.Fatal("unset list: no member is a bot")
+	}
+	t.Setenv(botMemberIDsEnv, " other-id , "+strings.ToUpper(bot)+" ")
+	if !isBotMember(util.MustParseUUID(bot)) || isBotMember(human) || isBotMember(pgtype.UUID{}) {
+		t.Fatal("isBotMember: wrong classification")
+	}
+	parent := &db.Comment{AuthorType: "member", AuthorID: util.MustParseUUID(bot),
+		Content: "[@A](mention://agent/" + bot + ") PR_WATCH:fix"}
+	if agentAnswersMemberWhoNamedIt(parent, bot) {
+		t.Fatal("a bot member's post is not a human asking the agent")
+	}
 }
