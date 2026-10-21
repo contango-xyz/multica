@@ -167,6 +167,22 @@ func TestIssueWakeupTerminalStateAndScope(t *testing.T) {
 	}
 }
 
+func TestIssueWakeupRejectsWaitingForItsOwnRun(t *testing.T) {
+	f, s, issue, agent := wakeFixture(t)
+	runtime := testutil.Raw("(SELECT runtime_id FROM agent WHERE id='" + agent + "')")
+	own := f.Task(t, agent, testutil.Cols{"issue_id": issue, "status": "running", "runtime_id": runtime})
+	in := WakeupInput{AgentID: agent, Kind: "event", EventTypes: []string{"task.completed"}, FilterTaskID: own, Instruction: "after my run"}
+	_, err := s.Create(context.Background(), issue, parseTestUUID(t, f.UserID), parseTestUUID(t, own), in)
+	if !errors.Is(err, ErrWakeupInput) || !strings.Contains(err.Error(), "run that creates it") {
+		t.Fatalf("own-run wakeup accepted: %v", err)
+	}
+	other := f.Task(t, agent, testutil.Cols{"issue_id": issue, "status": "running", "runtime_id": runtime})
+	in.FilterTaskID = other
+	if _, err = s.Create(context.Background(), issue, parseTestUUID(t, f.UserID), parseTestUUID(t, own), in); err != nil {
+		t.Fatalf("another run's wakeup refused: %v", err)
+	}
+}
+
 func TestIssueWakeupContinuousSelfLoopAndClose(t *testing.T) {
 	f, s, issue, agent := wakeFixture(t)
 	ctx := context.Background()
