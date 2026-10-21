@@ -2027,9 +2027,11 @@ func isNoteComment(content string) bool {
 }
 
 // agentAnswersMemberWhoNamedIt reports whether a comment by agentID replies to a
-// live human comment that mentions agentID (Contango, CTG-839).
+// live human comment that mentions agentID (Contango, CTG-839). A member listed
+// in MULTICA_BOT_USER_IDS is automation, not a human: an agent's reply to its
+// post (pr-watch's PR_WATCH wakes) is a worker result and still wakes the leader.
 func agentAnswersMemberWhoNamedIt(parent *db.Comment, agentID string) bool {
-	if parent == nil || parent.DeletedAt.Valid || parent.AuthorType != "member" {
+	if parent == nil || parent.DeletedAt.Valid || parent.AuthorType != "member" || isBotMember(parent.AuthorID) {
 		return false
 	}
 	for _, m := range util.ParseMentions(parent.Content) {
