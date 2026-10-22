@@ -10,6 +10,15 @@ import (
 	"testing"
 )
 
+// contangoMigrationStems are the fork's push_device migrations. They were
+// numbered before upstream claimed 564-566 and are applied in production by
+// stem, so they keep their names (contango, docs/contango/PATCHES.md).
+var contangoMigrationStems = map[string]bool{
+	"564_push_device":             true,
+	"565_push_device_token_index": true,
+	"566_push_device_user_index":  true,
+}
+
 func TestMigrationNumericPrefixesAreUnique(t *testing.T) {
 	files := migrationFilesForLint(t, "*.up.sql")
 
@@ -20,7 +29,7 @@ func TestMigrationNumericPrefixesAreUnique(t *testing.T) {
 	stemByNumber := make(map[int]string)
 	for _, file := range files {
 		stem, _, ok := splitMigrationFilename(filepath.Base(file))
-		if !ok {
+		if !ok || contangoMigrationStems[stem] {
 			continue
 		}
 		prefix, _, ok := strings.Cut(stem, "_")

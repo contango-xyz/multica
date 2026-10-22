@@ -44,7 +44,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `server/internal/handler/handler.go`, `server/pkg/db/queries/push_device.sql`, `apps/mobile/*`,
   `apps/mobile/package.json` (`expo-application`, `expo-notifications`), `pnpm-lock.yaml`.
 - **Migrations:** `564_push_device`, `565_push_device_token_index`, `566_push_device_user_index`
-  (applied in production 2026-10-07; permanent).
+  (applied in production 2026-10-07; permanent). Upstream also uses 564–566, so
+  `server/internal/migrations/migrations_lint_test.go` exempts these three stems from
+  `TestMigrationNumericPrefixesAreUnique` (commit `test(migrations): exempt the fork's push_device
+  migrations from the unique-prefix lint (contango)`). Number new fork migrations after upstream's
+  highest to avoid adding to that list.
 - **Also carries:** `.github/workflows/contango-backend-image.yml` (builds
   `ghcr.io/contango-xyz/multica-backend:<sha7>` on every `contango/**` push) and
   `docs/contango/push-rollout.md`.
