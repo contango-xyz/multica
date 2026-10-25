@@ -89,3 +89,35 @@ WHERE d.depends_on_issue_id = ANY(sqlc.arg('issue_ids')::uuid[])
   AND d.type = 'blocked_by'
   AND i.workspace_id = sqlc.arg('workspace_id')::uuid
 ORDER BY d.depends_on_issue_id, i.number;
+
+-- name: ListWorkspaceDependencyEdges :many
+-- Every blocked-by edge in the workspace, for the dependency graph: issue_id is
+-- the blocked issue, depends_on_issue_id the blocker.
+SELECT d.issue_id, d.depends_on_issue_id
+FROM issue_dependency d
+JOIN issue i ON i.id = d.issue_id
+JOIN issue b ON b.id = d.depends_on_issue_id
+WHERE d.type = 'blocked_by'
+  AND i.workspace_id = sqlc.arg('workspace_id')::uuid
+  AND b.workspace_id = sqlc.arg('workspace_id')::uuid
+ORDER BY i.number, b.number;
+
+-- name: ListWorkspaceDependencyNodes :many
+-- The issues on either end of a blocked-by edge, with the workspace's
+-- "Critical path" number property (set by the operator's critical-path job) as text.
+SELECT i.id, i.number, i.title, i.status,
+       COALESCE((
+         SELECT i.properties ->> p.id::text
+         FROM issue_property p
+         WHERE p.workspace_id = i.workspace_id AND p.name = 'Critical path' AND p.archived_at IS NULL
+         ORDER BY p.created_at
+         LIMIT 1
+       ), '')::text AS critical_path
+FROM issue i
+WHERE i.workspace_id = sqlc.arg('workspace_id')::uuid
+  AND i.id IN (
+    SELECT d.issue_id FROM issue_dependency d WHERE d.type = 'blocked_by'
+    UNION
+    SELECT d.depends_on_issue_id FROM issue_dependency d WHERE d.type = 'blocked_by'
+  )
+ORDER BY i.number;

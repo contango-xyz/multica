@@ -2097,6 +2097,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Get("/search", h.SearchIssues)
 				r.Get("/child-progress", h.ChildIssueProgress)
 				r.Get("/children", h.ListChildrenByParents)
+				r.Get("/dependency-graph", h.ListWorkspaceDependencies)
 				r.Get("/grouped", h.ListGroupedIssues)
 				// The caller's issues with an agent result they have not seen
 				// yet; backs the sidebar's unread dot.

@@ -193,6 +193,99 @@ func (q *Queries) ListBlocksForIssues(ctx context.Context, arg ListBlocksForIssu
 	return items, nil
 }
 
+const listWorkspaceDependencyEdges = `-- name: ListWorkspaceDependencyEdges :many
+SELECT d.issue_id, d.depends_on_issue_id
+FROM issue_dependency d
+JOIN issue i ON i.id = d.issue_id
+JOIN issue b ON b.id = d.depends_on_issue_id
+WHERE d.type = 'blocked_by'
+  AND i.workspace_id = $1::uuid
+  AND b.workspace_id = $1::uuid
+ORDER BY i.number, b.number
+`
+
+type ListWorkspaceDependencyEdgesRow struct {
+	IssueID          pgtype.UUID `json:"issue_id"`
+	DependsOnIssueID pgtype.UUID `json:"depends_on_issue_id"`
+}
+
+// Every blocked-by edge in the workspace, for the dependency graph: issue_id is
+// the blocked issue, depends_on_issue_id the blocker.
+func (q *Queries) ListWorkspaceDependencyEdges(ctx context.Context, workspaceID pgtype.UUID) ([]ListWorkspaceDependencyEdgesRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceDependencyEdges, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWorkspaceDependencyEdgesRow{}
+	for rows.Next() {
+		var i ListWorkspaceDependencyEdgesRow
+		if err := rows.Scan(&i.IssueID, &i.DependsOnIssueID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkspaceDependencyNodes = `-- name: ListWorkspaceDependencyNodes :many
+SELECT i.id, i.number, i.title, i.status,
+       COALESCE((
+         SELECT i.properties ->> p.id::text
+         FROM issue_property p
+         WHERE p.workspace_id = i.workspace_id AND p.name = 'Critical path' AND p.archived_at IS NULL
+         ORDER BY p.created_at
+         LIMIT 1
+       ), '')::text AS critical_path
+FROM issue i
+WHERE i.workspace_id = $1::uuid
+  AND i.id IN (
+    SELECT d.issue_id FROM issue_dependency d WHERE d.type = 'blocked_by'
+    UNION
+    SELECT d.depends_on_issue_id FROM issue_dependency d WHERE d.type = 'blocked_by'
+  )
+ORDER BY i.number
+`
+
+type ListWorkspaceDependencyNodesRow struct {
+	ID           pgtype.UUID `json:"id"`
+	Number       int32       `json:"number"`
+	Title        string      `json:"title"`
+	Status       string      `json:"status"`
+	CriticalPath string      `json:"critical_path"`
+}
+
+// The issues on either end of a blocked-by edge, with the workspace's
+// "Critical path" number property (set by the operator's critical-path job) as text.
+func (q *Queries) ListWorkspaceDependencyNodes(ctx context.Context, workspaceID pgtype.UUID) ([]ListWorkspaceDependencyNodesRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceDependencyNodes, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWorkspaceDependencyNodesRow{}
+	for rows.Next() {
+		var i ListWorkspaceDependencyNodesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Number,
+			&i.Title,
+			&i.Status,
+			&i.CriticalPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeIssueBlockedBy = `-- name: RemoveIssueBlockedBy :one
 WITH deleted AS (
     DELETE FROM issue_dependency d

@@ -228,3 +228,56 @@ func (h *Handler) recordDependencyActivity(r *http.Request, userID string, issue
 		},
 	})
 }
+
+// DependencyGraphNode is an issue on either end of a blocked-by edge. CriticalPath
+// is the workspace's "Critical path" number property (how many open cards wait on
+// this one), nil when unset.
+type DependencyGraphNode struct {
+	IssueDependencyRef
+	CriticalPath *float64 `json:"critical_path"`
+}
+
+// DependencyGraphEdge points from the blocker to the issue it blocks.
+type DependencyGraphEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// ListWorkspaceDependencies returns the workspace's whole dependency graph in one
+// call (GET /api/issues/dependency-graph): every issue on an edge and every
+// blocker → blocked edge, for the Dependencies page.
+func (h *Handler) ListWorkspaceDependencies(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	wsUUID, ok := parseUUIDOrBadRequest(w, h.resolveWorkspaceID(r), "workspace_id")
+	if !ok {
+		return
+	}
+	nodes, err := h.Queries.ListWorkspaceDependencyNodes(ctx, wsUUID)
+	if err != nil {
+		slog.Warn("ListWorkspaceDependencyNodes failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to list dependencies")
+		return
+	}
+	edges, err := h.Queries.ListWorkspaceDependencyEdges(ctx, wsUUID)
+	if err != nil {
+		slog.Warn("ListWorkspaceDependencyEdges failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to list dependencies")
+		return
+	}
+	prefix := h.getIssuePrefix(ctx, wsUUID)
+	outNodes := make([]DependencyGraphNode, 0, len(nodes))
+	for _, n := range nodes {
+		node := DependencyGraphNode{IssueDependencyRef: IssueDependencyRef{
+			ID: uuidToString(n.ID), Identifier: dependencyIdentifier(prefix, n.Number), Number: n.Number, Title: n.Title, Status: n.Status,
+		}}
+		if v, err := strconv.ParseFloat(n.CriticalPath, 64); err == nil {
+			node.CriticalPath = &v
+		}
+		outNodes = append(outNodes, node)
+	}
+	outEdges := make([]DependencyGraphEdge, 0, len(edges))
+	for _, e := range edges {
+		outEdges = append(outEdges, DependencyGraphEdge{From: uuidToString(e.DependsOnIssueID), To: uuidToString(e.IssueID)})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"nodes": outNodes, "edges": outEdges})
+}
