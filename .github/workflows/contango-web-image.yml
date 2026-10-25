@@ -1,0 +1,39 @@
+name: contango-web-image
+
+# Fork-only: builds the web frontend image from contango/** branches so ops can
+# run fork UI (e.g. issue dependencies). Upstream workflows untouched.
+on:
+  push:
+    branches: ["contango/**"]
+    paths: ["apps/web/**", "packages/**", "pnpm-lock.yaml", "Dockerfile.web", ".github/workflows/contango-web-image.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.web
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            REMOTE_API_URL=http://backend:8080
+            NEXT_PUBLIC_APP_VERSION=contango-${{ steps.meta.outputs.short }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/multica-web:${{ steps.meta.outputs.short }}
+            ghcr.io/${{ github.repository_owner }}/multica-web:contango-latest
