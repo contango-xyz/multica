@@ -15,7 +15,8 @@ import type { Project } from "@multica/core/types";
 import { useNavigation } from "../../navigation";
 import { IssueContextMenuProvider } from "../../issues/actions";
 import { useT } from "../../i18n";
-import { PanelBody, PanelHeader, isPathWithin } from "../panel-nav";
+import { PanelBody, PanelHeader, PanelLink, PanelList, isPathWithin } from "../panel-nav";
+import { routeIconForPath } from "../route-icon-components";
 import { PinnedSection, usePanelPins } from "./pinned-section";
 import { useKeptActiveItem } from "./sidebar-tree";
 import { ProjectsSection, useIssueIdInTree } from "./work-tree";
@@ -159,8 +160,20 @@ export function WorkPanel() {
               activeIssueId={plainRowsLit ? currentIssueId : null}
             />
           )}
+
+          {/* contango: the issue dependency graph (patch 10). */}
+          <DependenciesLink href={p.dependencies()} pathname={pathname} label={t(($) => $.nav.dependencies)} />
         </PanelBody>
       </IssueContextMenuProvider>
     </>
+  );
+}
+
+function DependenciesLink({ href, pathname, label }: { href: string; pathname: string; label: string }) {
+  const Icon = routeIconForPath(href);
+  return (
+    <PanelList className="mt-2">
+      <PanelLink href={href} icon={<Icon />} label={label} active={isPathWithin(pathname, href)} />
+    </PanelList>
   );
 }

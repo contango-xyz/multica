@@ -157,7 +157,7 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   idempotent, bump the issue revision and write a `dependency_added` / `dependency_removed`
   activity. `GET /api/issues/{id}` and `GET /api/issues` carry `blocked_by` and `blocks`
   (`id, identifier, number, title, status`). CLI: `multica issue dependency list|add|remove
-  <issue> [--blocked-by <issue>]`. No web UI.
+  <issue> [--blocked-by <issue>]`. Web UI: patch 10.
 - **Commit:** `feat(server): issue dependencies — blocked-by API, CLI and issue fields (contango)`.
 - **Touches:** `server/pkg/db/queries/issue_dependency.sql` (ours) and its generated code,
   `server/internal/handler/contango_issue_dependency{,_test}.go` (ours),
@@ -170,6 +170,40 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none as of v0.7.0: the table has existed since `001_init` with no queries,
   API or CLI.
 - **Drop when:** upstream ships issue relations; migrate the edges to its model first.
+
+### 10. Issue dependencies in the web app, and the dependency graph
+
+- **What:** the web UI for patch 9 (owner, 2026-10-25: "a chart/graph, and a ref on each card").
+  The issue sidebar shows "Blocked by" and "Blocks" sections (status icon, identifier, title,
+  link), each hidden while empty. Board cards and list rows show "Blocked by N" / "Blocks N" pills
+  counting open issues only, with the identifiers in a native tooltip. A workspace page
+  `/{slug}/dependencies` (sidebar, under Projects) draws every open issue on a blocked-by edge as a
+  layered left-to-right graph, blockers on the left, coloured by status, with the "Critical path"
+  number property as a badge and nodes at 3 or more outlined; filters hide done/cancelled (on by
+  default) and show only the critical path. Read-only: edges are still edited with the CLI/API.
+  Server: `GET /api/issues/dependency-graph` returns `{nodes, edges}` in one call (nodes carry
+  `critical_path`, read from the workspace property named "Critical path"; edges are
+  `{from: blocker, to: blocked}`). Fork CI builds `ghcr.io/contango-xyz/multica-web`. Web only:
+  the desktop router has no `dependencies` route, so the shared sidebar entry has no desktop page.
+- **Commits:** `feat(server): workspace dependency graph endpoint (contango)`, `feat(views):
+  issue dependency sections, card markers and graph page (contango)`, `ci: build the web image
+  from contango branches (contango)`.
+- **Touches:** ours: `packages/views/issues/components/issue-dependencies{,.test}.tsx`,
+  `packages/views/dependencies/`, `apps/web/app/[workspaceSlug]/(dashboard)/dependencies/`,
+  `.github/workflows/contango-web-image.yml`. Upstream files: `packages/core/types/{issue,api,
+  index}.ts`, `packages/core/api/{schemas,client}.ts`, `packages/core/issues/queries.ts`,
+  `packages/core/paths/{paths,route-icons,tab-subject,reserved-slugs,consistency.test}.ts`,
+  `packages/core/diagnostics/diagnostic-context.ts`, the workspace-paths mocks in
+  `packages/views/{search,layout}/*.test.tsx`,
+  `packages/views/issues/components/{issue-detail,board-card,list-row}.tsx`,
+  `packages/views/layout/{app-sidebar,route-icon-components}.tsx`,
+  `packages/views/search/search-command.tsx`, `packages/views/editor/utils/link-handler.ts`,
+  `packages/views/package.json`, `packages/views/locales/*/{issues,layout}.json`,
+  `apps/web/proxy.ts`, `server/internal/handler/reserved_slugs.json`, plus the server files of
+  patch 9 (`issue_dependency.sql`, `contango_issue_dependency{,_test}.go`, `router.go`).
+- **Migrations:** none. **Lockfile:** unchanged (the graph is hand-rolled SVG).
+- **Upstream status:** none as of v0.7.0.
+- **Drop when:** patch 9 is dropped, or upstream ships an issue relations UI.
 
 ## Last rebase
 
