@@ -146,6 +146,31 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   circuit) are separate fixes in the same file.
 - **Drop when:** upstream's Result.Output fallback ignores commentary / pre-tool messages.
 
+### 9. Issue dependencies ("blocked by")
+
+- **What:** "issue X is blocked by issue Y" as data, so the board and its automation can rank the
+  critical path instead of reading blockers out of comment prose (owner, 2026-10-25). One edge per
+  pair in the existing `issue_dependency` table, always `type = 'blocked_by'`; "blocks" is the same
+  edge read from the other side. API: `GET/POST /api/issues/{id}/dependencies` (body
+  `{"blocked_by": "<uuid or CTG-N>"}`) and `DELETE /api/issues/{id}/dependencies/{blockerId}`.
+  Both issues must be in the workspace; self-edges are 400 and cycles 409. Add and remove are
+  idempotent, bump the issue revision and write a `dependency_added` / `dependency_removed`
+  activity. `GET /api/issues/{id}` and `GET /api/issues` carry `blocked_by` and `blocks`
+  (`id, identifier, number, title, status`). CLI: `multica issue dependency list|add|remove
+  <issue> [--blocked-by <issue>]`. No web UI.
+- **Commit:** `feat(server): issue dependencies — blocked-by API, CLI and issue fields (contango)`.
+- **Touches:** `server/pkg/db/queries/issue_dependency.sql` (ours) and its generated code,
+  `server/internal/handler/contango_issue_dependency{,_test}.go` (ours),
+  `server/internal/handler/issue.go` (`IssueResponse` fields, `GetIssue`, `ListIssues`),
+  `server/cmd/server/router.go`, `server/cmd/multica/cmd_issue_dependency{,_test}.go` (ours),
+  `server/cmd/migrate/main.go` (cleanup entry).
+- **Migrations:** `593_issue_dependency_edge_unique` (unique index on
+  `(issue_id, depends_on_issue_id, type)`, concurrent). The table and its cascading foreign keys
+  come from upstream's `001_init`, so deleting an issue removes its edges.
+- **Upstream status:** none as of v0.7.0: the table has existed since `001_init` with no queries,
+  API or CLI.
+- **Drop when:** upstream ships issue relations; migrate the edges to its model first.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`

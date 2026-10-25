@@ -104,6 +104,11 @@ type IssueResponse struct {
 	// preserves whatever labels are already in cache. nil pointer = "field
 	// absent, do not touch"; non-nil (incl. empty slice) = authoritative list.
 	Labels *[]LabelResponse `json:"labels,omitempty"`
+	// Dependencies (contango): set by the detail and list endpoints; pointer +
+	// omitempty so other paths (create, update, websocket payloads) leave them out
+	// rather than claim "no dependencies".
+	BlockedBy *[]IssueDependencyRef `json:"blocked_by,omitempty"`
+	Blocks    *[]IssueDependencyRef `json:"blocks,omitempty"`
 	// SourceContext is detail-only. List, board, search, and children responses
 	// deliberately omit the potentially large immutable snapshot.
 	SourceContext *sourceContextDetailResponse `json:"source_context,omitempty"`
@@ -1420,6 +1425,7 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 			}
 			resp[i].Labels = &labels
 		}
+		h.attachDependencies(ctx, wsUUID, prefix, resp)
 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"issues": resp,
@@ -1836,6 +1842,7 @@ LIMIT %s OFFSET %s`, whereSql, orderBy, limitRef, offsetRef)
 		}
 		resp[i].Labels = &labels
 	}
+	h.attachDependencies(ctx, wsUUID, prefix, resp)
 	h.fillStatusCategories(ctx, wsUUID, resp)
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -2488,6 +2495,9 @@ func (h *Handler) GetIssue(w http.ResponseWriter, r *http.Request) {
 		detailLabels = []LabelResponse{}
 	}
 	resp.Labels = &detailLabels
+	detail := []IssueResponse{resp}
+	h.attachDependencies(r.Context(), issue.WorkspaceID, prefix, detail)
+	resp = detail[0]
 
 	// Fetch issue reactions.
 	reactions, err := h.Queries.ListIssueReactions(r.Context(), issue.ID)
