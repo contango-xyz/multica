@@ -1415,6 +1415,20 @@
       "rate": "more than 12 runs in an hour"
     }
   },
+  "dependencies": {
+    "blocked_by": "Blocked by",
+    "blocks": "Blocks",
+    "blocked_by_count_one": "Blocked by {{count}}",
+    "blocked_by_count_other": "Blocked by {{count}}",
+    "blocks_count_one": "Blocks {{count}}",
+    "blocks_count_other": "Blocks {{count}}",
+    "page_title": "Dependencies",
+    "hide_closed": "Hide done and cancelled",
+    "only_critical": "Only critical path",
+    "empty": "No dependencies between open issues yet.",
+    "critical_one": "{{count}} card waits on this",
+    "critical_other": "{{count}} cards wait on this"
+  },
   "duplicates": {
     "banner_prefix": "Duplicate of",
     "unmark": "Not a duplicate",

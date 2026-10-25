@@ -30,6 +30,7 @@ import { LabelChip } from "../../labels/label-chip";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
 import { CustomStatusChip, useIsCustomStatus } from "./custom-status-chip";
 import { IssueDuplicateOfMarker } from "./issue-duplicates";
+import { IssueDependencyMarker } from "./issue-dependencies";
 import { useIssueSurfaceActionsOptional } from "../surface/actions-context";
 import {
   PEEK_TARGET_ATTR,
@@ -205,6 +206,7 @@ export const BoardCardContent = memo(function BoardCardContent({
           {priorityIconNode}
           <p className="text-caption text-muted-foreground truncate">{issue.identifier}</p>
           <IssueDuplicateOfMarker issue={issue} insideLink />
+          <IssueDependencyMarker issue={issue} />
         </div>
         <IssueAgentActivityIndicator issueId={issue.id} />
       </div>

@@ -167,6 +167,19 @@ export interface IssueDuplicateOf {
   status: IssueStatus;
 }
 
+/**
+ * One side of an issue dependency (Contango fork, issue_dependency): the issue
+ * this one is blocked by, or one it blocks. Resolved by the server on the
+ * issue endpoints; absent when connected to a backend without the patch.
+ */
+export interface IssueDependencyRef {
+  id: string;
+  identifier: string;
+  number: number;
+  title: string;
+  status: IssueStatus;
+}
+
 export interface Issue {
   id: string;
   workspace_id: string;
@@ -202,6 +215,9 @@ export interface Issue {
    * Absent when connected to an older backend.
    */
   duplicate_of?: IssueDuplicateOf | null;
+  /** Issues this one waits on, and issues waiting on it (Contango fork); absent on older backends. */
+  blocked_by?: IssueDependencyRef[];
+  blocks?: IssueDependencyRef[];
   project_id: string | null;
   position: number;
   // Ordered barrier group among sibling sub-issues (null = unstaged). The

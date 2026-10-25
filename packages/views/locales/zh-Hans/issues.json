@@ -1369,6 +1369,17 @@
       "rate": "1 小时内触发超过 12 次"
     }
   },
+  "dependencies": {
+    "blocked_by": "被以下阻塞",
+    "blocks": "阻塞以下",
+    "blocked_by_count_other": "被阻塞 {{count}}",
+    "blocks_count_other": "阻塞 {{count}}",
+    "page_title": "依赖关系",
+    "hide_closed": "隐藏已完成和已取消",
+    "only_critical": "仅关键路径",
+    "empty": "未完成的事项之间还没有依赖关系。",
+    "critical_other": "{{count}} 个事项在等待"
+  },
   "duplicates": {
     "banner_prefix": "重复于",
     "unmark": "不是重复",

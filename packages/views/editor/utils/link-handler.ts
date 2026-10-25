@@ -26,6 +26,7 @@ import type { LinkClickIntent } from "../../navigation/click-intent";
  */
 const WORKSPACE_ROUTE_SEGMENTS = new Set([
   "usage",
+  "dependencies",
   "issues",
   "projects",
   "autopilots",

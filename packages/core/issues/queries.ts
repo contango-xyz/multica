@@ -132,6 +132,7 @@ export const issueKeys = {
   identifier: (wsId: string, identifier: string) =>
     [...issueKeys.all(wsId), "identifier", identifier] as const,
   /** Prefix for every per-issue duplicate-relation query in a workspace. */
+  dependencyGraph: (wsId: string) => [...issueKeys.all(wsId), "dependency-graph"] as const,
   duplicatesAll: (wsId: string) =>
     [...issueKeys.all(wsId), "duplicates"] as const,
   duplicates: (wsId: string, id: string) =>
@@ -503,6 +504,15 @@ export function childIssueProgressOptions(wsId: string) {
 }
 
 /** Both sides of an issue's duplicate relation: its original and its duplicates. */
+/** The workspace's issue dependency graph (Contango fork). */
+export function dependencyGraphOptions(wsId: string) {
+  return queryOptions({
+    queryKey: issueKeys.dependencyGraph(wsId),
+    queryFn: () => api.getDependencyGraph(),
+    refetchOnMount: "always",
+  });
+}
+
 export function issueDuplicatesOptions(wsId: string, id: string) {
   return queryOptions({
     queryKey: issueKeys.duplicates(wsId, id),

@@ -1418,6 +1418,11 @@ export const CommentSubIssueTaskResponseSchema = z.object({
   task_id: z.string().min(1),
 }).loose();
 
+// Contango fork (issue dependencies): one side of a blocked-by edge.
+const IssueDependencyRefSchema = z
+  .object({ id: z.string(), identifier: z.string(), number: z.number(), title: z.string(), status: z.string() })
+  .loose();
+
 export const IssueSchema = z.object({
   id: z.string(),
   workspace_id: z.string(),
@@ -1457,6 +1462,10 @@ export const IssueSchema = z.object({
     .nullable()
     .optional()
     .catch(undefined),
+  // Contango fork: issues this one is blocked by / blocks. Additive display data
+  // (same disproportionate-failure reasoning as duplicate_of); older backends omit them.
+  blocked_by: z.array(IssueDependencyRefSchema).optional().catch(undefined),
+  blocks: z.array(IssueDependencyRefSchema).optional().catch(undefined),
   project_id: z.string().nullable(),
   position: z.number(),
   // Older backends predate `stage`; default to null so a missing field parses
@@ -1749,6 +1758,25 @@ export const SubscribersListSchema = z.array(SubscriberSchema);
 
 export const ChildIssuesResponseSchema = z.object({
   issues: z.array(IssueSchema).default([]),
+}).loose();
+
+// Contango fork: GET /api/issues/dependency-graph.
+export const DependencyGraphResponseSchema = z.object({
+  nodes: z
+    .array(
+      z
+        .object({
+          id: z.string(),
+          identifier: z.string(),
+          number: z.number(),
+          title: z.string(),
+          status: z.string(),
+          critical_path: z.number().nullable().default(null),
+        })
+        .loose(),
+    )
+    .default([]),
+  edges: z.array(z.object({ from: z.string(), to: z.string() }).loose()).default([]),
 }).loose();
 
 export const IssueDuplicatesResponseSchema = z.object({

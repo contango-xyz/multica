@@ -1369,6 +1369,17 @@
       "rate": "1시간에 12회 넘게 실행됨"
     }
   },
+  "dependencies": {
+    "blocked_by": "선행 차단 이슈",
+    "blocks": "차단 중인 이슈",
+    "blocked_by_count_other": "선행 차단 {{count}}",
+    "blocks_count_other": "차단 중 {{count}}",
+    "page_title": "의존성",
+    "hide_closed": "완료 및 취소 숨기기",
+    "only_critical": "크리티컬 패스만",
+    "empty": "아직 열린 이슈 간 의존성이 없습니다.",
+    "critical_other": "{{count}}개 이슈가 대기 중"
+  },
   "duplicates": {
     "banner_prefix": "중복 원본:",
     "unmark": "중복 아님",

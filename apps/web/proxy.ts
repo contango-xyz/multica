@@ -23,6 +23,7 @@ const LEGACY_ROUTE_SEGMENTS = new Set([
   "skills",
   "settings",
   "usage",
+  "dependencies",
 ]);
 
 function resolveLocale(req: NextRequest): string {

@@ -14,6 +14,7 @@ import type {
   MoveIssueRequest,
   UpdateIssueRequest,
   IssueDuplicates,
+  DependencyGraph,
   GroupedIssuesResponse,
   ListIssuesResponse,
   SearchIssuesResponse,
@@ -275,6 +276,7 @@ import {
   StartMikaOnboardingResponseSchema,
   ChildIssuesResponseSchema,
   IssueDuplicatesResponseSchema,
+  DependencyGraphResponseSchema,
   ChildIssueProgressResponseSchema,
   CommentsListSchema,
   CommentTriggerPreviewSchema,
@@ -1576,6 +1578,13 @@ export class ApiClient {
     return this.fetch(`/api/issues/${id}/move`, {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  }
+
+  async getDependencyGraph(): Promise<DependencyGraph> {
+    const raw = await this.fetch<unknown>("/api/issues/dependency-graph");
+    return parseWithFallback(raw, DependencyGraphResponseSchema, { nodes: [], edges: [] }, {
+      endpoint: "GET /api/issues/dependency-graph",
     });
   }
 

@@ -97,6 +97,23 @@ export interface UpdateIssueRequest {
 }
 
 /** Both sides of an issue's duplicate relation (MUL-7349). */
+/** One issue on the workspace dependency graph (Contango fork). */
+export interface DependencyGraphNode {
+  id: string;
+  identifier: string;
+  number: number;
+  title: string;
+  status: string;
+  /** The workspace's "Critical path" number property: how many open cards wait on this one. */
+  critical_path: number | null;
+}
+
+/** GET /api/issues/dependency-graph: every blocker → blocked edge in the workspace. */
+export interface DependencyGraph {
+  nodes: DependencyGraphNode[];
+  edges: { from: string; to: string }[];
+}
+
 export interface IssueDuplicates {
   /** The original this issue duplicates, when it is marked as a duplicate. */
   duplicate_of: Issue | null;

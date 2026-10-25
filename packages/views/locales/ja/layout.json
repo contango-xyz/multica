@@ -9,6 +9,7 @@
     "agents": "エージェント",
     "squads": "スクワッド",
     "usage": "分析",
+    "dependencies": "依存関係",
     "runtimes": "ランタイム",
     "skills": "スキル",
     "settings": "設定"

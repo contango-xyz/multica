@@ -1369,6 +1369,17 @@
       "rate": "1 時間に 12 回を超えて起動"
     }
   },
+  "dependencies": {
+    "blocked_by": "ブロック元",
+    "blocks": "ブロック先",
+    "blocked_by_count_other": "ブロック元 {{count}}",
+    "blocks_count_other": "ブロック先 {{count}}",
+    "page_title": "依存関係",
+    "hide_closed": "完了とキャンセルを非表示",
+    "only_critical": "クリティカルパスのみ",
+    "empty": "未完了の課題間に依存関係はまだありません。",
+    "critical_other": "{{count}} 件が待機中"
+  },
   "duplicates": {
     "banner_prefix": "重複元:",
     "unmark": "重複ではない",

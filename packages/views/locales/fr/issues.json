@@ -1415,6 +1415,20 @@
       "rate": "plus de 12 exécutions en une heure"
     }
   },
+  "dependencies": {
+    "blocked_by": "Bloqué par",
+    "blocks": "Bloque",
+    "blocked_by_count_one": "Bloqué par {{count}}",
+    "blocked_by_count_other": "Bloqué par {{count}}",
+    "blocks_count_one": "Bloque {{count}}",
+    "blocks_count_other": "Bloque {{count}}",
+    "page_title": "Dépendances",
+    "hide_closed": "Masquer terminés et annulés",
+    "only_critical": "Chemin critique uniquement",
+    "empty": "Aucune dépendance entre les tickets ouverts pour l’instant.",
+    "critical_one": "{{count}} ticket en attente",
+    "critical_other": "{{count}} tickets en attente"
+  },
   "duplicates": {
     "banner_prefix": "Doublon de",
     "unmark": "Pas un doublon",
