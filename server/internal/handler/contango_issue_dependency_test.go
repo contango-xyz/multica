@@ -179,3 +179,51 @@ func TestIssueDependencyShownInIssueList(t *testing.T) {
 		t.Fatalf("listed blocker blocks = %v, want one", c.Blocks)
 	}
 }
+
+func TestWorkspaceDependencyGraph(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	blocked := createIssueForTest(t, map[string]any{"title": "graph: blocked card"})
+	blocker := createIssueForTest(t, map[string]any{"title": "graph: blocker card"})
+	loner := createIssueForTest(t, map[string]any{"title": "graph: no dependencies"})
+	addDependencyForTest(t, blocked.ID, blocker.ID, http.StatusOK)
+
+	w := httptest.NewRecorder()
+	testHandler.ListWorkspaceDependencies(w, newRequest(http.MethodGet, "/api/issues/dependency-graph", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListWorkspaceDependencies: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var out struct {
+		Nodes []DependencyGraphNode `json:"nodes"`
+		Edges []DependencyGraphEdge `json:"edges"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&out); err != nil {
+		t.Fatalf("decode graph: %v", err)
+	}
+	nodes := map[string]DependencyGraphNode{}
+	for _, n := range out.Nodes {
+		nodes[n.ID] = n
+	}
+	for _, id := range []string{blocked.ID, blocker.ID} {
+		n, ok := nodes[id]
+		if !ok {
+			t.Fatalf("graph is missing node %s", id)
+		}
+		if n.Identifier == "" || n.Status == "" || n.CriticalPath != nil {
+			t.Fatalf("node %+v: want identifier, status and no critical path", n)
+		}
+	}
+	if _, ok := nodes[loner.ID]; ok {
+		t.Fatalf("graph includes an issue with no dependencies")
+	}
+	found := false
+	for _, e := range out.Edges {
+		if e.From == blocker.ID && e.To == blocked.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("graph edges %+v lack blocker → blocked %s → %s", out.Edges, blocker.ID, blocked.ID)
+	}
+}
