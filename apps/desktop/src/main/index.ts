@@ -76,12 +76,11 @@ import {
 } from "./notification-gate";
 import {
   chatSessionPath,
-  RecentPush,
   registerForPush,
   routeForPushPayload,
   type PushRoute,
 } from "./push";
-import { loadNativeAddon, startNativePushClicks } from "./push-click";
+import { PushClicks, loadNativeAddon, startNativePushClicks } from "./push-click";
 
 configureLinuxFileDialogs(app.commandLine);
 
@@ -168,11 +167,15 @@ let authSessionGeneration = 0;
 // Set by the renderer while this device is registered for APNs; read in
 // `notification:show` so a local banner never duplicates a remote push.
 let pushActive = false;
-// The last APNs push received while the app was in the background; the next
-// activation within the click window opens it (see RecentPush). Only used when
-// the fork's native click addon is not running.
-const recentPush = new RecentPush();
-let nativePushClicks = false;
+// Clicks on APNs notifications: reported natively by the fork's push-click
+// addon, else guessed from the next activation (see PushClicks).
+const pushClicks = new PushClicks({
+  open: (route) => openPushRoute(route),
+  focus: () => {
+    const window = ensureMainWindow();
+    if (window) focusMainWindow(window);
+  },
+});
 // Route from the push notification that cold-launched the app, if any.
 let pendingLaunchRoute: PushRoute | null = null;
 const rendererRouteContexts = new WeakMap<
@@ -719,29 +722,23 @@ if (!gotTheLock) {
     pendingLaunchRoute = routeForPushPayload(
       (launchInfo as { userInfo?: unknown } | undefined)?.userInfo ?? launchInfo,
     );
-    nativePushClicks = startNativePushClicks({
-      platform: process.platform,
-      isPackaged: app.isPackaged,
-      resourcesPath: process.resourcesPath,
-      ensureNotificationDelegate: () => Notification.isSupported(),
-      load: loadNativeAddon,
-      onClick: (userInfo) => openPushRoute(routeForPushPayload(userInfo)),
-    });
+    pushClicks.start(launchInfo, (onClick) =>
+      startNativePushClicks({
+        platform: process.platform,
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        ensureNotificationDelegate: () => Notification.isSupported(),
+        load: loadNativeAddon,
+        onClick,
+      }),
+    );
   });
 
   if (process.platform === "darwin") {
     pushNotifications.on("received-apns-notification", (_event, userInfo) => {
-      if (nativePushClicks) return;
-      // A push that arrives while the app is in front is no click candidate:
-      // no activation follows a click on it.
-      recentPush.received(
-        BrowserWindow.getFocusedWindow() ? null : routeForPushPayload(userInfo),
-      );
+      pushClicks.received(userInfo, BrowserWindow.getFocusedWindow() !== null);
     });
-    app.on("did-become-active", () => {
-      if (nativePushClicks) return;
-      openPushRoute(recentPush.takeOnActivate());
-    });
+    app.on("did-become-active", () => pushClicks.activated());
   }
 
   app.whenReady().then(async () => {
