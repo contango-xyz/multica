@@ -34,7 +34,10 @@
 ### Task 1: Server accepts macOS devices
 
 **Files:**
-- Create: `server/migrations/567_push_device_platform_macos.up.sql`, `server/migrations/567_push_device_platform_macos.down.sql`
+- Numbering: fork migrations go after upstream's highest (docs/contango/PATCHES.md). 594 was
+  free on 2026-10-26 (upstream main tops out at 593). Re-check `ls server/migrations` against
+  `origin/main` before creating, and take the next free number if upstream has moved.
+- Create: `server/migrations/594_push_device_platform_macos.up.sql`, `server/migrations/594_push_device_platform_macos.down.sql`
 - Modify: `server/internal/handler/push_device.go` (platform switch, ~line 39)
 - Test: `server/internal/handler/push_device_test.go`
 
@@ -66,13 +69,13 @@ Check the success status the existing iOS register test expects and use exactly 
 
 - [ ] **Step 3: Migration**
 
-`567_push_device_platform_macos.up.sql`:
+`594_push_device_platform_macos.up.sql`:
 ```sql
 -- The fork desktop app registers APNs tokens too.
 ALTER TABLE push_device DROP CONSTRAINT IF EXISTS push_device_platform_check;
 ALTER TABLE push_device ADD CONSTRAINT push_device_platform_check CHECK (platform IN ('ios', 'macos'));
 ```
-`567_push_device_platform_macos.down.sql`:
+`594_push_device_platform_macos.down.sql`:
 ```sql
 DELETE FROM push_device WHERE platform = 'macos';
 ALTER TABLE push_device DROP CONSTRAINT IF EXISTS push_device_platform_check;
@@ -293,10 +296,10 @@ if (app.getVersion().includes("-contango.")) {
 
 - [ ] **Step 7: Run tests** — Step 2 commands. Expected: PASS. Also `pnpm --filter @multica/desktop typecheck`.
 
-- [ ] **Step 8: Real build.** `git tag v0.6.1-contango.1 && pnpm --filter @multica/desktop contango:build`. Then verify:
+- [ ] **Step 8: Real build.** `git tag v0.7.0-contango.1 && pnpm --filter @multica/desktop contango:build`. Then verify:
   - `codesign -dv --entitlements - dist/mac-arm64/Multica.app 2>&1 | grep -E "Authority=Developer ID|aps-environment|TeamIdentifier"` → all three present.
   - `spctl -a -vv dist/mac-arm64/Multica.app` → `accepted`, `source=Notarized Developer ID`.
-  - `ls dist/` shows the DMG, ZIP, `.blockmap` and `contango-mac.yml`; `grep version dist/contango-mac.yml` → `0.6.1-contango.1`.
+  - `ls dist/` shows the DMG, ZIP, `.blockmap` and `contango-mac.yml`; `grep version dist/contango-mac.yml` → `0.7.0-contango.1`.
   - `strings dist/mac-arm64/Multica.app/Contents/Resources/app.asar | grep -c "$CONTANGO_API_URL"` ≥ 1.
   Do not push the tag yet.
 
@@ -624,7 +627,7 @@ Mount `<DesktopPushBridge appId={__CONTANGO_APP_ID__} />` next to `DesktopInboxB
 
 Needs Task 1 deployed on ops (ask the owner to run the admin-box deploy; give them the image digest and these env changes: add the desktop bundle id to `MULTICA_APNS_ALLOWED_BUNDLE_IDS`, comma-separated) and Tasks 2–6.
 
-- [ ] Build: bump tag (`v0.6.1-contango.1` if unpublished, else next n), `contango:build`, install the DMG after the owner deletes `/Applications/Multica.app` (upstream).
+- [ ] Build: bump tag (`v0.7.0-contango.1` if unpublished, else next n), `contango:build`, install the DMG after the owner deletes `/Applications/Multica.app` (upstream).
 - [ ] Log in. Check: `push_device` has a `macos` row for the owner (ask the admin box, or `GET`-free proof: the next step).
 - [ ] Record each of these as PASS/FAIL in the PR description:
 
@@ -739,9 +742,9 @@ ssh "$ADMIN" "publish-desktop ~/$STAGE"
 
 Add `CONTANGO_ADMIN_SSH=ubuntu@<admin host>` to the env file template in Task 2. Run it in the foreground (SSH keys are touch-confirmed).
 
-- [ ] **Step 3: First publish** — publish the build from Task 7, then `curl -s https://<server host>/desktop/contango-mac.yml` shows `0.6.1-contango.1`.
-- [ ] **Step 4: Update E2E** — tag `v0.6.1-contango.2`, build, publish. On the Mac running `.1`: wait up to 1 h or use Settings → Updates → check; quit → reopen → About shows `0.6.1-contango.2`.
-- [ ] **Step 5: Push tags + branch** — `git push contango contango/desktop-build v0.6.1-contango.1 v0.6.1-contango.2`. (Tags contain no secrets.)
+- [ ] **Step 3: First publish** — publish the build from Task 7, then `curl -s https://<server host>/desktop/contango-mac.yml` shows `0.7.0-contango.1`.
+- [ ] **Step 4: Update E2E** — tag `v0.7.0-contango.2`, build, publish. On the Mac running `.1`: wait up to 1 h or use Settings → Updates → check; quit → reopen → About shows `0.7.0-contango.2`.
+- [ ] **Step 5: Push tags + branch** — `git push contango contango/desktop-build v0.7.0-contango.1 v0.7.0-contango.2`. (Tags contain no secrets.)
 - [ ] **Step 6: Commit** — `chore(desktop): fork release publish script`.
 
 ---
