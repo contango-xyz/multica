@@ -130,3 +130,18 @@ func TestUnregisterOnlyDeletesOwnToken(t *testing.T) {
 		t.Fatalf("own token still present")
 	}
 }
+
+func TestRegisterPushDeviceAcceptsMacOS(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	resetPushDevices(t)
+	body := map[string]any{"platform": "macos", "token": "tok-mac", "bundle_id": "com.example.desktop", "environment": "production"}
+	if code := registerPush(t, testUserID, body); code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", code, http.StatusNoContent)
+	}
+	owner, disabled := pushOwner(t, "tok-mac")
+	if owner != testUserID || disabled {
+		t.Fatalf("owner=%q disabled=%v", owner, disabled)
+	}
+}
