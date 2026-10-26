@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderEntitlements, builderOverrides, builderConfig, builderEnv, parseEnvFile, verifyCommands, assertCleanTree } from "./contango-build.mjs";
+import { renderEntitlements, builderOverrides, builderConfig, builderEnv, parseEnvFile, verifyCommands, assertCleanTree, addonBuildArgs } from "./contango-build.mjs";
 
 const env = {
   CONTANGO_APP_ID: "com.example.desktop", CONTANGO_TEAM_ID: "ABCDE12345",
@@ -42,7 +42,8 @@ test("generated config extends the base and replaces publish", () => {
   assert.equal(c.extends, "/x/electron-builder.yml");
   assert.equal(c.appId, "com.example.desktop");
   assert.deepEqual(c.extraMetadata, { version: "0.7.0-contango.3" });
-  assert.deepEqual(c.mac, { entitlements: "/tmp/ent.plist", provisioningProfile: "/tmp/p.provisionprofile", notarize: true });
+  assert.deepEqual(c.mac, { entitlements: "/tmp/ent.plist", provisioningProfile: "/tmp/p.provisionprofile", notarize: true,
+    extraResources: [{ from: "native/push-click/build/Release/push_click.node", to: "push-click.node" }] });
   assert.deepEqual(c.publish, [{ provider: "generic", url: "https://srv.example.test/desktop/", channel: "contango" }]);
 });
 
@@ -113,4 +114,14 @@ test("fuses close the Node entry points into the signed app", () => {
     enableNodeCliInspectArguments: false,
   });
   assert.deepEqual(builderConfig(o, "/x", "1").electronFuses, o.electronFuses);
+});
+
+// Upstream's top-level extraResources (LICENSE, NOTICE) stay: electron-builder
+// adds mac.extraResources to them, and only the push-click addon is added.
+test("push-click addon ships in Resources, built for the installed Electron", () => {
+  const c = builderConfig(builderOverrides(env, "/tmp/ent.plist"), "/x/electron-builder.yml", "1");
+  assert.equal("extraResources" in c, false);
+  assert.deepEqual(c.mac.extraResources, [{ from: "native/push-click/build/Release/push_click.node", to: "push-click.node" }]);
+  assert.deepEqual(addonBuildArgs("44.9.3"), ["exec", "node-gyp", "rebuild", "--directory", "native/push-click",
+    "--target=44.9.3", "--arch=arm64", "--dist-url=https://electronjs.org/headers"]);
 });

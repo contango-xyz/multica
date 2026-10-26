@@ -11,6 +11,10 @@ const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED = ["CONTANGO_APP_ID", "CONTANGO_TEAM_ID", "CONTANGO_PROVISIONING_PROFILE", "CONTANGO_API_URL", "CONTANGO_UPDATE_URL"];
 // electron-builder picks the APPLE_* ones over APPLE_KEYCHAIN_PROFILE when
 // present; CSC_IDENTITY_AUTO_DISCOVERY=false would skip signing entirely.
+// native/push-click: reports clicks on APNs notifications (src/main/push-click.ts).
+// Platform extraResources add to upstream's list instead of replacing it; the
+// file lands in Contents/Resources, outside the asar, and is signed with the app.
+export const PUSH_CLICK_ADDON = { from: "native/push-click/build/Release/push_click.node", to: "push-click.node" };
 const STRIPPED_ENV = ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER", "CSC_IDENTITY_AUTO_DISCOVERY"];
 
 export function renderEntitlements(template, env) {
@@ -32,7 +36,12 @@ export function builderOverrides(env, entitlementsPath) {
   }
   return {
     appId: env.CONTANGO_APP_ID,
-    mac: { entitlements: entitlementsPath, provisioningProfile: env.CONTANGO_PROVISIONING_PROFILE, notarize: true },
+    mac: {
+      entitlements: entitlementsPath,
+      provisioningProfile: env.CONTANGO_PROVISIONING_PROFILE,
+      notarize: true,
+      extraResources: [PUSH_CLICK_ADDON],
+    },
     publish: { provider: "generic", url: env.CONTANGO_UPDATE_URL, channel: "contango" },
     // Arrays replace upstream's list, so multica:// is restated.
     protocols: [
@@ -62,6 +71,12 @@ export function builderConfig(overrides, baseConfigPath, version) {
     protocols: overrides.protocols,
     electronFuses: overrides.electronFuses,
   };
+}
+
+// Compiles the addon against the installed Electron's headers (N-API, arm64).
+export function addonBuildArgs(electronVersion) {
+  return ["exec", "node-gyp", "rebuild", "--directory", "native/push-click", `--target=${electronVersion}`,
+    "--arch=arm64", "--dist-url=https://electronjs.org/headers"];
 }
 
 // Notarize with the notarytool keychain profile only; without it
@@ -121,6 +136,8 @@ function main() {
   writeFileSync(config, JSON.stringify(builderConfig(builderOverrides(env, entitlements), join(desktopRoot, "electron-builder.yml"), version), null, 2));
   const run = (cmd, args) => execFileSync(cmd, args, { cwd: desktopRoot, stdio: "inherit", env });
   run("pnpm", ["run", "build"]);
+  const electronVersion = JSON.parse(readFileSync(join(desktopRoot, "node_modules/electron/package.json"), "utf8")).version;
+  run("pnpm", addonBuildArgs(electronVersion));
   run("pnpm", ["exec", "electron-builder", "--mac", "--arm64", "--publish", "never", "--config", config]);
   for (const [cmd, args] of verifyCommands(join(desktopRoot, "dist/mac-arm64/Multica.app"))) run(cmd, args);
 }
