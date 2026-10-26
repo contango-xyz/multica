@@ -94,7 +94,15 @@ export function verifyCommands(appPath) {
   ];
 }
 
+// `git status --porcelain --untracked-files=no` output: anything means
+// tracked changes, so the build would not match the release tag.
+export function assertCleanTree(porcelain) {
+  const dirty = porcelain.split("\n").filter((line) => line.trim());
+  if (dirty.length) throw new Error(`Working tree is dirty; commit or stash first:\n${dirty.join("\n")}`);
+}
+
 function main() {
+  assertCleanTree(execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: desktopRoot }).toString());
   const env = builderEnv({ ...process.env, ...loadEnvFile(join(desktopRoot, ".env.contango.local")) });
   const version = execFileSync("git", ["describe", "--tags", "--match", "v*-contango.*", "--exact-match"], { cwd: desktopRoot })
     .toString().trim().replace(/^v/, "");
