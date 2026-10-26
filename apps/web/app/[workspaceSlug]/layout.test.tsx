@@ -111,6 +111,7 @@ function renderLayout(slug = "acme") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   state.user = {
     id: "user-1",
     onboarded_at: "2026-01-01T00:00:00Z",

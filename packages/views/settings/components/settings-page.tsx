@@ -76,7 +76,7 @@ export interface ExtraSettingsTab {
 }
 
 interface SettingsPageProps {
-  /** Device settings supplied by the desktop platform. */
+  /** Device settings supplied by the platform (desktop app or web). */
   extraDeviceTabs?: ExtraSettingsTab[];
 }
 

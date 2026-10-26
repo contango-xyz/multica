@@ -8,6 +8,8 @@ import { readOpenInDesktop, writeOpenInDesktop } from "@/platform/desktop-handof
 
 export function OpenInDesktopSetting() {
   const { t } = useT("settings");
+  // Safe to read localStorage here: the workspace layout renders nothing until
+  // auth loads client-side, so this never runs during SSR.
   const [enabled, setEnabled] = useState(readOpenInDesktop);
   const label = t(($) => $.desktop.open_in_app.toggle);
 
