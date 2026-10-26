@@ -126,6 +126,10 @@ per build.
 - **Project id:** `EAS_PROJECT_ID_PROD` in `app.config.ts` holds the production
   EAS project id (from `eas init`). With a project id, a production config
   refuses missing server URLs or bundle id, or URLs pointing at `multica.ai`.
+- **Committed files only:** `cli.requireCommit` makes EAS build from a git
+  checkout. Without it EAS copies the working tree filtered by its own
+  `.gitignore` reader, which ignores this folder's `!data/` exception to the
+  root `data/` rule and drops `data/` from the build.
 - **Submit:** `submit.production.ios.ascAppId` is the App Store Connect app's
   numeric Apple ID, committed because EAS cannot read it from an environment
   variable (without it `eas submit` needs an interactive Apple sign-in).

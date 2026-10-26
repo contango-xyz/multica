@@ -1,7 +1,9 @@
 {
   "cli": {
     "version": ">= 21.1.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "promptToConfigurePushNotifications": false,
+    "requireCommit": true
   },
   "build": {
     "production": {
