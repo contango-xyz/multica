@@ -14,6 +14,17 @@ function isFocusOnlyPath(pathname: string): boolean {
   );
 }
 
+function routeOrFocus(pathname: string, path: string): WebLinkDecision {
+  return isFocusOnlyPath(pathname) ? { kind: "focus" } : { kind: "route", path };
+}
+
+// A path handed over by a `multica://open?path=` link: exactly one leading
+// `/` (no `//host`, absolute URLs or empty), and not a focus-only path.
+export function decideAppPath(path: string): WebLinkDecision {
+  if (!/^\/(?![/\\])/.test(path)) return { kind: "focus" };
+  return routeOrFocus(new URL(path, "http://localhost").pathname, path);
+}
+
 // Links a link router (e.g. Choosy) hands to the app. A URL on our host is
 // never handed back to the OS: a router rule "our host -> Multica" would send
 // it straight back here, forever. Such URLs either route in-app or only bring
@@ -33,6 +44,5 @@ export function decideWebLink(url: string, appUrl: string | null): WebLinkDecisi
     (u.protocol === "https:" || u.protocol === "http:") &&
     u.hostname === new URL(appUrl).hostname;
   if (!ours) return { kind: "external" };
-  if (isFocusOnlyPath(u.pathname)) return { kind: "focus" };
-  return { kind: "route", path: `${u.pathname}${u.search}${u.hash}` };
+  return routeOrFocus(u.pathname, `${u.pathname}${u.search}${u.hash}`);
 }

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { decideWebLink } from "./web-link";
+import { decideAppPath, decideWebLink } from "./web-link";
 
 const APP = "https://srv.example.test";
 
@@ -44,5 +44,26 @@ describe("decideWebLink", () => {
   it("only focuses when runtime config is missing", () => {
     expect(decideWebLink("https://srv.example.test/acme", null)).toEqual({ kind: "focus" });
     expect(decideWebLink("https://evil.example.test/x", null)).toEqual({ kind: "focus" });
+  });
+});
+
+describe("decideAppPath", () => {
+  it("routes an in-app path with query and hash", () => {
+    expect(decideAppPath("/acme/issues/abc?x=1#c")).toEqual({ kind: "route", path: "/acme/issues/abc?x=1#c" });
+  });
+
+  it.each([
+    "/",
+    "/login",
+    "/login?next=%2Facme",
+    "/desktop/x",
+    "/api/x",
+    "//evil.test/x",
+    "/\\evil.test/x",
+    "https://evil.test/x",
+    "",
+    "acme/issues",
+  ])("only focuses for %j", (p) => {
+    expect(decideAppPath(p)).toEqual({ kind: "focus" });
   });
 });

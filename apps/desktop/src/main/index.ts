@@ -18,7 +18,7 @@ import { setupDaemonManager } from "./daemon-manager";
 import { setupLocalDirectory } from "./local-directory";
 import { configureLinuxFileDialogs } from "./linux-file-dialog";
 import { openExternalSafely, downloadURLSafely } from "./external-url";
-import { decideWebLink } from "./web-link";
+import { decideAppPath, decideWebLink } from "./web-link";
 import { installContextMenu } from "./context-menu";
 import { handleAppShortcut } from "./keyboard-shortcuts";
 import { installNavigationGestures } from "./navigation-gestures";
@@ -246,6 +246,20 @@ function handleDeepLink(url: string): void {
     if (parsed.hostname === "invite") {
       const id = parsed.pathname.replace(/^\//, "");
       if (id) dispatchToMainRenderer("invite:open", decodeURIComponent(id));
+      return;
+    }
+
+    // multica://open?path=<path>
+    // Sent by the web app to hand a page over to the desktop app. An invalid
+    // or focus-only path just brings the app forward.
+    if (parsed.hostname === "open") {
+      const decision = decideAppPath(parsed.searchParams.get("path") ?? "");
+      if (decision.kind === "route") {
+        dispatchToMainRenderer("route:open", decision.path);
+      } else {
+        const window = ensureMainWindow();
+        if (window) focusMainWindow(window);
+      }
       return;
     }
   } catch {
