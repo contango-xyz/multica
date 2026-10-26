@@ -16,7 +16,7 @@ import { unregisterForPush } from "@/data/push-registration";
 import { Alert, ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Application from "expo-application";
 import * as Updates from "expo-updates";
 import { useQuery } from "@tanstack/react-query";
@@ -101,7 +101,13 @@ export default function SettingsPage() {
   };
 
   const [checking, setChecking] = useState(false);
-  const { currentlyRunning, isUpdatePending } = Updates.useUpdates();
+  const { currentlyRunning, isUpdatePending, downloadedUpdate } = Updates.useUpdates();
+  // Ref so a manual check reads the pending state at the moment it needs it.
+  const pendingRef = useRef({ isUpdatePending, updateId: downloadedUpdate?.updateId });
+  const downloadedId = downloadedUpdate?.updateId;
+  useEffect(() => {
+    pendingRef.current = { isUpdatePending, updateId: downloadedId };
+  }, [isUpdatePending, downloadedId]);
   const about = describeAppVersion(
     {
       version: Application.nativeApplicationVersion,
@@ -122,7 +128,7 @@ export default function SettingsPage() {
     if (checking) return;
     setChecking(true);
     try {
-      const result = await checkForUpdateManually(tCommon, isUpdatePending);
+      const result = await checkForUpdateManually(tCommon, () => pendingRef.current);
       if (result === "up-to-date") Alert.alert(t("about.up_to_date"));
       else if (result === "error") Alert.alert(t("about.check_failed"));
     } finally {

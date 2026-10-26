@@ -59,30 +59,51 @@ export function promptForPendingUpdate(
 
 export type ManualCheckResult = "prompted" | "up-to-date" | "error";
 
+export interface PendingState {
+  isUpdatePending: boolean;
+  updateId?: string;
+}
+
+export interface ManualCheckDeps extends Omit<OtaUpdateDeps, "fetch" | "prompt"> {
+  fetch(): Promise<{ isNew: boolean; updateId?: string }>;
+  /** Latest pending-update state, read at call time (not captured at tap time). */
+  getPending(): PendingState;
+  /** `updateId` lets the caller gate duplicates; undefined means always show. */
+  prompt(onRestart: () => void, updateId?: string): void;
+}
+
 /**
  * User-initiated check from Settings. Unlike the automatic flow it reports an
  * outcome, ignores the 30-minute throttle, and re-offers an update that is
- * already downloaded and waiting for a restart.
+ * already downloaded and waiting for a restart (including one the automatic
+ * check downloaded while this one was running).
  */
-export async function manualUpdateCheck(
-  deps: OtaUpdateDeps & { isUpdatePending: boolean },
-): Promise<ManualCheckResult> {
+export async function manualUpdateCheck(deps: ManualCheckDeps): Promise<ManualCheckResult> {
   if (!deps.isEnabled) return "up-to-date";
-  const prompt = () =>
+  const prompt = (updateId?: string) =>
     deps.prompt(() => {
       deps.reload().catch((err: unknown) => deps.log("OTA reload failed", err));
-    });
+    }, updateId);
   try {
-    if (deps.isUpdatePending) {
-      prompt();
+    if (deps.getPending().isUpdatePending) {
+      prompt(); // explicit re-offer: the user asked
       return "prompted";
     }
     const { isAvailable } = await deps.check();
-    if (!isAvailable) return "up-to-date";
-    const { isNew } = await deps.fetch();
-    if (!isNew) return "up-to-date";
-    prompt();
-    return "prompted";
+    if (isAvailable) {
+      const { isNew, updateId } = await deps.fetch();
+      if (isNew) {
+        prompt(updateId);
+        return "prompted";
+      }
+    }
+    // The automatic check may have downloaded it while we were running.
+    const latest = deps.getPending();
+    if (latest.isUpdatePending) {
+      prompt(latest.updateId);
+      return "prompted";
+    }
+    return "up-to-date";
   } catch (err) {
     deps.log("OTA manual update check failed", err);
     return "error";

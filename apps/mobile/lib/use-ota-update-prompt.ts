@@ -13,6 +13,7 @@ import {
   checkAndPromptForUpdate,
   manualUpdateCheck,
   type ManualCheckResult,
+  type PendingState,
   createUpdatePromptGate,
   promptForPendingUpdate,
 } from "@/lib/ota-update";
@@ -33,21 +34,21 @@ function showUpdatePrompt(t: TFn, onRestart: () => void): void {
 }
 
 /** Manual "Check for updates": ignores the throttle, uses the shared prompt. */
-export function checkForUpdateManually(t: TFn, isUpdatePending: boolean): Promise<ManualCheckResult> {
-  let fetchedId: string | undefined;
+export function checkForUpdateManually(
+  t: TFn,
+  getPending: () => PendingState,
+): Promise<ManualCheckResult> {
   return manualUpdateCheck({
     isEnabled: Updates.isEnabled,
-    isUpdatePending,
+    getPending,
     check: () => Updates.checkForUpdateAsync(),
     fetch: async () => {
       const result = await Updates.fetchUpdateAsync();
-      if (result.isNew) fetchedId = result.manifest?.id;
-      return { isNew: result.isNew };
+      return { isNew: result.isNew, updateId: result.manifest?.id };
     },
-    prompt: (onRestart) => {
-      // Mark as seen so the automatic paths do not prompt again for it.
-      if (fetchedId) promptGate(fetchedId);
-      showUpdatePrompt(t, onRestart);
+    prompt: (onRestart, updateId) => {
+      // Same gate as the automatic paths: one prompt per update id.
+      if (!updateId || promptGate(updateId)) showUpdatePrompt(t, onRestart);
     },
     reload: () => Updates.reloadAsync(),
     log: (msg, err) => console.warn(msg, err),

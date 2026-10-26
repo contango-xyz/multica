@@ -3,6 +3,8 @@ import {
   checkAndPromptForUpdate,
   createUpdatePromptGate,
   manualUpdateCheck,
+  type ManualCheckDeps,
+  type PendingState,
   promptForPendingUpdate,
   type OtaUpdateDeps,
 } from "./ota-update";
@@ -133,13 +135,25 @@ describe("promptForPendingUpdate", () => {
 });
 
 describe("manualUpdateCheck", () => {
-  const manual = (over: Partial<OtaUpdateDeps> = {}, pending = false) =>
-    ({ ...makeDeps(over), isUpdatePending: pending });
+  const manual = (
+    over: Partial<ManualCheckDeps> = {},
+    pending: PendingState | (() => PendingState) = { isUpdatePending: false },
+  ) => {
+    const base = makeDeps();
+    return {
+      ...base,
+      fetch: vi.fn(async () => ({ isNew: true, updateId: "u1" })),
+      getPending: typeof pending === "function" ? pending : () => pending,
+      prompt: vi.fn<(onRestart: () => void, updateId?: string) => void>(),
+      ...over,
+    } as ManualCheckDeps & { prompt: ReturnType<typeof vi.fn<(onRestart: () => void, updateId?: string) => void>> };
+  };
 
-  it("prompts after fetching a new update", async () => {
+  it("prompts after fetching a new update, passing its id for gating", async () => {
     const deps = manual();
     expect(await manualUpdateCheck(deps)).toBe("prompted");
     expect(deps.prompt).toHaveBeenCalledOnce();
+    expect(deps.prompt.mock.calls[0][1]).toBe("u1");
   });
   it("reports up-to-date when nothing is available or fetched", async () => {
     expect(await manualUpdateCheck(manual({ check: async () => ({ isAvailable: false }) }))).toBe("up-to-date");
@@ -148,9 +162,32 @@ describe("manualUpdateCheck", () => {
     expect(deps.prompt).not.toHaveBeenCalled();
   });
   it("re-prompts an already downloaded update without checking", async () => {
-    const deps = manual({}, true);
+    const deps = manual({}, { isUpdatePending: true, updateId: "u0" });
     expect(await manualUpdateCheck(deps)).toBe("prompted");
     expect(deps.check).not.toHaveBeenCalled();
+    expect(deps.prompt.mock.calls[0][1]).toBeUndefined();
+  });
+  it("offers a restart when the automatic check downloaded it mid-flight", async () => {
+    let state: PendingState = { isUpdatePending: false };
+    const deps = manual(
+      {
+        fetch: async () => {
+          state = { isUpdatePending: true, updateId: "u2" };
+          return { isNew: false };
+        },
+      },
+      () => state,
+    );
+    expect(await manualUpdateCheck(deps)).toBe("prompted");
+    expect(deps.prompt.mock.calls[0][1]).toBe("u2");
+  });
+  it("also catches a mid-flight download when nothing was available", async () => {
+    let state: PendingState = { isUpdatePending: false };
+    const deps = manual(
+      { check: async () => { state = { isUpdatePending: true, updateId: "u3" }; return { isAvailable: false }; } },
+      () => state,
+    );
+    expect(await manualUpdateCheck(deps)).toBe("prompted");
   });
   it("returns error and logs when the check throws", async () => {
     const deps = manual({ check: async () => { throw new Error("offline"); } });
@@ -167,5 +204,15 @@ describe("manualUpdateCheck", () => {
     await manualUpdateCheck(deps);
     deps.prompt.mock.calls[0][0]();
     expect(deps.reload).toHaveBeenCalled();
+  });
+  it("a gate already holding the id lets the caller suppress the second prompt", async () => {
+    const gate = createUpdatePromptGate();
+    gate("u1"); // root hook already prompted for u1
+    const shown = vi.fn();
+    const deps = manual({
+      prompt: (onRestart, id) => { if (!id || gate(id)) shown(onRestart); },
+    });
+    expect(await manualUpdateCheck(deps)).toBe("prompted");
+    expect(shown).not.toHaveBeenCalled();
   });
 });
