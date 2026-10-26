@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { configStore } from "@multica/core/config";
 import { CoreProvider } from "@multica/core/platform";
 import { createBrowserCookieLocaleAdapter } from "@multica/core/i18n/browser";
 import type { LocaleResources, SupportedLocale } from "@multica/core/i18n";
@@ -50,13 +51,20 @@ export function WebProviders({
   resources,
   apiBaseUrl,
   wsUrl,
+  desktopDownloadUrl,
 }: {
   children: React.ReactNode;
   locale: SupportedLocale;
   resources: Record<string, LocaleResources>;
   apiBaseUrl?: string;
   wsUrl?: string;
+  desktopDownloadUrl?: string;
 }) {
+  // Constant per deployment, so writing it during render is idempotent and
+  // keeps the SSR markup identical to the hydrated one.
+  if (configStore.getState().desktopDownloadUrl !== (desktopDownloadUrl ?? "")) {
+    configStore.getState().setDesktopDownloadUrl(desktopDownloadUrl);
+  }
   const cookieAuth = !hasLegacyToken();
   const syncUserLocale = useUserLocaleSyncEnabled();
   // Stable identity reference so downstream effects keyed on it don't see a

@@ -173,3 +173,42 @@ describe("fetchLatestRelease", () => {
     expect(result.assets).toEqual({});
   });
 });
+
+describe("fetchLatestRelease with MULTICA_DESKTOP_FEED_URL", () => {
+  const FEED = "https://srv.example.test/desktop/";
+  const YML =
+    "version: 0.7.0-contango.4\nfiles:\n  - url: M-arm64.dmg\n  - url: M-arm64-mac.zip\n";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("serves the fork build and never calls GitHub when the feed works", async () => {
+    vi.stubEnv("MULTICA_DESKTOP_FEED_URL", FEED);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(YML));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await fetchLatestRelease();
+    expect(result.version).toBe("0.7.0-contango.4");
+    expect(result.assets.macArm64Dmg).toBe(`${FEED}M-arm64.dmg`);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("github");
+  });
+
+  it("falls back to upstream releases when the feed fails", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("MULTICA_DESKTOP_FEED_URL", FEED);
+    const upstream = new Response(
+      JSON.stringify([
+        releasePayload({ tag: "v0.2.14", assets: completeAssets("0.2.14") }),
+      ]),
+      { status: 200 },
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("", { status: 502 }))
+      .mockResolvedValueOnce(upstream);
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await fetchLatestRelease();
+    expect(result.version).toBe("v0.2.14");
+  });
+});

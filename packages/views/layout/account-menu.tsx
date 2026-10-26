@@ -15,6 +15,7 @@ import {
   User,
 } from "@multica/ui/icons";
 import { useAuthStore } from "@multica/core/auth";
+import { useConfigStore } from "@multica/core/config";
 import { useWorkspacePaths } from "@multica/core/paths";
 import type { SupportedLocale } from "@multica/core/i18n";
 import { resolvePublicFileUrl } from "@multica/core/workspace/avatar-url";
@@ -78,6 +79,8 @@ export function AccountMenu() {
   const logout = useLogout();
   const { theme, setTheme } = useTheme();
   const language = useLanguageSwitch();
+  // contango (patch 12): the fork's download page when the web server has a feed.
+  const downloadUrl = useConfigStore((state) => state.desktopDownloadUrl) || DOWNLOAD_URL;
   const themeValue = (theme ?? "system") as (typeof THEMES)[number]["value"];
   const name = user?.name ?? "";
   const avatar = (size: "md" | "lg") => (
@@ -171,7 +174,7 @@ export function AccountMenu() {
           <ExternalItem href={DISCORD_URL} icon={<DiscordIcon />} label={t(($) => $.help.discord)} />
           {!isDesktopShell() && (
             <ExternalItem
-              href={DOWNLOAD_URL}
+              href={downloadUrl}
               icon={<Download />}
               label={t(($) => $.help.download_desktop)}
             />
