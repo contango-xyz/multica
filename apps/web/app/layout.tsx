@@ -13,6 +13,7 @@ import {
   resolveBrowserApiBaseUrl,
   resolveBrowserWsUrl,
 } from "@/config/runtime-urls";
+import { normalizeFeedBase } from "@/features/landing/utils/desktop-feed";
 import "./globals.css";
 
 // Inter is the Latin UI face. next/font produces a hashed family (`__Inter_xxx`)
@@ -160,6 +161,11 @@ export default async function RootLayout({
             resources={resources}
             apiBaseUrl={apiBaseUrl}
             wsUrl={wsUrl}
+            desktopDownloadUrl={
+              normalizeFeedBase(process.env.MULTICA_DESKTOP_FEED_URL)
+                ? "/download"
+                : undefined
+            }
           >
             {children}
           </WebProviders>

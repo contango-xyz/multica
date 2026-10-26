@@ -38,8 +38,13 @@ migration deploy) is done by the admin-box agent, not by this runbook.
 
 ## First install for a new person
 
-VPN on, download `https://<server host>/desktop/<dmg>`, delete the upstream Multica app first
+VPN on, open the web app's download page (`https://<server host>/download`, also the Help menu's
+"Desktop app" entry) and take the macOS button, or download `https://<server host>/desktop/<dmg>`, delete the upstream Multica app first
 (different app id, both would register as the same URL handler), open the DMG, drag to Applications.
+
+The page offers our DMG only when ops set `MULTICA_DESKTOP_FEED_URL` on the web container (runtime
+env, not a build arg): the absolute feed base, `https://<server host>/desktop/`. Unset, or when the
+feed cannot be read, the page shows upstream's releases. Other platforms are not offered in this mode.
 
 ## Opening links in the app
 

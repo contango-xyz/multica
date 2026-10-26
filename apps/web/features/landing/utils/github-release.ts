@@ -1,3 +1,4 @@
+import { fetchDesktopFeedRelease, normalizeFeedBase } from "./desktop-feed";
 import {
   hasCompleteAssetSet,
   parseReleaseAssets,
@@ -51,6 +52,14 @@ interface GitHubReleasePayload {
 }
 
 export async function fetchLatestRelease(): Promise<LatestRelease> {
+  // Fork opt-in (runtime env): offer our own desktop build from its update
+  // feed; any failure falls through to the upstream behaviour below.
+  const feedBase = normalizeFeedBase(process.env.MULTICA_DESKTOP_FEED_URL);
+  if (feedBase) {
+    const fork = await fetchDesktopFeedRelease(feedBase);
+    if (fork) return fork;
+  }
+
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",

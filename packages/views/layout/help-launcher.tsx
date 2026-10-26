@@ -36,6 +36,8 @@ const DOWNLOAD_URL = "https://multica.ai/download";
 export function HelpLauncher() {
   const { t, i18n } = useT("layout");
   const serverVersion = useConfigStore((state) => state.serverVersion);
+  const downloadUrl =
+    useConfigStore((state) => state.desktopDownloadUrl) || DOWNLOAD_URL;
   // Web-only: offering "download the desktop app" inside the desktop app is
   // nonsense, and this sidebar is shared — apps/desktop renders the same
   // AppSidebar as the web dashboard, so the entry has to be gated here.
@@ -67,7 +69,7 @@ export function HelpLauncher() {
             <DropdownMenuItem
               render={
                 <a
-                  href={DOWNLOAD_URL}
+                  href={downloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                 />

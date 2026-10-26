@@ -241,6 +241,20 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream ships desktop push and a first-party macOS distribution.
 
+### 12. Download page offers the fork's desktop build (opt-in)
+
+- **What:** when the web server has `MULTICA_DESKTOP_FEED_URL` (runtime env, absolute feed base),
+  `/download` offers the macOS DMG and version read from `<base>/contango-mac.yml` instead of
+  upstream's GitHub release, and the Help menu's "Desktop app" link points at `/download`. Feed
+  failure or unset env keeps upstream behaviour. Only bare `.dmg` file names under the base are
+  accepted.
+- **Touches:** ours: `apps/web/features/landing/utils/desktop-feed{,.test}.ts`. Upstream files:
+  `apps/web/features/landing/utils/github-release{,.test}.ts`, `apps/web/app/layout.tsx`,
+  `apps/web/components/web-providers.tsx`, `packages/core/config/index.ts` (`desktopDownloadUrl`),
+  `packages/views/layout/help-launcher{,.test}.tsx`.
+- **Upstream status:** none as of v0.7.0.
+- **Drop when:** upstream offers a configurable download source.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`

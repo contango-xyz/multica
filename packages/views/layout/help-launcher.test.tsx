@@ -80,6 +80,7 @@ vi.mock("@multica/ui/components/ui/dropdown-menu", async () => {
 beforeEach(() => {
   vi.mocked(isDesktopShell).mockReturnValue(false);
   i18nState.language = "en";
+  configStore.getState().setDesktopDownloadUrl();
 });
 
 afterEach(() => {
@@ -105,6 +106,15 @@ describe("HelpLauncher", () => {
     render(<HelpLauncher />);
     const link = screen.getByRole("link", { name: /Desktop app/ });
     expect(link).toHaveAttribute("href", "https://multica.ai/download");
+  });
+
+  it("links to the configured download page when the host provides one", () => {
+    configStore.getState().setDesktopDownloadUrl("/download");
+    render(<HelpLauncher />);
+    expect(screen.getByRole("link", { name: /Desktop app/ })).toHaveAttribute(
+      "href",
+      "/download",
+    );
   });
 
   it.each([
