@@ -4,6 +4,9 @@
  * The server puts routing data under `body` (the key expo-notifications
  * exposes as content.data); top-level data is accepted too.
  */
+import type { InboxItem } from "@multica/core/types";
+import { getInboxNavigationTarget } from "./inbox-display";
+
 export type PushData =
   | { kind: "inbox"; workspace_slug: string; item_id: string; type?: string; issue_id?: string; comment_id?: string }
   | { kind: "chat"; workspace_slug: string; session_id: string };
@@ -49,14 +52,25 @@ export function pushTarget(data: PushData): PushTarget {
   if (data.kind === "chat") {
     return { pathname: "/[workspace]/chat", params: { workspace }, chatSessionId: data.session_id };
   }
-  if (data.issue_id) {
+  // Same rule as tapping the inbox row; a push only carries the fields it needs.
+  const row = getInboxNavigationTarget(
+    {
+      id: data.item_id,
+      type: data.type,
+      issue_id: data.issue_id ?? null,
+      details: data.comment_id ? { comment_id: data.comment_id } : {},
+    } as unknown as InboxItem,
+    workspace,
+    "",
+  );
+  if (row?.pathname === "/[workspace]/issue/[id]") {
     return {
-      pathname: "/[workspace]/issue/[id]",
-      params: { workspace, id: data.issue_id, ...(data.comment_id ? { highlight: data.comment_id } : {}) },
+      pathname: row.pathname,
+      params: { workspace, id: row.params.id, ...(data.comment_id ? { highlight: data.comment_id } : {}) },
     };
   }
-  if (data.type === "autopilot_quota_exceeded" || data.type === "autopilot_paused") {
-    return { pathname: "/[workspace]/inbox/[id]", params: { workspace, id: data.item_id } };
+  if (row?.pathname === "/[workspace]/inbox/[id]") {
+    return { pathname: row.pathname, params: { workspace, id: row.params.id } };
   }
   return { pathname: "/[workspace]/inbox", params: { workspace } };
 }

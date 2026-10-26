@@ -1,4 +1,14 @@
+/**
+ * Push inventory (server/internal/push/dispatcher.go; `workspace_slug` is added to every push in process()):
+ *
+ * | kind  | extra fields                                              |
+ * |-------|-----------------------------------------------------------|
+ * | inbox | item_id, type (every InboxItemType), issue_id?, comment_id? |
+ * | chat  | session_id                                                |
+ */
 import { describe, expect, it } from "vitest";
+import type { InboxItem, InboxItemType } from "@multica/core/types";
+import { getInboxNavigationTarget } from "./inbox-display";
 import { createOnceGate, parsePushData, pushTarget, shouldPresentInForeground } from "./push-routing";
 
 describe("parsePushData", () => {
@@ -32,6 +42,47 @@ describe("pushTarget", () => {
   it("chat opens the chat tab on that session", () => {
     expect(pushTarget({ kind: "chat", workspace_slug: "w", session_id: "s" }))
       .toEqual({ pathname: "/[workspace]/chat", params: { workspace: "w" }, chatSessionId: "s" });
+  });
+});
+
+const ALL_TYPES: InboxItemType[] = [
+  "issue_assigned", "issue_subscribed", "unassigned", "assignee_changed", "status_changed",
+  "priority_changed", "start_date_changed", "due_date_changed", "new_comment", "mentioned",
+  "review_requested", "task_completed", "task_failed", "agent_blocked", "agent_completed",
+  "reaction_added", "quick_create_done", "quick_create_failed", "quick_create_unconfirmed",
+  "autopilot_paused", "autopilot_quota_exceeded", "children_done",
+];
+
+// What tapping the inbox row would do, reduced to the fields a push carries.
+function rowTarget(type: InboxItemType, issue_id: string | null, comment_id?: string) {
+  const item = { id: "i", type, issue_id, details: comment_id ? { comment_id } : {} } as unknown as InboxItem;
+  const t = getInboxNavigationTarget(item, "b", "tok");
+  if (!t) return { pathname: "/[workspace]/inbox", params: { workspace: "b" } };
+  const { h: _h, ...params } = t.params as Record<string, unknown>;
+  return { pathname: t.pathname, params: Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined)) };
+}
+
+describe("pushTarget parity with inbox row taps", () => {
+  for (const type of ALL_TYPES) {
+    it(`${type} with an issue matches the row tap`, () => {
+      expect(pushTarget({ kind: "inbox", workspace_slug: "b", item_id: "i", type, issue_id: "is", comment_id: "c" }))
+        .toEqual(rowTarget(type, "is", "c"));
+    });
+    it(`${type} without an issue matches the row tap`, () => {
+      expect(pushTarget({ kind: "inbox", workspace_slug: "b", item_id: "i", type }))
+        .toEqual(rowTarget(type, null));
+    });
+  }
+  it("an unknown type without issue_id opens that workspace's inbox", () => {
+    expect(pushTarget({ kind: "inbox", workspace_slug: "b", item_id: "i", type: "brand_new_type" }))
+      .toEqual({ pathname: "/[workspace]/inbox", params: { workspace: "b" } });
+  });
+  it("an unknown type with issue_id opens the issue", () => {
+    expect(pushTarget({ kind: "inbox", workspace_slug: "b", item_id: "i", type: "brand_new_type", issue_id: "is" }).pathname)
+      .toBe("/[workspace]/issue/[id]");
+  });
+  it("routes with the payload's workspace, not the current one", () => {
+    expect(pushTarget({ kind: "chat", workspace_slug: "b", session_id: "s" }).params.workspace).toBe("b");
   });
 });
 
