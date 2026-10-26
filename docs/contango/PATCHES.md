@@ -216,7 +216,16 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Touches:** ours: `apps/desktop/scripts/contango-{build,publish}*`,
   `apps/desktop/build/entitlements.contango.template.plist`. Upstream files: desktop main process
   (push registration, link handling), `packages/core` (push device API, `beforeLogout` hook),
-  `server/internal/push/*`, `server/internal/handler` push-device handlers.
+  `server/internal/handler` push-device handlers.
+- **Migrations:** `594_push_device_platform_macos` (adds `macos` to the platform check).
+  **Lockfile:** unchanged (`apps/desktop/package.json` only gains the `contango:build` script).
+- **Migration numbering:** upstream `main` (after v0.7.0) has `593_runtime_profile_add_devin`,
+  which shares 593 with patch 9's `593_issue_dependency_edge_unique`. The runner keys
+  `schema_migrations` by the whole filename stem, so both apply, but
+  `TestMigrationNumericPrefixesAreUnique` will fail on the next rebase. Resolution then: keep our
+  filename (it may have run in production) and add `593_issue_dependency_edge_unique` to
+  `contangoMigrationStems` in `server/internal/migrations/migrations_lint_test.go`; do the same for
+  `594_push_device_platform_macos` once upstream claims 594.
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream ships desktop push and a first-party macOS distribution.
 

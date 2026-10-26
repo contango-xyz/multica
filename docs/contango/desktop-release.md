@@ -23,7 +23,7 @@ migration deploy) is done by the admin-box agent, not by this runbook.
 ## Release
 
 1. Tag the commit: `git tag v<upstream>-contango.<n>` (for example `v0.7.0-contango.2`). The build
-   refuses to run unless HEAD has exactly such a tag.
+   refuses to run unless HEAD has exactly such a tag and tracked files have no uncommitted changes.
 2. `unset CDPATH; pnpm --filter @multica/desktop contango:build`. Takes more than 10 minutes
    (notarization). A final gate runs `codesign --verify` and `stapler validate`; if it fails, do not
    publish.
@@ -45,6 +45,8 @@ Follow the checklist in `PATCHES.md`, then start a fresh series at `v<new>-conta
 
 ## Rollback
 
-Re-publish the previous version's files (all of them, metadata last). Downgrade is NOT enabled in the
-updater (`allowDowngrade` off), so clients on the bad build will not move back: fix forward with
-`n+1`.
+Installed clients never downgrade (`allowDowngrade` is off), so re-publishing the previous version's
+files only changes what new installs download. Fix a bad build forward: commit the fix, or `git
+revert` the bad commits back to the last good tag's code, tag the result `n+1`, build and publish
+it. Don't put `n+1` on the old tagged commit itself: the build reads the version from the one tag on
+HEAD.
