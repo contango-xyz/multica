@@ -19,10 +19,31 @@ function routeOrFocus(pathname: string, path: string): WebLinkDecision {
 }
 
 // A path handed over by a `multica://open?path=` link: exactly one leading
-// `/` (no `//host`, absolute URLs or empty), and not a focus-only path.
+// `/` (no `//host`, absolute URLs or empty), no control characters (the URL
+// parser silently strips tab/CR/LF, which could turn `/\t/host` into
+// `//host`), and not a focus-only path. The routed path is taken from the
+// parsed URL, which must stay on the fixed base host. Anything that throws
+// only focuses.
+function hasControlChar(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return true;
+  }
+  return false;
+}
+
+const PATH_BASE = "http://localhost";
+
 export function decideAppPath(path: string): WebLinkDecision {
+  if (hasControlChar(path)) return { kind: "focus" };
   if (!/^\/(?![/\\])/.test(path)) return { kind: "focus" };
-  return routeOrFocus(new URL(path, "http://localhost").pathname, path);
+  try {
+    const u = new URL(path, PATH_BASE);
+    if (u.host !== new URL(PATH_BASE).host) return { kind: "focus" };
+    return routeOrFocus(u.pathname, `${u.pathname}${u.search}${u.hash}`);
+  } catch {
+    return { kind: "focus" };
+  }
 }
 
 // Links a link router (e.g. Choosy) hands to the app. A URL on our host is
