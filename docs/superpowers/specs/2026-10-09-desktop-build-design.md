@@ -4,7 +4,7 @@ Date: 2026-10-09. Status: draft for review.
 
 ## Why
 
-The stock desktop app (upstream 0.6.1) has three problems for us:
+The stock desktop app (upstream 0.7.0) has three problems for us:
 
 1. Notifications exist only while the app runs. The renderer builds them from
    its WebSocket, so a quit app or a sleeping Mac gets nothing.
@@ -96,7 +96,7 @@ its click handler survives. Small and upstreamable on its own.
   `https://<our server>/desktop/`. The updater code stays as is.
 - Ops serves that directory as static files: DMG, update ZIP, blockmap,
   `latest-mac.yml`. VPN-only like the rest of the server.
-- Versions are `<upstream>-contango.<n>` (e.g. `0.6.1-contango.1`), with the
+- Versions are `<upstream>-contango.<n>` (e.g. `0.7.0-contango.1`), with the
   updater set to accept that prerelease channel. A rebase on a newer
   upstream resets n.
 - Builds run on the owner's Mac (certificate in the login keychain), not in
