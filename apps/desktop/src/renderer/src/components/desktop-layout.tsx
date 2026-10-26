@@ -36,6 +36,7 @@ import { TabBar } from "./tab-bar";
 import { TabContent } from "./tab-content";
 import { WindowOverlay } from "./window-overlay";
 import { DesktopPushBridge } from "./desktop-push-bridge";
+import { openExternalTarget } from "../platform/open-external-target";
 import { WindowToolbar, WINDOW_TOOLBAR_CLEARANCE } from "./window-toolbar";
 
 const TOP_BAR_HEIGHT_CLASS = "h-10";
@@ -198,11 +199,11 @@ function DesktopInboxBridge() {
     const offInbox = window.desktopAPI.onInboxOpen(({ slug, issueKey }) => {
       if (!slug) return;
       const inboxPath = `${paths.workspace(slug).inbox()}?issue=${encodeURIComponent(issueKey)}`;
-      pushRef.current(inboxPath);
+      openExternalTarget(inboxPath, pushRef.current);
     });
     // Remote push clicks: same adapter, so a path in another workspace
     // becomes a real switchWorkspace.
-    const offRoute = window.desktopAPI.onRouteOpen((path) => pushRef.current(path));
+    const offRoute = window.desktopAPI.onRouteOpen((path) => openExternalTarget(path, pushRef.current));
     return () => {
       offInbox();
       offRoute();
