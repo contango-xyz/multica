@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 
 vi.mock("@multica/core/api", () => ({
   api: {
@@ -23,6 +23,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 afterEach(() => {
+  cleanup(); // unmount while the stub still exists; unmount calls setPushActive
   w.desktopAPI = original;
 });
 
@@ -69,5 +70,41 @@ describe("DesktopPushBridge", () => {
     expect(setPushActive).toHaveBeenLastCalledWith(false);
     expect(api.unregisterPushDevice).toHaveBeenCalledWith("tok2");
     await Promise.resolve();
+  });
+
+  it("turns local banners back on when the shell unmounts (e.g. session expiry)", async () => {
+    const setPushActive = vi.fn();
+    w.desktopAPI = { registerPush: vi.fn(async () => ({ token: "tok3" })), setPushActive };
+    const { unmount } = render(<DesktopPushBridge appId="com.example.desktop" />);
+    await waitFor(() => expect(setPushActive).toHaveBeenCalledWith(true));
+    unmount();
+    expect(setPushActive).toHaveBeenLastCalledWith(false);
+  });
+
+  it("starts each mount with local banners on until registration succeeds", () => {
+    const setPushActive = vi.fn();
+    w.desktopAPI = { registerPush: vi.fn(() => new Promise(() => {})), setPushActive };
+    render(<DesktopPushBridge appId="com.example.desktop" />);
+    expect(setPushActive).toHaveBeenCalledWith(false);
+    expect(setPushActive).not.toHaveBeenCalledWith(true);
+  });
+
+  it("drops a registration that completes after logout", async () => {
+    const setPushActive = vi.fn();
+    let finishPost!: () => void;
+    vi.mocked(api.registerPushDevice).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finishPost = resolve)) as never,
+    );
+    w.desktopAPI = { registerPush: vi.fn(async () => ({ token: "tok4" })), setPushActive };
+    const { unmount } = render(<DesktopPushBridge appId="com.example.desktop" />);
+    await waitFor(() => expect(api.registerPushDevice).toHaveBeenCalled());
+    unregisterPushOnLogout();
+    unmount();
+    finishPost();
+    await waitFor(() => expect(api.unregisterPushDevice).toHaveBeenCalledWith("tok4"));
+    expect(setPushActive).not.toHaveBeenCalledWith(true);
+    vi.mocked(api.unregisterPushDevice).mockClear();
+    unregisterPushOnLogout();
+    expect(api.unregisterPushDevice).not.toHaveBeenCalled();
   });
 });
