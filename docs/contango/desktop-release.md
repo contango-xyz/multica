@@ -16,6 +16,8 @@ at `https://<server host>/desktop/`. Upstream's packaging is untouched; the fork
   `CONTANGO_TEAM_ID`, `CONTANGO_PROVISIONING_PROFILE`, `CONTANGO_API_URL`, `CONTANGO_UPDATE_URL`,
   `APPLE_KEYCHAIN_PROFILE`, `CONTANGO_ADMIN_SSH` (`ubuntu@<admin host>`).
 - The company VPN on, and the SSH key for `<admin host>` (touch-confirmed).
+- Xcode command line tools (`xcode-select --install`): the build compiles the push-click addon with
+  `node-gyp` against the Electron headers before packaging.
 
 One-time ops setup (feed directory, Caddy `/desktop/*` route, APNs allowed bundle id, push-device
 migration deploy) is done by the admin-box agent, not by this runbook.
@@ -52,6 +54,20 @@ comes forward or does nothing, so "Continue in browser" covers it.
 
 The Choosy (or similar) browser-picker rule is optional: it is still useful for links from native
 apps such as Slack desktop or Mail, which never reach the web setting.
+
+## How the fork build differs at runtime
+
+- **Push clicks:** Electron drops clicks on APNs notifications while the app runs. The fork ships a
+  small native addon (`apps/desktop/native/push-click`, loaded from `Contents/Resources/push-click.node`)
+  that reports each click (default action only, not a dismiss) with its payload, so the app opens
+  exactly the clicked item, foreground or from Notification Centre. If the addon fails to load or
+  start, the app falls back to the old rule: an activation within 10 s of a background push opens
+  that push. Upstream and dev builds never have the addon.
+- **Foreground banners:** to install the hook, the app sets up macOS notifications at launch, so pushes
+  now also show a banner while the app is in front (and the notification permission prompt appears
+  at first launch).
+- **Fuses:** fork builds disable the Electron fuses for running as Node, `NODE_OPTIONS` and
+  `--inspect`.
 
 ## Rebase on a new upstream
 

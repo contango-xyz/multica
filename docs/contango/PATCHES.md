@@ -214,17 +214,23 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `docs/contango/desktop-release.md`.
 - **Commits:** `feat(server): accept macOS push devices` through `chore(desktop): fork release
   publish script`; web link handoff: `feat(desktop): open multica://open?path= links in the app
-  (contango)` through `docs(contango): web link handoff`.
+  (contango)` through `docs(contango): web link handoff`; native click reporting: `build(desktop):
+  native push-click addon for fork builds (contango)` and the `fix(desktop)` commits after it.
 - **Touches:** ours: `apps/desktop/scripts/contango-{build,publish}*`,
   `apps/desktop/build/entitlements.contango.template.plist`,
   `apps/web/platform/desktop-handoff.ts`,
-  `apps/web/components/{desktop-handoff,open-in-desktop-setting}.tsx`. Upstream files: desktop main
-  process (push registration, link handling, `web-link.ts`), web handoff wiring
+  `apps/web/components/{desktop-handoff,open-in-desktop-setting}.tsx`,
+  `apps/desktop/native/push-click/**` (N-API addon reporting APNs notification clicks),
+  `apps/desktop/src/main/push-click{,.test}.ts`, `apps/desktop/scripts/push-click-smoke.mjs`.
+  Upstream files: desktop main process (push registration, link handling, `web-link.ts`, push-click
+  wiring in `src/main/index.ts`), `apps/desktop/package.json` (`node-gyp` devDependency, used only by
+  the fork build), `apps/desktop/electron-builder.yml` (`!native/**` in `files`), web handoff wiring
   (`apps/web/app/[workspaceSlug]/{layout,(dashboard)/settings/page}.tsx`, `packages/views/locales/*/settings.json` `desktop.open_in_app`),
   `packages/core` (push device API, `beforeLogout` hook),
   `server/internal/handler` push-device handlers.
 - **Migrations:** `594_push_device_platform_macos` (adds `macos` to the platform check).
-  **Lockfile:** unchanged (`apps/desktop/package.json` only gains the `contango:build` script).
+  **Lockfile:** `node-gyp` for `apps/desktop` (`apps/desktop/package.json` also gains the
+  `contango:build` script).
 - **Migration numbering:** upstream `main` (after v0.7.0) has `593_runtime_profile_add_devin`,
   which shares 593 with patch 9's `593_issue_dependency_edge_unique`. The runner keys
   `schema_migrations` by the whole filename stem, so both apply, but
