@@ -39,6 +39,13 @@ export function builderOverrides(env, entitlementsPath) {
       { name: "Multica", schemes: ["multica"] },
       { name: "Web links", schemes: ["https", "http"], role: "Viewer" },
     ],
+    // The app holds the user's session and push token; without these anything
+    // running as the user could start it as plain Node or attach a debugger.
+    electronFuses: {
+      runAsNode: false,
+      enableNodeOptionsEnvironmentVariable: false,
+      enableNodeCliInspectArguments: false,
+    },
   };
 }
 
@@ -53,6 +60,7 @@ export function builderConfig(overrides, baseConfigPath, version) {
     mac: overrides.mac,
     publish: [overrides.publish],
     protocols: overrides.protocols,
+    electronFuses: overrides.electronFuses,
   };
 }
 
