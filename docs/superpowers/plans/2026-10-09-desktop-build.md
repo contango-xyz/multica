@@ -639,6 +639,8 @@ Needs Task 1 deployed on ops (ask the owner to run the admin-box deploy; give th
 | d | Click (c) | App launches on that issue |
 | e | Agent chat reply while app in background | Banner; click opens the chat |
 | f | Log out, trigger again | No banner |
+| g | App focused, push arrives | No banner duplicated compared with upstream behaviour (record what happens) |
+| h | Fresh install, first registration | macOS asks for notification permission and banners show (no prompt or no authorization may mean silent banners; record) |
 
 - [ ] Decision rules:
   - (c) fails → APNs isn't reaching a Developer ID app. Stop and report to the owner; options are dropping push (keep Tasks 4–6 behind the empty-`appId` switch) or a native module. Do not improvise.
