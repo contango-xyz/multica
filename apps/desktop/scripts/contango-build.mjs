@@ -9,12 +9,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED = ["CONTANGO_APP_ID", "CONTANGO_TEAM_ID", "CONTANGO_PROVISIONING_PROFILE", "CONTANGO_API_URL", "CONTANGO_UPDATE_URL"];
-// electron-builder picks the APPLE_* ones over APPLE_KEYCHAIN_PROFILE when
-// present; CSC_IDENTITY_AUTO_DISCOVERY=false would skip signing entirely.
 // native/push-click: reports clicks on APNs notifications (src/main/push-click.ts).
 // Platform extraResources add to upstream's list instead of replacing it; the
 // file lands in Contents/Resources, outside the asar, and is signed with the app.
 export const PUSH_CLICK_ADDON = { from: "native/push-click/build/Release/push_click.node", to: "push-click.node" };
+// electron-builder picks the APPLE_* ones over APPLE_KEYCHAIN_PROFILE when
+// present; CSC_IDENTITY_AUTO_DISCOVERY=false would skip signing entirely.
 const STRIPPED_ENV = ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER", "CSC_IDENTITY_AUTO_DISCOVERY"];
 
 export function renderEntitlements(template, env) {
