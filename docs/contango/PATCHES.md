@@ -209,13 +209,18 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 
 - **What:** a signed, notarized arm64 desktop app with its own app id, APNs push (registration after
   login, click routing, one banner per event), our server's web links opening in the app, and a
-  generic update feed on our server. Server accepts macOS push devices. Build and release steps:
+  generic update feed on our server, and a per-browser web setting that hands workspace links to the
+  app (`multica://open?path=`). Server accepts macOS push devices. Build and release steps:
   `docs/contango/desktop-release.md`.
 - **Commits:** `feat(server): accept macOS push devices` through `chore(desktop): fork release
-  publish script`.
+  publish script`; web link handoff: `feat(desktop): open multica://open?path= links in the app
+  (contango)` through `docs(contango): web link handoff`.
 - **Touches:** ours: `apps/desktop/scripts/contango-{build,publish}*`,
   `apps/desktop/build/entitlements.contango.template.plist`. Upstream files: desktop main process
-  (push registration, link handling), `packages/core` (push device API, `beforeLogout` hook),
+  (push registration, link handling, `web-link.ts`), web handoff (`apps/web/platform/desktop-handoff.ts`,
+  `apps/web/components/{desktop-handoff,open-in-desktop-setting}.tsx`, `apps/web/app/[workspaceSlug]/
+  {layout,(dashboard)/settings/page}.tsx`, `packages/views/locales/*/settings.json` `desktop.open_in_app`),
+  `packages/core` (push device API, `beforeLogout` hook),
   `server/internal/handler` push-device handlers.
 - **Migrations:** `594_push_device_platform_macos` (adds `macos` to the platform check).
   **Lockfile:** unchanged (`apps/desktop/package.json` only gains the `contango:build` script).

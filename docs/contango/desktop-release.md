@@ -39,6 +39,18 @@ migration deploy) is done by the admin-box agent, not by this runbook.
 VPN on, download `https://<server host>/desktop/<dmg>`, delete the upstream Multica app first
 (different app id, both would register as the same URL handler), open the DMG, drag to Applications.
 
+## Opening links in the app
+
+Links to our server (GitHub PR bodies, web Slack, email, bookmarks) stay `https://`. In each browser,
+open Settings, Desktop app, and turn on "Open links in the desktop app" (per browser, off by
+default). A workspace link opened as a fresh page load then hands off to the app via
+`multica://open?path=...` and shows a panel with "Continue in browser" and "Stop opening links in the
+app". Reloads and in-app navigation stay in the browser. An upstream desktop app, or no app, just
+comes forward or does nothing, so "Continue in browser" covers it.
+
+The Choosy (or similar) browser-picker rule is optional: it is still useful for links from native
+apps such as Slack desktop or Mail, which never reach the web setting.
+
 ## Rebase on a new upstream
 
 Follow the checklist in `PATCHES.md`, then start a fresh series at `v<new>-contango.1`.
