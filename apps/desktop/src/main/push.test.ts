@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { chatSessionPath, routeForPushPayload } from "./push";
+import { PUSH_CLICK_WINDOW_MS, RecentPush, chatSessionPath, routeForPushPayload } from "./push";
 
 describe("routeForPushPayload", () => {
   it("routes inbox pushes to the issue in their own workspace", () => {
@@ -25,5 +25,32 @@ describe("chatSessionPath", () => {
   });
   it("encodes the slug and session id", () => {
     expect(chatSessionPath("a b", "s/1?x")).toBe("/a%20b/chat?session=s%2F1%3Fx");
+  });
+});
+
+describe("RecentPush", () => {
+  const route = { kind: "chat" as const, slug: "b", sessionId: "s1" };
+
+  it("treats an activation right after a push as its click", () => {
+    const recent = new RecentPush();
+    recent.received(route, 1_000);
+    expect(recent.takeOnActivate(1_000 + PUSH_CLICK_WINDOW_MS)).toEqual(route);
+  });
+  it("ignores activations after the window", () => {
+    const recent = new RecentPush();
+    recent.received(route, 1_000);
+    expect(recent.takeOnActivate(1_001 + PUSH_CLICK_WINDOW_MS)).toBeNull();
+  });
+  it("opens a push at most once", () => {
+    const recent = new RecentPush();
+    recent.received(route, 1_000);
+    recent.takeOnActivate(2_000);
+    expect(recent.takeOnActivate(3_000)).toBeNull();
+  });
+  it("forgets a push with no route", () => {
+    const recent = new RecentPush();
+    recent.received(route, 1_000);
+    recent.received(null, 2_000);
+    expect(recent.takeOnActivate(3_000)).toBeNull();
   });
 });
