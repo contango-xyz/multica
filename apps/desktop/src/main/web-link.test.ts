@@ -63,7 +63,18 @@ describe("decideAppPath", () => {
     "https://evil.test/x",
     "",
     "acme/issues",
+    "/\t/evil.test/x",
+    "/\n//evil.test",
+    "/\r/evil.test",
+    "/a\u0000b",
+    "/a\u007fb",
+    "/\t/[",
   ])("only focuses for %j", (p) => {
     expect(decideAppPath(p)).toEqual({ kind: "focus" });
+  });
+
+  it("focuses instead of throwing when the URL parser throws", () => {
+    expect(() => decideAppPath("/\t/[")).not.toThrow();
+    expect(decideAppPath("/\t/[")).toEqual({ kind: "focus" });
   });
 });
