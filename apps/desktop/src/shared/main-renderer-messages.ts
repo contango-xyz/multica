@@ -31,6 +31,7 @@ export const MAIN_RENDERER_MESSAGE_CHANNELS = [
   "auth:token",
   "invite:open",
   "inbox:open",
+  "route:open",
   "settings:open",
   TAB_SELECTION_SHORTCUT_CHANNEL,
   WORKSPACE_OPEN_PATH_CHANNEL,

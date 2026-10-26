@@ -70,6 +70,12 @@ interface DesktopAPI {
       issueKey: string;
     }) => void,
   ) => () => void;
+  /** Register this Mac for APNs; `{ error: "unsupported" }` off macOS. */
+  registerPush: () => Promise<{ token: string } | { error: string }>;
+  /** Tell main whether this device currently receives remote pushes. */
+  setPushActive: (active: boolean) => void;
+  /** Listen for in-app paths to open from push clicks. Returns an unsubscribe function. */
+  onRouteOpen: (callback: (path: string) => void) => () => void;
   /** Listen for native macOS back/forward swipe gestures. Returns an unsubscribe function. */
   onNavigationGesture: (callback: (gesture: NavigationGesture) => void) => () => void;
   /** Report the renderer's memory-router path for recovery diagnostics. */
