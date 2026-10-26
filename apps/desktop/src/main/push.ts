@@ -24,6 +24,28 @@ export function routeForPushPayload(userInfo: unknown): PushRoute | null {
   return null;
 }
 
+// Electron drops clicks on a push while the app runs: the click only activates
+// the app, with nothing saying which push it was. A push received shortly
+// before an activation is taken as the one clicked. A click from Notification
+// Centre after the window only brings the app forward.
+export const PUSH_CLICK_WINDOW_MS = 10_000;
+
+export class RecentPush {
+  private route: PushRoute | null = null;
+  private at = 0;
+
+  received(route: PushRoute | null, now = Date.now()): void {
+    this.route = route;
+    this.at = now;
+  }
+
+  takeOnActivate(now = Date.now()): PushRoute | null {
+    const route = this.route && now - this.at <= PUSH_CLICK_WINDOW_MS ? this.route : null;
+    this.route = null;
+    return route;
+  }
+}
+
 // Mirrors `paths.workspace(slug).chatSession(id)` in packages/core/paths/paths.ts;
 // main does not import @multica/core, so keep the two in sync by hand.
 export function chatSessionPath(slug: string, sessionId: string): string {

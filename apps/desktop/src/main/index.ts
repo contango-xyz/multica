@@ -76,6 +76,7 @@ import {
 } from "./notification-gate";
 import {
   chatSessionPath,
+  RecentPush,
   registerForPush,
   routeForPushPayload,
   type PushRoute,
@@ -166,10 +167,9 @@ let authSessionGeneration = 0;
 // Set by the renderer while this device is registered for APNs; read in
 // `notification:show` so a local banner never duplicates a remote push.
 let pushActive = false;
-// Route of the last APNs push received while running. Kept for a later
-// decision on click handling; receipt alone never navigates. Exported only so
-// tsc's noUnusedLocals accepts it.
-export let lastPushRoute: PushRoute | null = null;
+// The last APNs push received while the app was in the background; the next
+// activation within the click window opens it (see RecentPush).
+const recentPush = new RecentPush();
 // Route from the push notification that cold-launched the app, if any.
 let pendingLaunchRoute: PushRoute | null = null;
 const rendererRouteContexts = new WeakMap<
@@ -720,7 +720,14 @@ if (!gotTheLock) {
 
   if (process.platform === "darwin") {
     pushNotifications.on("received-apns-notification", (_event, userInfo) => {
-      lastPushRoute = routeForPushPayload(userInfo);
+      // A push that arrives while the app is in front is no click candidate:
+      // no activation follows a click on it.
+      recentPush.received(
+        BrowserWindow.getFocusedWindow() ? null : routeForPushPayload(userInfo),
+      );
+    });
+    app.on("did-become-active", () => {
+      openPushRoute(recentPush.takeOnActivate());
     });
   }
 
