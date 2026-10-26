@@ -2,11 +2,29 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigContext } from "expo/config";
-import createConfig from "./app.config";
+import createConfig, { EAS_PROJECT_ID_PROD } from "./app.config";
 
+// A non-upstream production setup by default, so production cases pass the
+// upstream guard even once EAS_PROJECT_ID_PROD is committed.
+beforeEach(() => {
+  vi.stubEnv("EAS_BUILD", undefined);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api.example.com");
+  vi.stubEnv("EXPO_PUBLIC_WEB_URL", "https://app.example.com");
+  vi.stubEnv("EXPO_BUNDLE_IDENTIFIER_PROD", "com.example.multica");
+});
 afterEach(() => vi.unstubAllEnvs());
+
+// Our production setup: an EAS project plus our own server and bundle id.
+function stubOurProduction() {
+  vi.stubEnv("APP_ENV", "production");
+  vi.stubEnv("EAS_BUILD", undefined);
+  vi.stubEnv("EAS_PROJECT_ID", "proj-ours");
+  vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api.example.com");
+  vi.stubEnv("EXPO_PUBLIC_WEB_URL", "https://app.example.com");
+  vi.stubEnv("EXPO_BUNDLE_IDENTIFIER_PROD", "com.example.multica");
+}
 
 describe("iOS scene lifecycle configuration", () => {
   it("resolves native presenters from the foregrounded scene", () => {
@@ -26,12 +44,15 @@ describe("iOS scene lifecycle configuration", () => {
     );
   });
 
-  it.each([
+  const identityCases: [string | undefined, string, string][] = [
     [undefined, "Multica (Dev)", "ai.multica.mobile.dev"],
     ["development", "Multica (Dev)", "ai.multica.mobile.dev"],
     ["staging", "Multica (Staging)", "ai.multica.mobile.staging"],
-    ["production", "Multica", "ai.multica.mobile"],
-  ])("enables scene support for %s without changing app identity", (env, name, bundleIdentifier) => {
+  ];
+  // Upstream's production identity; a committed project id makes it refused.
+  if (!EAS_PROJECT_ID_PROD) identityCases.push(["production", "Multica", "ai.multica.mobile"]);
+
+  it.each(identityCases)("enables scene support for %s without changing app identity", (env, name, bundleIdentifier) => {
     vi.stubEnv("APP_ENV", env);
     vi.stubEnv("EXPO_BUNDLE_IDENTIFIER_DEV", undefined);
     vi.stubEnv("EXPO_BUNDLE_IDENTIFIER_STAGING", undefined);
@@ -112,5 +133,87 @@ describe("OTA updates", () => {
     vi.stubEnv("EAS_PROJECT_ID", "proj-env");
     const config = createConfig({ config: {} } as ConfigContext);
     expect(config.updates?.url).toBe("https://u.expo.dev/proj-env");
+  });
+});
+
+describe("committed production project id", () => {
+  it("is used by the production variant only", () => {
+    stubOurProduction();
+    vi.stubEnv("EAS_PROJECT_ID", undefined);
+    const prod = createConfig({ config: {} } as ConfigContext);
+    expect(prod.updates?.url).toBe(
+      EAS_PROJECT_ID_PROD ? `https://u.expo.dev/${EAS_PROJECT_ID_PROD}` : undefined,
+    );
+
+    vi.stubEnv("APP_ENV", "staging");
+    expect(createConfig({ config: {} } as ConfigContext).updates).toBeUndefined();
+  });
+
+  it("yields to an explicit project id", () => {
+    stubOurProduction();
+    expect(createConfig({ config: {} } as ConfigContext).updates?.url).toBe(
+      "https://u.expo.dev/proj-ours",
+    );
+  });
+});
+
+describe("production builds never target upstream", () => {
+  it("accepts our own server and bundle id", () => {
+    stubOurProduction();
+    const config = createConfig({ config: {} } as ConfigContext);
+    expect(config.ios?.bundleIdentifier).toBe("com.example.multica");
+  });
+
+  it.each([
+    ["EXPO_PUBLIC_API_URL", undefined, /EXPO_PUBLIC_API_URL/],
+    ["EXPO_PUBLIC_API_URL", "https://api.multica.ai", /EXPO_PUBLIC_API_URL/],
+    ["EXPO_PUBLIC_API_URL", "not a url", /EXPO_PUBLIC_API_URL/],
+    ["EXPO_PUBLIC_WEB_URL", undefined, /EXPO_PUBLIC_WEB_URL/],
+    ["EXPO_PUBLIC_WEB_URL", "https://multica.ai", /EXPO_PUBLIC_WEB_URL/],
+    ["EXPO_BUNDLE_IDENTIFIER_PROD", undefined, /EXPO_BUNDLE_IDENTIFIER_PROD/],
+  ])("refuses %s=%s", (name, value, message) => {
+    stubOurProduction();
+    vi.stubEnv(name, value);
+    expect(() => createConfig({ config: {} } as ConfigContext)).toThrow(message);
+  });
+
+  it("leaves upstream production without a project id unchanged", () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("EAS_BUILD", undefined);
+    vi.stubEnv("EAS_PROJECT_ID", undefined);
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api.multica.ai");
+    vi.stubEnv("EXPO_PUBLIC_WEB_URL", "https://multica.ai");
+    vi.stubEnv("EXPO_BUNDLE_IDENTIFIER_PROD", undefined);
+    if (EAS_PROJECT_ID_PROD) return; // our fork: production always has a project id
+    expect(createConfig({ config: {} } as ConfigContext).ios?.bundleIdentifier).toBe(
+      "ai.multica.mobile",
+    );
+  });
+
+  it("lets eas-cli read the project id before it loads the EAS environment", () => {
+    stubOurProduction();
+    for (const name of ["EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_WEB_URL", "EXPO_BUNDLE_IDENTIFIER_PROD"]) {
+      vi.stubEnv(name, undefined);
+    }
+    expect(createConfig({ config: {} } as ConfigContext).extra?.eas).toEqual({
+      projectId: "proj-ours",
+    });
+
+    vi.stubEnv("EAS_BUILD", "true");
+    expect(() => createConfig({ config: {} } as ConfigContext)).toThrow(/EXPO_PUBLIC_API_URL/);
+  });
+
+  it("refuses an EAS build without a project id", () => {
+    vi.stubEnv("APP_ENV", "staging");
+    vi.stubEnv("EAS_BUILD", "true");
+    vi.stubEnv("EAS_PROJECT_ID", undefined);
+    expect(() => createConfig({ config: {} } as ConfigContext)).toThrow(/project id/);
+  });
+
+  it("does not check non-production variants", () => {
+    stubOurProduction();
+    vi.stubEnv("APP_ENV", "staging");
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api.multica.ai");
+    expect(() => createConfig({ config: {} } as ConfigContext)).not.toThrow();
   });
 });

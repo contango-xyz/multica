@@ -9,6 +9,58 @@ import type { ExpoConfig, ConfigContext } from "expo/config";
  *   - dev:staging  → APP_ENV=staging
  *   - dev:prod     → APP_ENV=production (rare; usually only for EAS build)
  */
+/**
+ * Our EAS project id, committed so production `eas` commands need no
+ * EAS_PROJECT_ID in the shell: the CLI resolves the project before it loads
+ * the EAS environment. Set to the UUID printed by `eas init`
+ * (docs/contango/ios-release.md, owner checklist step 3). Not secret.
+ */
+export const EAS_PROJECT_ID_PROD: string | undefined = undefined;
+
+const UPSTREAM_HOST = "multica.ai";
+
+function isUpstreamOrInvalid(url: string | undefined): boolean {
+  if (!url) return true;
+  try {
+    const host = new URL(url).hostname;
+    return host === UPSTREAM_HOST || host.endsWith(`.${UPSTREAM_HOST}`);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Production with an EAS project is our TestFlight build. Without our values
+ * it would fall back to the committed upstream `.env.production` and bundle
+ * id (builds) or crash at launch and roll back (OTA updates), so refuse.
+ * Upstream production builds have no project id and are not checked.
+ *
+ * eas-cli evaluates this file once without the EAS environment (with dotenv
+ * off) just to read the project id, so an evaluation where none of these
+ * variables is set is only checked on the EAS builder itself.
+ */
+const PRODUCTION_VARS = [
+  "EXPO_PUBLIC_API_URL",
+  "EXPO_PUBLIC_WEB_URL",
+  "EXPO_BUNDLE_IDENTIFIER_PROD",
+] as const;
+
+function assertOurProduction(): void {
+  if (!process.env.EAS_BUILD && PRODUCTION_VARS.every((name) => !process.env[name])) return;
+  const problems = [
+    isUpstreamOrInvalid(process.env.EXPO_PUBLIC_API_URL) && "EXPO_PUBLIC_API_URL",
+    isUpstreamOrInvalid(process.env.EXPO_PUBLIC_WEB_URL) && "EXPO_PUBLIC_WEB_URL",
+    !process.env.EXPO_BUNDLE_IDENTIFIER_PROD && "EXPO_BUNDLE_IDENTIFIER_PROD",
+  ].filter(Boolean);
+  if (problems.length > 0) {
+    throw new Error(
+      `Production config with an EAS project needs our own ${problems.join(", ")} ` +
+        "(missing, invalid or pointing at multica.ai). Set them in the EAS " +
+        "production environment or .env.production.local; see docs/contango/ios-release.md.",
+    );
+  }
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const env = process.env.APP_ENV ?? "development";
   const isProd = env === "production";
@@ -17,7 +69,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // dev / prebuild keep working without it. The id is not secret.
   const easProjectId =
     (config.extra?.eas as { projectId?: string } | undefined)?.projectId ??
-    process.env.EAS_PROJECT_ID;
+    process.env.EAS_PROJECT_ID ??
+    (isProd ? EAS_PROJECT_ID_PROD : undefined);
+  if (process.env.EAS_BUILD && !easProjectId) {
+    throw new Error(
+      "EAS build without an EAS project id: set EAS_PROJECT_ID_PROD in app.config.ts.",
+    );
+  }
+  if (isProd && easProjectId) assertOurProduction();
 
   return {
     ...config,
