@@ -81,6 +81,7 @@ import {
   routeForPushPayload,
   type PushRoute,
 } from "./push";
+import { loadNativeAddon, startNativePushClicks } from "./push-click";
 
 configureLinuxFileDialogs(app.commandLine);
 
@@ -168,8 +169,10 @@ let authSessionGeneration = 0;
 // `notification:show` so a local banner never duplicates a remote push.
 let pushActive = false;
 // The last APNs push received while the app was in the background; the next
-// activation within the click window opens it (see RecentPush).
+// activation within the click window opens it (see RecentPush). Only used when
+// the fork's native click addon is not running.
 const recentPush = new RecentPush();
+let nativePushClicks = false;
 // Route from the push notification that cold-launched the app, if any.
 let pendingLaunchRoute: PushRoute | null = null;
 const rendererRouteContexts = new WeakMap<
@@ -716,10 +719,19 @@ if (!gotTheLock) {
     pendingLaunchRoute = routeForPushPayload(
       (launchInfo as { userInfo?: unknown } | undefined)?.userInfo ?? launchInfo,
     );
+    nativePushClicks = startNativePushClicks({
+      platform: process.platform,
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      ensureNotificationDelegate: () => Notification.isSupported(),
+      load: loadNativeAddon,
+      onClick: (userInfo) => openPushRoute(routeForPushPayload(userInfo)),
+    });
   });
 
   if (process.platform === "darwin") {
     pushNotifications.on("received-apns-notification", (_event, userInfo) => {
+      if (nativePushClicks) return;
       // A push that arrives while the app is in front is no click candidate:
       // no activation follows a click on it.
       recentPush.received(
@@ -727,6 +739,7 @@ if (!gotTheLock) {
       );
     });
     app.on("did-become-active", () => {
+      if (nativePushClicks) return;
       openPushRoute(recentPush.takeOnActivate());
     });
   }
