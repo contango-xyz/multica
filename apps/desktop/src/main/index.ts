@@ -10,6 +10,7 @@ import {
 } from "electron";
 import { homedir } from "os";
 import { join } from "path";
+import { appendFileSync, statSync, writeFileSync } from "fs";
 import { pathToFileURL } from "url";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import fixPath from "fix-path";
@@ -169,7 +170,24 @@ let authSessionGeneration = 0;
 let pushActive = false;
 // Clicks on APNs notifications: reported natively by the fork's push-click
 // addon, else guessed from the next activation (see PushClicks).
+// Diagnostics for push delivery and clicks, in ~/Library/Logs/<app>/:
+// without it a click that only brings the app forward leaves no trace.
+function pushLog(message: string): void {
+  try {
+    const file = join(app.getPath("logs"), "push-clicks.log");
+    try {
+      if (statSync(file).size > 256 * 1024) writeFileSync(file, "");
+    } catch {
+      // no file yet
+    }
+    appendFileSync(file, `${new Date().toISOString()} ${message}\n`);
+  } catch {
+    // diagnostics must never break the app
+  }
+}
+
 const pushClicks = new PushClicks({
+  log: pushLog,
   open: (route) => openPushRoute(route),
   focus: () => {
     const window = ensureMainWindow();
@@ -222,6 +240,7 @@ function dispatchToMainRenderer(
 
 function openPushRoute(route: PushRoute | null): void {
   if (!route) return; // no payload: the app just comes forward
+  pushLog(`open: ${route.kind} in ${route.slug}`);
   if (route.kind === "inbox") {
     dispatchToMainRenderer("inbox:open", {
       slug: route.slug,
@@ -730,6 +749,7 @@ if (!gotTheLock) {
         ensureNotificationDelegate: () => Notification.isSupported(),
         load: loadNativeAddon,
         onClick,
+        log: pushLog,
       }),
     );
   });
