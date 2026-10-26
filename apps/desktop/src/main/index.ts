@@ -18,7 +18,7 @@ import { setupDaemonManager } from "./daemon-manager";
 import { setupLocalDirectory } from "./local-directory";
 import { configureLinuxFileDialogs } from "./linux-file-dialog";
 import { openExternalSafely, downloadURLSafely } from "./external-url";
-import { appPathForWebUrl } from "./web-link";
+import { decideWebLink } from "./web-link";
 import { installContextMenu } from "./context-menu";
 import { handleAppShortcut } from "./keyboard-shortcuts";
 import { installNavigationGestures } from "./navigation-gestures";
@@ -163,13 +163,12 @@ const notificationGate = new NotificationGate();
 const mainRendererMessages = new MainRendererMessageQueue();
 let desktopInitialized = false;
 let authSessionGeneration = 0;
-// Set by the renderer once this device is registered for APNs (Task 6 uses it
-// in `notification:show` to avoid a local banner duplicating a remote push).
-// Exported only so tsc's noUnusedLocals accepts it until Task 6 reads it.
+// Set by the renderer while this device is registered for APNs; read in
+// `notification:show` so a local banner never duplicates a remote push.
 let pushActive = false;
 // Route of the last APNs push received while running. Kept for a later
-// decision on click handling; receipt alone never navigates. Exported for the
-// same noUnusedLocals reason as `pushActive`.
+// decision on click handling; receipt alone never navigates. Exported only so
+// tsc's noUnusedLocals accepts it.
 export let lastPushRoute: PushRoute | null = null;
 // Route from the push notification that cold-launched the app, if any.
 let pendingLaunchRoute: PushRoute | null = null;
@@ -265,11 +264,18 @@ function handleWebLink(url: string): void {
     pendingWebLinks.push(url);
     return;
   }
-  const path = runtimeConfigResult.ok
-    ? appPathForWebUrl(url, runtimeConfigResult.config.appUrl)
-    : null;
-  if (path) dispatchToMainRenderer("route:open", path);
-  else void openExternalSafely(url);
+  const decision = decideWebLink(
+    url,
+    runtimeConfigResult.ok ? runtimeConfigResult.config.appUrl : null,
+  );
+  if (decision.kind === "route") {
+    dispatchToMainRenderer("route:open", decision.path);
+  } else if (decision.kind === "focus") {
+    const window = ensureMainWindow();
+    if (window) focusMainWindow(window);
+  } else {
+    void openExternalSafely(url);
+  }
 }
 
 function flushPendingWebLinks(): void {
