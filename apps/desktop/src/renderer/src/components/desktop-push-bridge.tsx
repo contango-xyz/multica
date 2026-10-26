@@ -1,6 +1,12 @@
 import { useEffect } from "react";
 import { api } from "@multica/core/api";
 
+// The server only pushes to devices seen in the last 30 days and only a
+// registration bumps last-seen, so a long-running session re-registers daily
+// (the upsert is idempotent). Timers pause while the Mac sleeps, so after a
+// 30+ day sleep pushes resume at the next tick, up to a day of awake time.
+const REREGISTER_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 // The APNs token of this Mac while a user is logged in; read by beforeLogout.
 let registeredToken: string | null = null;
 
@@ -19,7 +25,7 @@ export function DesktopPushBridge({ appId }: { appId: string }) {
     let cancelled = false;
     // Local banners stay on until the server has this device.
     window.desktopAPI.setPushActive(false);
-    void (async () => {
+    const register = async () => {
       const result = await window.desktopAPI.registerPush();
       if (cancelled || !("token" in result)) return;
       try {
@@ -30,7 +36,9 @@ export function DesktopPushBridge({ appId }: { appId: string }) {
           environment: "production",
         });
       } catch {
-        return; // Local banners stay on; nothing else to do.
+        // First attempt: local banners stay on. Daily refresh: the device is
+        // still within the server's cutoff, so push stays active.
+        return;
       }
       if (cancelled) {
         // Logged out while the POST was in flight. Best effort only: the auth
@@ -42,9 +50,12 @@ export function DesktopPushBridge({ appId }: { appId: string }) {
       }
       registeredToken = result.token;
       window.desktopAPI.setPushActive(true);
-    })();
+    };
+    void register();
+    const timer = setInterval(() => void register(), REREGISTER_INTERVAL_MS);
     return () => {
       cancelled = true;
+      clearInterval(timer);
       // Covers session expiry, where beforeLogout does not run.
       window.desktopAPI.setPushActive(false);
     };
