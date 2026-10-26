@@ -4,8 +4,10 @@
 // Notification objects; a response to a remote notification is dropped after
 // the completion handler runs (shell/browser/notifications/mac/
 // notification_center_delegate.mm). This addon wraps that delegate method on
-// Electron's delegate class: for a UNPushNotificationTrigger it hands the
-// userInfo to JS, then always calls Electron's original implementation with
+// Electron's delegate class: for a default-action click (not a dismiss or a
+// custom action) on a UNPushNotificationTrigger it hands
+// { identifier, userInfo } to JS (userInfo null when it is not JSON-safe), then
+// always calls Electron's original implementation with
 // the same arguments, which still handles local notifications and calls the
 // completion handler exactly once.
 
@@ -28,7 +30,7 @@ SEL DidReceiveSelector() {
 napi_threadsafe_function g_tsfn = nullptr;
 DidReceiveFn g_original = nullptr;
 
-// Runs on the JS thread: parse the JSON userInfo and call the callback.
+// Runs on the JS thread: parse the JSON click and call the callback.
 void CallJs(napi_env env, napi_value callback, void*, void* data) {
   char* json = static_cast<char*>(data);
   if (env != nullptr && callback != nullptr) {
@@ -51,15 +53,25 @@ void CallJs(napi_env env, napi_value callback, void*, void* data) {
   free(json);
 }
 
+// The JS thread released the function (env teardown); clicks stop reporting.
+void TsfnFinalized(napi_env, void*, void*) { g_tsfn = nullptr; }
+
 void Emit(UNNotificationResponse* response) {
   @try {
+    UNNotificationRequest* request = response.notification.request;
     if (g_tsfn == nullptr ||
-        ![response.notification.request.trigger
-            isKindOfClass:[UNPushNotificationTrigger class]])
+        ![response.actionIdentifier
+            isEqualToString:UNNotificationDefaultActionIdentifier] ||
+        ![request.trigger isKindOfClass:[UNPushNotificationTrigger class]])
       return;
-    NSDictionary* info = response.notification.request.content.userInfo;
-    if (info == nil || ![NSJSONSerialization isValidJSONObject:info]) return;
-    NSData* data = [NSJSONSerialization dataWithJSONObject:info
+    NSDictionary* info = request.content.userInfo;
+    // Still report an unserialisable userInfo, so main brings the app forward.
+    id user_info = info != nil && [NSJSONSerialization isValidJSONObject:info]
+                       ? info
+                       : [NSNull null];
+    NSDictionary* click =
+        @{@"identifier" : request.identifier ?: @"", @"userInfo" : user_info};
+    NSData* data = [NSJSONSerialization dataWithJSONObject:click
                                                    options:0
                                                      error:nil];
     if (data == nil) return;
@@ -106,7 +118,7 @@ napi_value Start(napi_env env, napi_callback_info info) {
   napi_value name;
   napi_create_string_utf8(env, "push-click", NAPI_AUTO_LENGTH, &name);
   if (napi_create_threadsafe_function(env, argv[0], nullptr, name, 0, 1,
-                                      nullptr, nullptr, nullptr, CallJs,
+                                      nullptr, TsfnFinalized, nullptr, CallJs,
                                       &g_tsfn) != napi_ok) {
     g_tsfn = nullptr;
     return result_false;

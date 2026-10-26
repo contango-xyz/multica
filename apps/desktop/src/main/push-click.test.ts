@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { startNativePushClicks, type PushClickOptions } from "./push-click";
+import { PushClicks, startNativePushClicks, type PushClickOptions } from "./push-click";
 
 function options(overrides: Partial<PushClickOptions> = {}): PushClickOptions {
   return {
@@ -61,5 +61,85 @@ describe("startNativePushClicks", () => {
       },
     });
     expect(startNativePushClicks(opts)).toBe(false);
+  });
+});
+
+const inboxPush = { aps: {}, body: { kind: "inbox", workspace_slug: "w", item_id: "i1", issue_id: "is1" } };
+const inboxRoute = { kind: "inbox", slug: "w", itemId: "i1", issueKey: "is1" };
+
+function pushClicks() {
+  const open = vi.fn();
+  const focus = vi.fn();
+  return { open, focus, clicks: new PushClicks({ open, focus }) };
+}
+
+// Starts with a fake addon; returns the click callback it was handed.
+function startWith(clicks: PushClicks, launchInfo: unknown, active = true) {
+  let onClick: (click: unknown) => void = () => {};
+  const started = clicks.start(launchInfo, (cb) => {
+    onClick = cb;
+    return active;
+  });
+  return { started, click: (c: unknown) => onClick(c) };
+}
+
+describe("PushClicks", () => {
+  it("opens the route of the clicked notification", () => {
+    const { open, focus, clicks } = pushClicks();
+    const { started, click } = startWith(clicks, undefined);
+    expect(started).toBe(true);
+    click({ identifier: "n1", userInfo: inboxPush });
+    expect(open).toHaveBeenCalledWith(inboxRoute);
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it("skips the click that cold-launched the app (launchInfo already opens it)", () => {
+    const { open, clicks } = pushClicks();
+    const { click } = startWith(clicks, { identifier: "n1", userInfo: inboxPush });
+    click({ identifier: "n1", userInfo: inboxPush });
+    expect(open).not.toHaveBeenCalled();
+    click({ identifier: "n2", userInfo: inboxPush });
+    expect(open).toHaveBeenCalledWith(inboxRoute);
+  });
+
+  it("does not dedupe clicks without an identifier", () => {
+    const { open, clicks } = pushClicks();
+    const { click } = startWith(clicks, { userInfo: inboxPush });
+    click({ userInfo: inboxPush });
+    expect(open).toHaveBeenCalledWith(inboxRoute);
+  });
+
+  it.each([
+    ["unroutable userInfo", { identifier: "n1", userInfo: { aps: {} } }],
+    ["userInfo the addon could not serialise", { identifier: "n1", userInfo: null }],
+    ["a malformed click", "nonsense"],
+  ])("brings the app forward for %s", (_name, c) => {
+    const { open, focus, clicks } = pushClicks();
+    startWith(clicks, undefined).click(c);
+    expect(open).not.toHaveBeenCalled();
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores the RecentPush heuristic while native clicks are live", () => {
+    const { open, clicks } = pushClicks();
+    startWith(clicks, undefined);
+    clicks.received(inboxPush, false);
+    clicks.activated();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("falls back to RecentPush when the addon is not running", () => {
+    const { open, clicks } = pushClicks();
+    expect(startWith(clicks, undefined, false).started).toBe(false);
+    clicks.received(inboxPush, false);
+    clicks.activated();
+    expect(open).toHaveBeenLastCalledWith(inboxRoute);
+  });
+
+  it("uses RecentPush for pushes received before start (app not ready yet)", () => {
+    const { open, clicks } = pushClicks();
+    clicks.received(inboxPush, true); // in front: no click candidate
+    clicks.activated();
+    expect(open).toHaveBeenLastCalledWith(null);
   });
 });
