@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   NotificationGate,
   parseNativeNotificationPayload,
+  retainNotification,
+  retainedNotificationCount,
 } from "./notification-gate";
 
 describe("NotificationGate", () => {
@@ -65,5 +67,26 @@ describe("parseNativeNotificationPayload", () => {
       body: "",
     };
     expect(parseNativeNotificationPayload(payload)).toEqual(payload);
+  });
+});
+
+describe("push-aware gate and retention", () => {
+  it("never shows a local banner while push is active", () => {
+    const gate = new NotificationGate();
+    expect(gate.shouldShow("a", false, true)).toBe(false);
+  });
+
+  it("retains a notification until clicked or closed", () => {
+    const handlers: Record<string, () => void> = {};
+    const n = {
+      once: (e: "click" | "close", cb: () => void) => {
+        handlers[e] = cb;
+        return n;
+      },
+    };
+    retainNotification(n);
+    expect(retainedNotificationCount()).toBe(1);
+    handlers.click!();
+    expect(retainedNotificationCount()).toBe(0);
   });
 });

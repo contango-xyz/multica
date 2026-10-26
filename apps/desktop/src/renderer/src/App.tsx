@@ -11,6 +11,7 @@ import { setCurrentWorkspace } from "@multica/core/platform";
 import { ThemeProvider } from "@multica/ui/components/common/theme-provider";
 import { MulticaIcon } from "@multica/ui/components/common/multica-icon";
 import { Toaster } from "@multica/ui/components/ui/sonner";
+import { unregisterPushOnLogout } from "./components/desktop-push-bridge";
 import { DesktopLoginPage } from "./pages/login";
 import { DesktopAuthRecoveryPage } from "./pages/auth-recovery";
 import { DesktopShell } from "./components/desktop-layout";
@@ -457,6 +458,7 @@ export default function App() {
         <CoreProvider
           apiBaseUrl={runtimeConfigResult.config.apiUrl}
           wsUrl={runtimeConfigResult.config.wsUrl}
+          beforeLogout={unregisterPushOnLogout}
           onLogout={
             windowContext.kind === "main" ? handleDaemonLogout : undefined
           }

@@ -35,6 +35,7 @@ import {
 import { TabBar } from "./tab-bar";
 import { TabContent } from "./tab-content";
 import { WindowOverlay } from "./window-overlay";
+import { DesktopPushBridge } from "./desktop-push-bridge";
 import { WindowToolbar, WINDOW_TOOLBAR_CLEARANCE } from "./window-toolbar";
 
 const TOP_BAR_HEIGHT_CLASS = "h-10";
@@ -194,11 +195,18 @@ function DesktopInboxBridge() {
   }, [push]);
 
   useEffect(() => {
-    return window.desktopAPI.onInboxOpen(({ slug, issueKey }) => {
+    const offInbox = window.desktopAPI.onInboxOpen(({ slug, issueKey }) => {
       if (!slug) return;
       const inboxPath = `${paths.workspace(slug).inbox()}?issue=${encodeURIComponent(issueKey)}`;
       pushRef.current(inboxPath);
     });
+    // Remote push clicks: same adapter, so a path in another workspace
+    // becomes a real switchWorkspace.
+    const offRoute = window.desktopAPI.onRouteOpen((path) => pushRef.current(path));
+    return () => {
+      offInbox();
+      offRoute();
+    };
   }, []);
 
   return null;
@@ -253,6 +261,9 @@ export function DesktopShell() {
           IndexRedirect, not a route. */}
       <WorkspaceSlugProvider slug={slug}>
         <DesktopInboxBridge />
+        <DesktopPushBridge
+          appId={typeof __CONTANGO_APP_ID__ === "string" ? __CONTANGO_APP_ID__ : ""}
+        />
         <div className="flex h-screen bg-app-shell">
           {/* bg-app-shell is the wrapper's non-inset fill, so it also owns the
               non-inset half of --sidebar-wrapper-fill. sidebar.tsx supplies the
