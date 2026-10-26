@@ -241,6 +241,23 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream ships desktop push and a first-party macOS distribution.
 
+### 12. iOS app foundation (EAS builds, OTA, universal links, push routing)
+
+- **What:** reproducible iOS builds on EAS for TestFlight (pinned Xcode 27 image, remote build
+  numbers, `production` environment), OTA updates with a restart prompt, universal links into the app
+  from our server's web links, APNs registration that survives permission changes and token rotation,
+  and push/link routing to the linked screen. Release steps: `docs/contango/ios-release.md`.
+- **Commits:** `build(mobile): reproducible iOS project and EAS config (contango)` through
+  `docs(contango): iOS release runbook (contango)`.
+- **Touches:** ours: `docs/contango/ios-release.md`, `apps/mobile/scripts/print-aasa.mjs`,
+  `apps/mobile/lib/{universal-links,push-environment}*`. Upstream files: `apps/mobile/app.config.ts`
+  (associated domains, EAS updates, team id), `apps/mobile/eas.json`, `apps/mobile/README.md` (EAS
+  section), the mobile push registration and notification routing code.
+- **Config outside the repo:** EAS `production` environment variables and `ascAppId` in `eas.json`
+  (see the runbook); the public Cloudflare route for the association file.
+- **Upstream status:** none as of v0.7.0.
+- **Drop when:** upstream ships its own iOS distribution with universal links and OTA, and we move to it.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
