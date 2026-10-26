@@ -9,8 +9,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED = ["CONTANGO_APP_ID", "CONTANGO_TEAM_ID", "CONTANGO_PROVISIONING_PROFILE", "CONTANGO_API_URL", "CONTANGO_UPDATE_URL"];
-// electron-builder picks these over APPLE_KEYCHAIN_PROFILE when present.
-const OTHER_NOTARY_CREDENTIALS = ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"];
+// electron-builder picks the APPLE_* ones over APPLE_KEYCHAIN_PROFILE when
+// present; CSC_IDENTITY_AUTO_DISCOVERY=false would skip signing entirely.
+const STRIPPED_ENV = ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER", "CSC_IDENTITY_AUTO_DISCOVERY"];
 
 export function renderEntitlements(template, env) {
   return template
@@ -20,6 +21,15 @@ export function renderEntitlements(template, env) {
 
 export function builderOverrides(env, entitlementsPath) {
   for (const k of REQUIRED) if (!env[k]) throw new Error(`${k} missing from .env.contango.local`);
+  for (const k of ["CONTANGO_API_URL", "CONTANGO_UPDATE_URL"]) {
+    let url;
+    try {
+      url = new URL(env[k]);
+    } catch {
+      throw new Error(`${k} must be an http(s) URL`);
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(`${k} must be an http(s) URL`);
+  }
   return {
     appId: env.CONTANGO_APP_ID,
     mac: { entitlements: entitlementsPath, provisioningProfile: env.CONTANGO_PROVISIONING_PROFILE, notarize: true },
@@ -45,17 +55,37 @@ export function builderConfig(overrides, baseConfigPath, version) {
 export function builderEnv(env) {
   if (!env.APPLE_KEYCHAIN_PROFILE) throw new Error("APPLE_KEYCHAIN_PROFILE missing from .env.contango.local");
   const out = { ...env };
-  for (const k of OTHER_NOTARY_CREDENTIALS) delete out[k];
+  for (const k of STRIPPED_ENV) delete out[k];
   return out;
 }
 
-function loadEnvFile(path) {
+// Minimal dotenv: `export ` prefix, CRLF, `#` comment lines, matching
+// surrounding quotes, and ` #` inline comments on unquoted values.
+export function parseEnvFile(text) {
   const out = {};
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)=(.*)$/);
-    if (m) out[m[1]] = m[2].trim();
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$/);
+    if (!m) continue;
+    let value = m[2].trim();
+    const q = value.match(/^(["'])(.*)\1$/);
+    if (q) value = q[2];
+    else value = value.replace(/\s+#.*$/, "");
+    out[m[1]] = value;
   }
   return out;
+}
+
+export function loadEnvFile(path) {
+  return parseEnvFile(readFileSync(path, "utf8"));
+}
+
+// Gate run after electron-builder: it skips signing (and with it
+// notarization) with only a warning when no identity is usable.
+export function verifyCommands(appPath) {
+  return [
+    ["codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath]],
+    ["xcrun", ["stapler", "validate", appPath]],
+  ];
 }
 
 function main() {
@@ -70,6 +100,7 @@ function main() {
   const run = (cmd, args) => execFileSync(cmd, args, { cwd: desktopRoot, stdio: "inherit", env });
   run("pnpm", ["run", "build"]);
   run("pnpm", ["exec", "electron-builder", "--mac", "--arm64", "--publish", "never", "--config", config]);
+  for (const [cmd, args] of verifyCommands(join(desktopRoot, "dist/mac-arm64/Multica.app"))) run(cmd, args);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) main();

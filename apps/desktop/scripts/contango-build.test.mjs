@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderEntitlements, builderOverrides, builderConfig, builderEnv } from "./contango-build.mjs";
+import { renderEntitlements, builderOverrides, builderConfig, builderEnv, parseEnvFile, verifyCommands } from "./contango-build.mjs";
 
 const env = {
   CONTANGO_APP_ID: "com.example.desktop", CONTANGO_TEAM_ID: "ABCDE12345",
@@ -41,11 +41,44 @@ test("generated config extends the base and replaces publish", () => {
 // keychain profile and silently skips notarization when none is set.
 test("notarization uses only the keychain profile", () => {
   const e = builderEnv({ ...env, APPLE_KEYCHAIN_PROFILE: "notary", APPLE_ID: "a@b", APPLE_APP_SPECIFIC_PASSWORD: "x",
-    APPLE_API_KEY: "k", APPLE_API_KEY_ID: "i", APPLE_API_ISSUER: "s", PATH: "/bin" });
+    APPLE_API_KEY: "k", APPLE_API_KEY_ID: "i", APPLE_API_ISSUER: "s", CSC_IDENTITY_AUTO_DISCOVERY: "false", PATH: "/bin" });
   assert.equal(e.APPLE_KEYCHAIN_PROFILE, "notary");
   assert.equal(e.PATH, "/bin");
-  for (const k of ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"]) {
+  for (const k of ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER", "CSC_IDENTITY_AUTO_DISCOVERY"]) {
     assert.equal(k in e, false, k);
   }
   assert.throws(() => builderEnv(env), /APPLE_KEYCHAIN_PROFILE/);
+});
+
+test("env file: quotes, CRLF, comments, export", () => {
+  const text = [
+    "# comment line",
+    'CONTANGO_API_URL="https://srv.example.test"',
+    "CONTANGO_APP_ID='com.example.desktop'\r",
+    "export CONTANGO_TEAM_ID=ABCDE12345",
+    "CONTANGO_UPDATE_URL=https://srv.example.test/desktop/ # feed",
+    'QUOTED_HASH="a #b"',
+    "EMPTY=",
+    "",
+  ].join("\n");
+  assert.deepEqual(parseEnvFile(text), {
+    CONTANGO_API_URL: "https://srv.example.test",
+    CONTANGO_APP_ID: "com.example.desktop",
+    CONTANGO_TEAM_ID: "ABCDE12345",
+    CONTANGO_UPDATE_URL: "https://srv.example.test/desktop/",
+    QUOTED_HASH: "a #b",
+    EMPTY: "",
+  });
+});
+
+test("server and feed URLs must be http(s)", () => {
+  assert.throws(() => builderOverrides({ ...env, CONTANGO_API_URL: '"https://srv.example.test"' }, "/tmp/e"), /CONTANGO_API_URL/);
+  assert.throws(() => builderOverrides({ ...env, CONTANGO_UPDATE_URL: "ftp://srv.example.test/" }, "/tmp/e"), /CONTANGO_UPDATE_URL/);
+});
+
+test("post-build gate verifies signature and stapled ticket", () => {
+  assert.deepEqual(verifyCommands("/d/Multica.app"), [
+    ["codesign", ["--verify", "--deep", "--strict", "--verbose=2", "/d/Multica.app"]],
+    ["xcrun", ["stapler", "validate", "/d/Multica.app"]],
+  ]);
 });
