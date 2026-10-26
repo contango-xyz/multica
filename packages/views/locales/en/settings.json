@@ -1321,6 +1321,13 @@
       "reconnect_failed": "Couldn't reconnect the daemon",
       "try_again_moment": "Please try again in a moment.",
       "try_again": "Please try again."
+    },
+    "open_in_app": {
+      "tab": "Desktop app",
+      "toggle": "Open links in the desktop app",
+      "opened": "Opened in the desktop app",
+      "continue_in_browser": "Continue in browser",
+      "stop": "Stop opening links in the app"
     }
   },
   "members": {

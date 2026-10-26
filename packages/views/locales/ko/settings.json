@@ -1051,6 +1051,13 @@
       "reconnect_failed": "데몬에 다시 연결하지 못했습니다",
       "try_again_moment": "잠시 후 다시 시도하세요.",
       "try_again": "다시 시도하세요."
+    },
+    "open_in_app": {
+      "tab": "데스크톱 앱",
+      "toggle": "링크를 데스크톱 앱에서 열기",
+      "opened": "데스크톱 앱에서 열었습니다",
+      "continue_in_browser": "브라우저에서 계속",
+      "stop": "앞으로 링크를 앱에서 열지 않기"
     }
   },
   "members": {

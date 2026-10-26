@@ -1311,6 +1311,13 @@
       "reconnect_failed": "デーモンに再接続できませんでした",
       "try_again_moment": "しばらくしてからもう一度お試しください。",
       "try_again": "もう一度お試しください。"
+    },
+    "open_in_app": {
+      "tab": "デスクトップ版",
+      "toggle": "リンクをデスクトップ版で開く",
+      "opened": "デスクトップ版で開きました",
+      "continue_in_browser": "ブラウザで続ける",
+      "stop": "今後リンクをアプリで開かない"
     }
   },
   "members": {

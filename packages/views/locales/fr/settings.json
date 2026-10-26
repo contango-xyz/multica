@@ -1321,6 +1321,13 @@
       "reconnect_failed": "Impossible de reconnecter le démon",
       "try_again_moment": "Veuillez réessayer dans un instant.",
       "try_again": "Veuillez réessayer."
+    },
+    "open_in_app": {
+      "tab": "Application de bureau",
+      "toggle": "Ouvrir les liens dans l'application de bureau",
+      "opened": "Ouvert dans l'application de bureau",
+      "continue_in_browser": "Continuer dans le navigateur",
+      "stop": "Ne plus ouvrir les liens dans l'application"
     }
   },
   "members": {
