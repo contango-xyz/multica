@@ -21,6 +21,15 @@ test("overrides point at our id, profile and feed", () => {
   assert.deepEqual(o.publish, { provider: "generic", url: "https://srv.example.test/desktop/", channel: "contango" });
 });
 
+test("overrides keep multica:// and add http(s) as a viewer", () => {
+  const o = builderOverrides(env, "/tmp/ent.plist");
+  assert.deepEqual(o.protocols, [
+    { name: "Multica", schemes: ["multica"] },
+    { name: "Web links", schemes: ["https", "http"], role: "Viewer" },
+  ]);
+  assert.deepEqual(builderConfig(o, "/x", "1").protocols, o.protocols);
+});
+
 test("missing variable fails loudly", () => {
   assert.throws(() => builderOverrides({ ...env, CONTANGO_APP_ID: "" }, "/tmp/e"), /CONTANGO_APP_ID/);
 });

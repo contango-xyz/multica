@@ -34,6 +34,11 @@ export function builderOverrides(env, entitlementsPath) {
     appId: env.CONTANGO_APP_ID,
     mac: { entitlements: entitlementsPath, provisioningProfile: env.CONTANGO_PROVISIONING_PROFILE, notarize: true },
     publish: { provider: "generic", url: env.CONTANGO_UPDATE_URL, channel: "contango" },
+    // Arrays replace upstream's list, so multica:// is restated.
+    protocols: [
+      { name: "Multica", schemes: ["multica"] },
+      { name: "Web links", schemes: ["https", "http"], role: "Viewer" },
+    ],
   };
 }
 
@@ -47,6 +52,7 @@ export function builderConfig(overrides, baseConfigPath, version) {
     extraMetadata: { version },
     mac: overrides.mac,
     publish: [overrides.publish],
+    protocols: overrides.protocols,
   };
 }
 
