@@ -9,6 +9,8 @@
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
+      "node": "22.18.0",
+      "pnpm": "10.28.2",
       "env": {
         "APP_ENV": "production"
       },

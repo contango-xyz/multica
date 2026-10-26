@@ -107,6 +107,9 @@ per build.
   with a final (non-RC) Xcode. The `sdk-57` alias still points at Xcode 26.6;
   the pin keeps the iOS 27 SDK that local builds use. Move the pin when Expo
   publishes a newer final Xcode image.
+- **Toolchain:** `node` (the `.nvmrc` major; eas.json needs an exact version)
+  and `pnpm` (the root `packageManager` version) are pinned in the profile, so
+  builds do not follow the image's defaults. Move them with those files.
 - **Native project:** `expo prebuild --clean` output builds and archives with
   Xcode 27 without hand edits. Scene support comes from
   `ios.enableSceneSupport` (above); SDK 57's defaults (iOS 16.4 minimum, pod
