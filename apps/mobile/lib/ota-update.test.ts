@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkAndPromptForUpdate, type OtaUpdateDeps } from "./ota-update";
+import {
+  checkAndPromptForUpdate,
+  createUpdatePromptGate,
+  promptForPendingUpdate,
+  type OtaUpdateDeps,
+} from "./ota-update";
 
 function makeDeps(over: Partial<OtaUpdateDeps> = {}) {
   return {
@@ -71,5 +76,57 @@ describe("checkAndPromptForUpdate", () => {
     deps.prompt.mock.calls[0]![0]();
     await Promise.resolve();
     expect(deps.log).toHaveBeenCalledWith(expect.any(String), err);
+  });
+});
+
+describe("promptForPendingUpdate", () => {
+  it("prompts once for an update the native launch check downloaded", () => {
+    const seen = createUpdatePromptGate();
+    const prompt = vi.fn<(onRestart: () => void) => void>();
+    const reload = vi.fn(async () => {});
+    const log = vi.fn();
+    const pending = { isUpdatePending: true, updateId: "u1" };
+    promptForPendingUpdate(pending, seen, { prompt, reload, log });
+    promptForPendingUpdate(pending, seen, { prompt, reload, log });
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("prompts again for a different update id", () => {
+    const seen = createUpdatePromptGate();
+    const prompt = vi.fn<(onRestart: () => void) => void>();
+    const deps = { prompt, reload: vi.fn(async () => {}), log: vi.fn() };
+    promptForPendingUpdate({ isUpdatePending: true, updateId: "u1" }, seen, deps);
+    promptForPendingUpdate({ isUpdatePending: true, updateId: "u2" }, seen, deps);
+    expect(prompt).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not prompt when nothing is pending", () => {
+    const prompt = vi.fn<(onRestart: () => void) => void>();
+    promptForPendingUpdate({ isUpdatePending: false, updateId: "u1" }, createUpdatePromptGate(), {
+      prompt,
+      reload: vi.fn(async () => {}),
+      log: vi.fn(),
+    });
+    expect(prompt).not.toHaveBeenCalled();
+  });
+
+  it("reloads only on restart, never on dismiss", () => {
+    const prompt = vi.fn<(onRestart: () => void) => void>();
+    const reload = vi.fn(async () => {});
+    promptForPendingUpdate({ isUpdatePending: true, updateId: "u1" }, createUpdatePromptGate(), {
+      prompt,
+      reload,
+      log: vi.fn(),
+    });
+    expect(reload).not.toHaveBeenCalled();
+    prompt.mock.calls[0]![0]();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("a fetch that finds the already-prompted update does not prompt twice", () => {
+    const seen = createUpdatePromptGate();
+    expect(seen("u1")).toBe(true);
+    expect(seen("u1")).toBe(false);
   });
 });

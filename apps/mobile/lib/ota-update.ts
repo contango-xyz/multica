@@ -27,3 +27,32 @@ export async function checkAndPromptForUpdate(deps: OtaUpdateDeps): Promise<void
     deps.log("OTA update check failed", err);
   }
 }
+
+/**
+ * Remembers which update ids already got a prompt, so the same downloaded
+ * update is offered once however it arrived. Returns true the first time.
+ */
+export function createUpdatePromptGate(): (updateId: string) => boolean {
+  const seen = new Set<string>();
+  return (updateId) => {
+    if (seen.has(updateId)) return false;
+    seen.add(updateId);
+    return true;
+  };
+}
+
+/**
+ * Prompts for an update that is already downloaded and waiting for a restart,
+ * whichever path downloaded it (including the native ON_LOAD launch check,
+ * which applies it silently on the next launch otherwise).
+ */
+export function promptForPendingUpdate(
+  state: { isUpdatePending: boolean; updateId: string | undefined },
+  firstTime: (updateId: string) => boolean,
+  deps: Pick<OtaUpdateDeps, "prompt" | "reload" | "log">,
+): void {
+  if (!state.isUpdatePending || !state.updateId || !firstTime(state.updateId)) return;
+  deps.prompt(() => {
+    deps.reload().catch((err: unknown) => deps.log("OTA reload failed", err));
+  });
+}
