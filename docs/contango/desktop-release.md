@@ -42,10 +42,12 @@ VPN on, download `https://<server host>/desktop/<dmg>`, delete the upstream Mult
 ## Opening links in the app
 
 Links to our server (GitHub PR bodies, web Slack, email, bookmarks) stay `https://`. In each browser,
-open Settings, Desktop app, and turn on "Open links in the desktop app" (per browser, off by
+open Settings → This device → Desktop app, and turn on "Open links in the desktop app" (per browser, off by
 default). A workspace link opened as a fresh page load then hands off to the app via
 `multica://open?path=...` and shows a panel with "Continue in browser" and "Stop opening links in the
-app". Reloads and in-app navigation stay in the browser. An upstream desktop app, or no app, just
+app". Reloads, in-app navigation and returns from other sites (such as a checkout) stay in the
+browser. Turn it on only in desktop browsers, not on a phone (the mobile app registers `multica://`
+but has no open route). An upstream desktop app, or no app, just
 comes forward or does nothing, so "Continue in browser" covers it.
 
 The Choosy (or similar) browser-picker rule is optional: it is still useful for links from native
