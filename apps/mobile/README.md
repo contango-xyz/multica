@@ -113,8 +113,10 @@ per build.
   targets at 15.1 or later, no script sandboxing on the app target) cover the
   other fixes the SDK 55 project needed.
 - **Environment:** the bundle id, team id, server URLs and associated domain
-  come from the EAS `production` environment, not from `eas.json`. OTA updates
-  read only that environment.
+  come from the EAS `production` environment, which the profile selects with
+  `"environment": "production"`. The profile's environment does not apply to
+  OTA updates; publish them with
+  `eas update --channel production --environment production`.
 - **Submit:** `submit.production.ios` is empty on purpose. EAS cannot read
   `ascAppId` from an environment variable, so without it `eas submit` looks up
   the App Store Connect app by bundle id, which needs an interactive Apple

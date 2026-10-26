@@ -5,6 +5,7 @@
   },
   "build": {
     "production": {
+      "environment": "production",
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
