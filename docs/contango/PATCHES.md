@@ -205,6 +205,21 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** patch 9 is dropped, or upstream ships an issue relations UI.
 
+### 11. Desktop build for macOS (own app id, push, update feed)
+
+- **What:** a signed, notarized arm64 desktop app with its own app id, APNs push (registration after
+  login, click routing, one banner per event), our server's web links opening in the app, and a
+  generic update feed on our server. Server accepts macOS push devices. Build and release steps:
+  `docs/contango/desktop-release.md`.
+- **Commits:** `feat(server): accept macOS push devices` through `chore(desktop): fork release
+  publish script`.
+- **Touches:** ours: `apps/desktop/scripts/contango-{build,publish}*`,
+  `apps/desktop/build/entitlements.contango.template.plist`. Upstream files: desktop main process
+  (push registration, link handling), `packages/core` (push device API, `beforeLogout` hook),
+  `server/internal/push/*`, `server/internal/handler` push-device handlers.
+- **Upstream status:** none as of v0.7.0.
+- **Drop when:** upstream ships desktop push and a first-party macOS distribution.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
