@@ -1,12 +1,27 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_RUNTIME_CONFIG_UPSTREAM,
+  defaultRuntimeConfigFor,
   deriveWsUrl,
   parseRuntimeConfig,
   runtimeConfigFromDevEnv,
 } from "./runtime-config";
 
 describe("runtime config", () => {
+  it("uses the build-time server URL as default when set", () => {
+    expect(defaultRuntimeConfigFor("https://srv.example.test")).toEqual({
+      schemaVersion: 1,
+      apiUrl: "https://srv.example.test",
+      wsUrl: "wss://srv.example.test/ws",
+      appUrl: "https://srv.example.test",
+    });
+  });
+
+  it("keeps upstream defaults without a build-time URL", () => {
+    expect(defaultRuntimeConfigFor("")).toEqual(DEFAULT_RUNTIME_CONFIG_UPSTREAM);
+  });
+
   it("derives https/wss compatible URLs from apiUrl", () => {
     expect(
       parseRuntimeConfig(

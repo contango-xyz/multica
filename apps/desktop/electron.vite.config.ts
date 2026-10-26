@@ -3,8 +3,15 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+// Fork builds bake their server URL in (scripts/contango-build.mjs); "" keeps
+// upstream's defaults.
+const define = {
+  __CONTANGO_API_URL__: JSON.stringify(process.env.CONTANGO_API_URL ?? ""),
+};
+
 export default defineConfig({
   main: {
+    define,
     plugins: [externalizeDepsPlugin()],
   },
   preload: {
@@ -14,9 +21,11 @@ export default defineConfig({
     // externalized `require("@electron-toolkit/preload")` would throw and
     // every contextBridge API would vanish. electron-vite emits preload as a
     // single CJS bundle, which is exactly what the sandbox requires.
+    define,
     plugins: [externalizeDepsPlugin({ exclude: ["@electron-toolkit/preload"] })],
   },
   renderer: {
+    define,
     server: {
       // Allow parallel worktrees to run `pnpm dev:desktop` side-by-side
       // (e.g. Multica Canary alongside a primary checkout) by overriding

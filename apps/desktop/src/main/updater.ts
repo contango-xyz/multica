@@ -51,6 +51,13 @@ export function configureMacX64UpdateChannel(
 // arm64 feed and runtime path remain unchanged.
 configureMacX64UpdateChannel(autoUpdater);
 
+// Fork builds publish to the "contango" channel of a generic feed; pinning it
+// keeps prerelease versions (x.y.z-contango.n) on our feed only.
+if (app.getVersion().includes("-contango.")) {
+  autoUpdater.channel = "contango";
+  autoUpdater.allowDowngrade = false;
+}
+
 const STARTUP_CHECK_DELAY_MS = 5_000;
 const PERIODIC_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
