@@ -104,3 +104,13 @@ test("a clean tree passes", () => {
 test("tracked changes refuse the build and name the files", () => {
   assert.throws(() => assertCleanTree(" M apps/desktop/src/main/index.ts\nA  docs/x.md\n"), /dirty.*index\.ts.*docs\/x\.md/s);
 });
+
+test("fuses close the Node entry points into the signed app", () => {
+  const o = builderOverrides(env, "/tmp/ent.plist");
+  assert.deepEqual(o.electronFuses, {
+    runAsNode: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableNodeCliInspectArguments: false,
+  });
+  assert.deepEqual(builderConfig(o, "/x", "1").electronFuses, o.electronFuses);
+});
