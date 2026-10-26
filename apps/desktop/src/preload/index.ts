@@ -192,6 +192,18 @@ const desktopAPI = {
       issueKey: string;
     }) => void,
   ) => subscribeToMainRendererChannel("inbox:open", callback),
+  /** Register this Mac for APNs; resolves with the device token or an error
+   *  (`"unsupported"` off macOS). */
+  registerPush: () =>
+    ipcRenderer.invoke("push:register") as Promise<
+      { token: string } | { error: string }
+    >,
+  /** Tell main whether this device currently receives remote pushes. */
+  setPushActive: (active: boolean) => ipcRenderer.send("push:active", active),
+  /** Listen for in-app paths to open (push notification clicks). Returns an
+   *  unsubscribe function. */
+  onRouteOpen: (callback: (path: string) => void) =>
+    subscribeToMainRendererChannel("route:open", callback),
   /** Listen for native macOS back/forward swipe gestures. */
   onNavigationGesture: (callback: (gesture: NavigationGesture) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, gesture: unknown) => {

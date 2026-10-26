@@ -1,4 +1,13 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification, screen } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeImage,
+  Notification,
+  pushNotifications,
+  screen,
+} from "electron";
 import { homedir } from "os";
 import { join } from "path";
 import { pathToFileURL } from "url";
@@ -63,6 +72,12 @@ import {
   NotificationGate,
   parseNativeNotificationPayload,
 } from "./notification-gate";
+import {
+  chatSessionPath,
+  registerForPush,
+  routeForPushPayload,
+  type PushRoute,
+} from "./push";
 
 configureLinuxFileDialogs(app.commandLine);
 
@@ -146,6 +161,16 @@ const notificationGate = new NotificationGate();
 const mainRendererMessages = new MainRendererMessageQueue();
 let desktopInitialized = false;
 let authSessionGeneration = 0;
+// Set by the renderer once this device is registered for APNs (Task 6 uses it
+// in `notification:show` to avoid a local banner duplicating a remote push).
+// Exported only so tsc's noUnusedLocals accepts it until Task 6 reads it.
+export let pushActive = false;
+// Route of the last APNs push received while running. Kept for a later
+// decision on click handling; receipt alone never navigates. Exported for the
+// same noUnusedLocals reason as `pushActive`.
+export let lastPushRoute: PushRoute | null = null;
+// Route from the push notification that cold-launched the app, if any.
+let pendingLaunchRoute: PushRoute | null = null;
 const rendererRouteContexts = new WeakMap<
   Electron.WebContents,
   RendererRouteContext
@@ -186,6 +211,19 @@ function dispatchToMainRenderer(
   mainRendererMessages.enqueue(channel, payload, sendMainRendererMessage);
   const window = ensureMainWindow();
   if (window) focusMainWindow(window);
+}
+
+function openPushRoute(route: PushRoute | null): void {
+  if (!route) return; // no payload: the app just comes forward
+  if (route.kind === "inbox") {
+    dispatchToMainRenderer("inbox:open", {
+      slug: route.slug,
+      itemId: route.itemId,
+      issueKey: route.issueKey,
+    });
+  } else {
+    dispatchToMainRenderer("route:open", chatSessionPath(route.slug, route.sessionId));
+  }
 }
 
 function handleDeepLink(url: string): void {
@@ -621,6 +659,20 @@ if (!gotTheLock) {
   );
   if (coldStartDeepLink) handleDeepLink(coldStartDeepLink);
 
+  // macOS: a push that cold-launched the app arrives as `ready`'s launchInfo
+  // (a NotificationResponse carrying `userInfo`, or the userInfo itself).
+  app.once("ready", (_event, launchInfo) => {
+    pendingLaunchRoute = routeForPushPayload(
+      (launchInfo as { userInfo?: unknown } | undefined)?.userInfo ?? launchInfo,
+    );
+  });
+
+  if (process.platform === "darwin") {
+    pushNotifications.on("received-apns-notification", (_event, userInfo) => {
+      lastPushRoute = routeForPushPayload(userInfo);
+    });
+  }
+
   app.whenReady().then(async () => {
     const viteEnv = import.meta.env as ImportMetaEnv & {
       readonly VITE_API_URL?: string;
@@ -762,6 +814,7 @@ if (!gotTheLock) {
         if (accountInvalidated) {
           authSessionGeneration += 1;
           mainRendererMessages.clear("inbox:open");
+          mainRendererMessages.clear("route:open");
         }
         return;
       }
@@ -824,6 +877,13 @@ if (!gotTheLock) {
       notification.show();
     });
 
+    // APNs registration is renderer-initiated (Task 6 gates it on the fork
+    // build), so upstream builds never register.
+    ipcMain.handle("push:register", () => registerForPush());
+    ipcMain.on("push:active", (_event, active: unknown) => {
+      pushActive = active === true;
+    });
+
     // IPC: update the dock / taskbar unread badge. Values above 99 render as
     // "99+". macOS is the primary target (user-visible dock badge); Linux
     // Unity launchers also respect `setBadgeCount`. Windows' taskbar overlay
@@ -841,6 +901,9 @@ if (!gotTheLock) {
 
     desktopInitialized = true;
     createWindow();
+    // Queued until the renderer's matching listener is ready.
+    openPushRoute(pendingLaunchRoute);
+    pendingLaunchRoute = null;
 
     setupAutoUpdater(() => mainWindow);
     setupDaemonManager(() => mainWindow);
