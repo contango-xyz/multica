@@ -31,6 +31,10 @@ export interface CoreProviderProps {
   onLogin?: () => void;
   /** Called after logout (e.g. clear cookie). */
   onLogout?: () => void;
+  /** Called synchronously at the start of an explicit logout, before the
+   *  credential is cleared (e.g. unregister a push device). Not called on
+   *  session expiry. */
+  beforeLogout?: () => void;
   /** Called when the server ends the session (401) rather than the user.
    *  Defaults to `onLogout`; pass it only when some of this shell's logout
    *  teardown is too destructive for an expiry the user did not ask for. */

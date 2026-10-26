@@ -188,4 +188,31 @@ describe("authStore", () => {
     expect(store.getState().status).toBe("authenticated");
     expect(store.getState().expired).toBe(false);
   });
+
+  it("runs beforeLogout before clearing the token", () => {
+    const order: string[] = [];
+    const api = {
+      setToken: (t: string | null) => order.push(`setToken:${t}`),
+    } as unknown as ApiClient;
+    const store = createAuthStore({
+      api,
+      storage: makeStorage({ multica_token: "t" }),
+      beforeLogout: () => order.push("before"),
+    });
+    store.getState().logout();
+    expect(order[0]).toBe("before");
+    expect(order).toContain("setToken:null");
+  });
+
+  it("does not run beforeLogout on session expiry", () => {
+    const beforeLogout = vi.fn();
+    const store = createAuthStore({
+      api: makeApi(),
+      storage: makeStorage({ multica_token: "t" }),
+      beforeLogout,
+    });
+    store.setState({ user: fakeUser, status: "authenticated", isLoading: false });
+    store.getState().sessionExpired();
+    expect(beforeLogout).not.toHaveBeenCalled();
+  });
 });
