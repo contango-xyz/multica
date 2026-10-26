@@ -5,7 +5,9 @@ import { Button } from "@multica/ui/components/ui/button";
 import { useT } from "@multica/views/i18n";
 import {
   handoffUrl,
+  markCheckedInTab,
   openDesktopApp,
+  readCheckedInTab,
   readOpenInDesktop,
   shouldHandOff,
   writeOpenInDesktop,
@@ -31,8 +33,12 @@ export function DesktopHandoff() {
       enabled: readOpenInDesktop(),
       navigationType: entry?.type,
       alreadyHandled: checked,
+      checkedInTab: readCheckedInTab(),
+      referrer: document.referrer,
+      origin: window.location.origin,
     });
     checked = true;
+    markCheckedInTab();
     if (!handOff) return;
     const { pathname, search, hash } = window.location;
     openDesktopApp(handoffUrl(pathname, search, hash));
@@ -45,7 +51,7 @@ export function DesktopHandoff() {
   return (
     <section
       aria-label={opened}
-      className="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-lg border bg-popover p-4 text-popover-foreground shadow-lg"
+      className="fixed bottom-4 left-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-lg border bg-popover p-4 text-popover-foreground shadow-lg"
     >
       <p className="text-body font-medium">{opened}</p>
       <div className="flex flex-wrap gap-2">

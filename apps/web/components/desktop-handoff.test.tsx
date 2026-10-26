@@ -35,6 +35,8 @@ describe("DesktopHandoff", () => {
     vi.resetModules();
     openDesktopApp.mockReset();
     localStorage.clear();
+    sessionStorage.clear();
+    vi.spyOn(document, "referrer", "get").mockReturnValue("");
     window.history.replaceState(null, "", "/acme/issues/MUL-1?view=a#c-1");
   });
 
@@ -116,6 +118,43 @@ describe("DesktopHandoff", () => {
         <DesktopHandoff />
       </I18nProvider>,
     );
+
+    expect(openDesktopApp).not.toHaveBeenCalled();
+  });
+
+  it("does not hand off when this tab already ran the check (return from another site)", async () => {
+    localStorage.setItem(KEY, "true");
+    setNavigationType("navigate");
+    await renderHandoff();
+    expect(openDesktopApp).toHaveBeenCalledTimes(1);
+    cleanup();
+    vi.resetModules();
+
+    await renderHandoff();
+
+    expect(openDesktopApp).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks the tab as checked even when the setting is off", async () => {
+    setNavigationType("navigate");
+    await renderHandoff();
+    cleanup();
+    vi.resetModules();
+    localStorage.setItem(KEY, "true");
+
+    await renderHandoff();
+
+    expect(openDesktopApp).not.toHaveBeenCalled();
+  });
+
+  it("does not hand off when the referrer is our own origin", async () => {
+    localStorage.setItem(KEY, "true");
+    setNavigationType("navigate");
+    vi.spyOn(document, "referrer", "get").mockReturnValue(
+      `${window.location.origin}/acme/inbox`,
+    );
+
+    await renderHandoff();
 
     expect(openDesktopApp).not.toHaveBeenCalled();
   });

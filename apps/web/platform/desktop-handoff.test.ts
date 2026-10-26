@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   handoffUrl,
+  markCheckedInTab,
+  readCheckedInTab,
   readOpenInDesktop,
   shouldHandOff,
   writeOpenInDesktop,
@@ -18,6 +20,16 @@ function stubStorage(initial: Record<string, string> = {}) {
     },
   });
   return store;
+}
+
+function stubSession() {
+  const store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+  };
 }
 
 afterEach(() => {
@@ -39,22 +51,52 @@ describe("handoffUrl", () => {
 });
 
 describe("shouldHandOff", () => {
+  const base = {
+    enabled: true,
+    navigationType: "navigate",
+    alreadyHandled: false,
+    checkedInTab: false,
+    referrer: "",
+    origin: "https://app.example.com",
+  };
+
   it.each([
-    [true, "navigate", false, true],
-    [false, "navigate", false, false],
-    [true, "reload", false, false],
-    [true, "back_forward", false, false],
-    [true, "prerender", false, false],
-    [true, undefined, false, false],
-    [true, "navigate", true, false],
-  ] as const)(
-    "enabled=%s navigationType=%s alreadyHandled=%s -> %s",
-    (enabled, navigationType, alreadyHandled, expected) => {
-      expect(shouldHandOff({ enabled, navigationType, alreadyHandled })).toBe(
-        expected,
-      );
-    },
-  );
+    [{}, true],
+    [{ enabled: false }, false],
+    [{ navigationType: "reload" }, false],
+    [{ navigationType: "back_forward" }, false],
+    [{ navigationType: "prerender" }, false],
+    [{ navigationType: undefined }, false],
+    [{ alreadyHandled: true }, false],
+    [{ checkedInTab: true }, false],
+    [{ referrer: "https://app.example.com/acme/inbox" }, false],
+    [{ referrer: "https://github.com/acme/pull/1" }, true],
+    [{ referrer: "not a url" }, true],
+  ] as const)("%j -> %s", (override, expected) => {
+    expect(shouldHandOff({ ...base, ...override })).toBe(expected);
+  });
+});
+
+describe("tab check flag", () => {
+  it("is unset until marked, then set", () => {
+    vi.stubGlobal("sessionStorage", stubSession());
+    expect(readCheckedInTab()).toBe(false);
+    markCheckedInTab();
+    expect(readCheckedInTab()).toBe(true);
+  });
+
+  it("reads as unchecked and does not throw when storage throws", () => {
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => {
+        throw new Error("denied");
+      },
+      setItem: () => {
+        throw new Error("denied");
+      },
+    });
+    expect(readCheckedInTab()).toBe(false);
+    expect(() => markCheckedInTab()).not.toThrow();
+  });
 });
 
 describe("open-in-desktop setting", () => {
