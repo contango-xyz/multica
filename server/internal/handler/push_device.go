@@ -36,8 +36,8 @@ func (h *Handler) RegisterPushDevice(w http.ResponseWriter, r *http.Request) {
 	req.Token = strings.TrimSpace(req.Token)
 	req.BundleID = strings.TrimSpace(req.BundleID)
 	switch {
-	case req.Platform != "ios":
-		writeError(w, http.StatusBadRequest, "platform must be ios")
+	case req.Platform != "ios" && req.Platform != "macos":
+		writeError(w, http.StatusBadRequest, "platform must be ios or macos")
 		return
 	case req.Environment != "sandbox" && req.Environment != "production":
 		writeError(w, http.StatusBadRequest, "environment must be sandbox or production")
