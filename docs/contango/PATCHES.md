@@ -247,14 +247,23 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   numbers, `production` environment), OTA updates with a restart prompt, universal links into the app
   from our server's web links, APNs registration that survives permission changes and token rotation,
   and push/link routing to the linked screen. Release steps: `docs/contango/ios-release.md`.
-- **Commits:** `build(mobile): reproducible iOS project and EAS config (contango)` through
-  `docs(contango): iOS release runbook (contango)`.
-- **Touches:** ours: `docs/contango/ios-release.md`, `apps/mobile/scripts/print-aasa.mjs`,
-  `apps/mobile/lib/{universal-links,push-environment}*`. Upstream files: `apps/mobile/app.config.ts`
-  (associated domains, EAS updates, team id), `apps/mobile/eas.json`, `apps/mobile/README.md` (EAS
-  section), the mobile push registration and notification routing code.
-- **Config outside the repo:** EAS `production` environment variables and `ascAppId` in `eas.json`
-  (see the runbook); the public Cloudflare route for the association file.
+- **Commits:** `fix(mobile): register TestFlight builds for production push and refresh daily
+  (contango)` through `build(mobile): pin node and pnpm for EAS builds (contango)`.
+- **Touches:** ours: `docs/contango/ios-release.md`, `apps/mobile/eas.json`,
+  `apps/mobile/scripts/print-aasa.mjs`, `apps/mobile/lib/{universal-links,push-environment,ota-update}*`,
+  `apps/mobile/lib/use-ota-update-prompt.ts`, `apps/mobile/app/+native-intent.tsx`,
+  `apps/mobile/data/auth-store.test.ts`. Upstream files: `apps/mobile/app.config.ts` (associated
+  domains, EAS updates, production project id and upstream-URL guard) and its test,
+  `apps/mobile/README.md` (EAS section), `apps/mobile/app/_layout.tsx`,
+  `apps/mobile/app/(app)/_layout.tsx`, `apps/mobile/app/(auth)/verify.tsx`,
+  `apps/mobile/app/(app)/[workspace]/(tabs)/chat.tsx`, `apps/mobile/data/auth-store.ts`,
+  `apps/mobile/data/push-registration*`, `apps/mobile/lib/{push-routing*,use-push-notifications.ts}`,
+  `apps/mobile/locales/*/common.json`, `apps/mobile/package.json` (`expo-updates`),
+  `packages/core/package.json` (`./paths/reserved-slugs` export).
+- **Migrations:** none. **Lockfile:** `expo-updates` for `apps/mobile`.
+- **Config outside the repo:** EAS `production` environment variables (see the runbook); the public
+  Cloudflare route for the association file. `ascAppId` (in `eas.json`) and the production EAS
+  project id (`EAS_PROJECT_ID_PROD` in `app.config.ts`) live in the repo.
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream ships its own iOS distribution with universal links and OTA, and we move to it.
 

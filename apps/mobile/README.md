@@ -116,13 +116,19 @@ per build.
   come from the EAS `production` environment, which the profile selects with
   `"environment": "production"`. The profile's environment does not apply to
   OTA updates; publish them with
-  `eas update --channel production --environment production`.
-- **Submit:** `submit.production.ios` is empty on purpose. EAS cannot read
-  `ascAppId` from an environment variable, so without it `eas submit` looks up
-  the App Store Connect app by bundle id, which needs an interactive Apple
-  sign-in.
-- `eas config --platform ios --profile production` needs `eas init` (the EAS
-  project id) first.
+  `APP_ENV=production eas update --channel production --environment production -p ios`.
+  `APP_ENV=production` must also be in the EAS environment: updates evaluate
+  the config with that environment only, and without it the update gets a
+  development fingerprint and never reaches the build.
+- **Project id:** `EAS_PROJECT_ID_PROD` in `app.config.ts` holds the production
+  EAS project id (from `eas init`). With a project id, a production config
+  refuses missing server URLs or bundle id, or URLs pointing at `multica.ai`.
+- **Submit:** `submit.production.ios` is empty until the owner adds `ascAppId`
+  (`docs/contango/ios-release.md`, checklist step 5). EAS cannot read it from an
+  environment variable, so without it `eas submit` looks up the App Store
+  Connect app by bundle id, which needs an interactive Apple sign-in.
+- `APP_ENV=production eas config --platform ios --profile production` needs
+  the project id first.
 
 ## First-time setup
 
