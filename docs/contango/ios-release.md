@@ -87,10 +87,12 @@ Secret-store writes (`eas env:*`) are done by the owner; agents cannot.
    environment, so load our values from the local file:
    `APP_ENV=production pnpm exec dotenv -e .env.production.local -- eas credentials -p ios`,
    pick the `production` profile and check the bundle id is `<BUNDLE_ID>`.
-   Let EAS create the distribution certificate and provisioning profile, then
-   under **App Store Connect: Manage your API Key** choose **Set up your
-   project to use an API Key for EAS Submit** and give it the key from step 2.
-   (Alternatively, the first `--auto-submit` prompts for the key.)
+   Let EAS create (or reuse) the distribution certificate and create the
+   provisioning profile. Do not upload the API key there: that menu needs an
+   interactive Apple ID sign-in, which fails for Apple IDs whose only second
+   factor is a hardware security key. Instead `eas.json` carries the key's id
+   and issuer id and reads the `.p8` from `$ASC_API_KEY_PATH` at submit time.
+   Keep the `.p8` outside the repo (mode 600; backup in the password manager).
 9. **Association file.** Generate it on this Mac (needs this pnpm checkout and
    Node 22.18 or newer):
    `pnpm exec dotenv -e .env.production.local -- node scripts/print-aasa.mjs > /tmp/aasa.json`.
@@ -150,7 +152,7 @@ remote app versioning with auto-increment, on the image pinned in `eas.json`
 
 ```bash
 # New native build, uploaded to TestFlight
-APP_ENV=production eas build -p ios --profile production --auto-submit
+APP_ENV=production ASC_API_KEY_PATH=<path to AuthKey_<KEY_ID>.p8> eas build -p ios --profile production --auto-submit
 
 # Before the FIRST update to a build: its fingerprint must match the local one
 APP_ENV=production eas fingerprint:compare --build-id <BUILD_ID> --environment production
