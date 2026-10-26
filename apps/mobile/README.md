@@ -126,10 +126,9 @@ per build.
 - **Project id:** `EAS_PROJECT_ID_PROD` in `app.config.ts` holds the production
   EAS project id (from `eas init`). With a project id, a production config
   refuses missing server URLs or bundle id, or URLs pointing at `multica.ai`.
-- **Submit:** `submit.production.ios` is empty until the owner adds `ascAppId`
-  (`docs/contango/ios-release.md`, checklist step 5). EAS cannot read it from an
-  environment variable, so without it `eas submit` looks up the App Store
-  Connect app by bundle id, which needs an interactive Apple sign-in.
+- **Submit:** `submit.production.ios.ascAppId` is the App Store Connect app's
+  numeric Apple ID, committed because EAS cannot read it from an environment
+  variable (without it `eas submit` needs an interactive Apple sign-in).
 - `APP_ENV=production eas config --platform ios --profile production` needs
   the project id first.
 
