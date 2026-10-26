@@ -107,4 +107,41 @@ describe("DesktopPushBridge", () => {
     unregisterPushOnLogout();
     expect(api.unregisterPushDevice).not.toHaveBeenCalled();
   });
+
+  it("re-registers daily so the server's 30-day last-seen cutoff never drops this Mac", async () => {
+    vi.useFakeTimers();
+    try {
+      const setPushActive = vi.fn();
+      const registerPush = vi.fn(async () => ({ token: "tok5" }));
+      w.desktopAPI = { registerPush, setPushActive };
+      const { unmount } = render(<DesktopPushBridge appId="com.example.desktop" />);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.registerPushDevice).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+      expect(registerPush).toHaveBeenCalledTimes(2);
+      expect(api.registerPushDevice).toHaveBeenCalledTimes(2);
+      unmount();
+      await vi.advanceTimersByTimeAsync(48 * 60 * 60 * 1000);
+      expect(api.registerPushDevice).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps push active when a daily refresh fails", async () => {
+    vi.useFakeTimers();
+    try {
+      const setPushActive = vi.fn();
+      w.desktopAPI = { registerPush: vi.fn(async () => ({ token: "tok6" })), setPushActive };
+      render(<DesktopPushBridge appId="com.example.desktop" />);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(setPushActive).toHaveBeenLastCalledWith(true);
+      vi.mocked(api.registerPushDevice).mockRejectedValueOnce(new Error("offline"));
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+      expect(api.registerPushDevice).toHaveBeenCalledTimes(2);
+      expect(setPushActive).toHaveBeenLastCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
