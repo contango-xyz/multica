@@ -5,10 +5,11 @@
  * across workspaces — the same number the server sends with each push.
  */
 import { useEffect } from "react";
+import { AppState } from "react-native";
 import { router, usePathname } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
-import { registerForPush } from "@/data/push-registration";
+import { registerForPush, registerForPushIfStale } from "@/data/push-registration";
 import { inboxUnreadSummaryOptions } from "@/data/queries/inbox";
 import { useChatSessionPickerStore } from "@/data/stores/chat-session-picker-store";
 import { useWorkspaceStore } from "@/data/workspace-store";
@@ -53,7 +54,13 @@ export function usePushNotifications(): void {
     void registerForPush();
     void Notifications.getLastNotificationResponseAsync().then(openFromResponse);
     const sub = Notifications.addNotificationResponseReceivedListener(openFromResponse);
-    return () => sub.remove();
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") void registerForPushIfStale();
+    });
+    return () => {
+      sub.remove();
+      appState.remove();
+    };
   }, []);
 
   useEffect(() => {

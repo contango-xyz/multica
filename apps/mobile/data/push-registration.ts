@@ -8,8 +8,11 @@ import * as Notifications from "expo-notifications";
 import * as Application from "expo-application";
 import * as SecureStore from "expo-secure-store";
 import { api } from "@/data/api";
+import { resolvePushEnvironment, shouldReRegister } from "@/lib/push-environment";
 
 const TOKEN_KEY = "multica_push_token";
+
+let lastRegisteredAt: number | null = null;
 
 export async function registerForPush(): Promise<void> {
   if (Platform.OS !== "ios") return;
@@ -19,22 +22,29 @@ export async function registerForPush(): Promise<void> {
     if (!status.granted) return;
     const env = await Application.getIosPushNotificationServiceEnvironmentAsync();
     const bundleId = Application.applicationId;
-    if (!env || !bundleId) return; // simulator / unsigned build
+    if (!bundleId) return;
     const { data: token } = await Notifications.getDevicePushTokenAsync();
     if (typeof token !== "string" || !token) return;
     await api.registerPushDevice({
       platform: "ios",
       token,
       bundle_id: bundleId,
-      environment: env === "production" ? "production" : "sandbox",
+      environment: resolvePushEnvironment(env),
     });
     await SecureStore.setItemAsync(TOKEN_KEY, token);
+    lastRegisteredAt = Date.now();
   } catch (err) {
     console.log("[push] registration failed", err);
   }
 }
 
+/** Foreground refresh: re-register when the last success is older than a day (or never happened). */
+export async function registerForPushIfStale(now = Date.now()): Promise<void> {
+  if (shouldReRegister(lastRegisteredAt, now)) await registerForPush();
+}
+
 export async function unregisterForPush(): Promise<void> {
+  lastRegisteredAt = null;
   try {
     const token = await SecureStore.getItemAsync(TOKEN_KEY);
     if (!token) return;
