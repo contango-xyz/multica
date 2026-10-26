@@ -46,6 +46,7 @@ interface InitCoreOptions {
   storage: StorageAdapter;
   onLogin?: () => void;
   onLogout?: () => void;
+  beforeLogout?: () => void;
   onSessionExpired?: () => void;
   cookieAuth?: boolean;
   identity?: ClientIdentity;
@@ -56,6 +57,7 @@ function initCore({
   storage,
   onLogin,
   onLogout,
+  beforeLogout,
   onSessionExpired,
   cookieAuth,
   identity,
@@ -117,6 +119,7 @@ function initCore({
     storage,
     onLogin,
     onLogout,
+    beforeLogout,
     onSessionExpired,
     cookieAuth,
   });
@@ -145,6 +148,7 @@ export function CoreProvider({
   cookieAuth,
   onLogin,
   onLogout,
+  beforeLogout,
   onSessionExpired,
   identity,
   locale,
@@ -162,6 +166,7 @@ export function CoreProvider({
         storage,
         onLogin,
         onLogout,
+        beforeLogout,
         onSessionExpired,
         cookieAuth,
         identity,

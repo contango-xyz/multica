@@ -9,6 +9,8 @@ export interface AuthStoreOptions {
   storage: StorageAdapter;
   onLogin?: () => void;
   onLogout?: () => void;
+  /** Runs synchronously before the credential is cleared on an explicit logout, e.g. to unregister a push device. */
+  beforeLogout?: () => void;
   /**
    * Cleanup for a session the server ended, as opposed to one the user did.
    * Defaults to `onLogout` — a shell only needs its own handler when some of
@@ -50,8 +52,15 @@ export interface AuthState {
 }
 
 export function createAuthStore(options: AuthStoreOptions) {
-  const { api, storage, onLogin, onLogout, onSessionExpired, cookieAuth } =
-    options;
+  const {
+    api,
+    storage,
+    onLogin,
+    onLogout,
+    beforeLogout,
+    onSessionExpired,
+    cookieAuth,
+  } = options;
 
   return create<AuthState>((set, get) => ({
     user: null,
@@ -108,6 +117,7 @@ export function createAuthStore(options: AuthStoreOptions) {
     },
 
     logout: () => {
+      beforeLogout?.();
       if (cookieAuth) {
         // Clear server-side HttpOnly cookie.
         api.logout().catch(() => {});

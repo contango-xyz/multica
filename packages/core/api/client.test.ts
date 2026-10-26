@@ -3171,3 +3171,42 @@ describe("ApiClient shared credential across windows", () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ApiClient push devices", () => {
+  const BASE = "https://api.example.test";
+
+  function stubFetch() {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("registers a push device", async () => {
+    const fetchMock = stubFetch();
+    const client = new ApiClient(BASE);
+    const body = {
+      platform: "macos" as const,
+      token: "t",
+      bundle_id: "com.example.desktop",
+      environment: "production" as const,
+    };
+    await client.registerPushDevice(body);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe(`${BASE}/api/push/devices`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual(body);
+  });
+
+  it("unregisters by token and sends the auth header even if the token is cleared right after", async () => {
+    const fetchMock = stubFetch();
+    const client = new ApiClient(BASE);
+    client.setToken("jwt-1");
+    const p = client.unregisterPushDevice("a/b");
+    client.setToken(null);
+    await p;
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe(`${BASE}/api/push/devices/a%2Fb`);
+    expect(init.method).toBe("DELETE");
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer jwt-1");
+  });
+});

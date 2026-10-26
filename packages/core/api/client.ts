@@ -2928,6 +2928,20 @@ export class ApiClient {
     });
   }
 
+  // Native push device tokens (fork: macOS desktop). Same endpoint as mobile.
+  async registerPushDevice(body: {
+    platform: "macos";
+    token: string;
+    bundle_id: string;
+    environment: "production";
+  }): Promise<void> {
+    await this.fetch<void>("/api/push/devices", { method: "POST", body: JSON.stringify(body) });
+  }
+
+  async unregisterPushDevice(token: string): Promise<void> {
+    await this.fetch<void>(`/api/push/devices/${encodeURIComponent(token)}`, { method: "DELETE" });
+  }
+
   async markInboxRead(id: string): Promise<InboxItem> {
     return this.fetch(`/api/inbox/${id}/read`, { method: "POST" });
   }
