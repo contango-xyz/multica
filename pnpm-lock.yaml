@@ -276,6 +276,9 @@ importers:
       jsdom:
         specifier: 'catalog:'
         version: 29.0.1(@noble/hashes@1.8.0)
+      node-gyp:
+        specifier: 11.5.0
+        version: 11.5.0
       tailwindcss:
         specifier: ^4
         version: 4.2.2

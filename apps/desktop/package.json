@@ -75,6 +75,7 @@
     "electron-vite": "^5.0.0",
     "globals": "^16.0.0",
     "jsdom": "catalog:",
+    "node-gyp": "11.5.0",
     "tailwindcss": "^4",
     "typescript": "catalog:",
     "vitest": "catalog:"
