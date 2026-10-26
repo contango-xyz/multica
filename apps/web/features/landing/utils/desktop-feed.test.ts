@@ -43,6 +43,30 @@ describe("parseDesktopFeed", () => {
     });
   });
 
+  it("prefers the arm64 dmg over an earlier x64 one, and handles CRLF", () => {
+    const yml = [
+      "version: 1.0.0",
+      "files:",
+      "  - url: M-x64.dmg",
+      "  - url: M-arm64.dmg",
+      "",
+    ].join("\r\n");
+    expect(parseDesktopFeed(yml, BASE)?.dmgUrl).toBe(`${BASE}M-arm64.dmg`);
+  });
+
+  it("uses the only dmg, but rejects several with no arm64 one", () => {
+    expect(
+      parseDesktopFeed("version: 1.0.0\nfiles:\n  - url: Only.dmg\n", BASE)
+        ?.dmgUrl,
+    ).toBe(`${BASE}Only.dmg`);
+    expect(
+      parseDesktopFeed(
+        "version: 1.0.0\nfiles:\n  - url: a.dmg\n  - url: b.dmg\n",
+        BASE,
+      ),
+    ).toBeNull();
+  });
+
   it("accepts quoted values", () => {
     const yml = `version: '1.2.3'\nfiles:\n  - url: "A b.dmg"\n`;
     expect(parseDesktopFeed(yml, BASE)).toEqual({
@@ -103,5 +127,36 @@ describe("fetchDesktopFeedRelease", () => {
     expect(await fetchDesktopFeedRelease(BASE)).toBeNull();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("junk")));
     expect(await fetchDesktopFeedRelease(BASE)).toBeNull();
+  });
+
+  it("passes an abort signal and falls back when the fetch is aborted", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new DOMException("timed out", "TimeoutError"));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await fetchDesktopFeedRelease(BASE)).toBeNull();
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("rejects an oversized feed by content-length and by body size", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(YML, { headers: { "content-length": "70000" } }),
+      ),
+    );
+    expect(await fetchDesktopFeedRelease(BASE)).toBeNull();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(`${YML}#${"x".repeat(70000)}`)),
+    );
+    expect(await fetchDesktopFeedRelease(BASE)).toBeNull();
+  });
+
+  it("marks the release as fork-only", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(YML)));
+    expect((await fetchDesktopFeedRelease(BASE))?.forkOnly).toBe(true);
   });
 });

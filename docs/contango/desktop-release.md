@@ -44,7 +44,8 @@ VPN on, open the web app's download page (`https://<server host>/download`, also
 
 The page offers our DMG only when ops set `MULTICA_DESKTOP_FEED_URL` on the web container (runtime
 env, not a build arg): the absolute feed base, `https://<server host>/desktop/`. Unset, or when the
-feed cannot be read, the page shows upstream's releases. Other platforms are not offered in this mode.
+feed cannot be read, the page shows upstream's releases. In this mode the page shows only our macOS (Apple Silicon) download and its version: no
+Windows/Linux/Intel buttons, CLI or cloud sections, and no upstream release links.
 
 ## Opening links in the app
 
