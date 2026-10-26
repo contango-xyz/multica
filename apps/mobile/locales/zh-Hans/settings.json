@@ -82,5 +82,15 @@
     "system_description": "账号变更、安全提醒和产品更新。"
   },
   "groups.assignments_description": "任务分配给我或取消分配给我时。",
-  "groups.mentions_description": "有人用 @ 提到你时，包括 @all 和 @squad。"
+  "groups.mentions_description": "有人用 @ 提到你时，包括 @all 和 @squad。",
+  "about": {
+    "title": "关于",
+    "version": "版本",
+    "built_in": "内置版本",
+    "development": "开发版本",
+    "update_running": "更新 {{date}}（{{id}}）",
+    "check_updates": "检查更新",
+    "up_to_date": "已是最新版本",
+    "check_failed": "无法检查更新，请稍后再试。"
+  }
 }

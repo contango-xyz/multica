@@ -56,3 +56,35 @@ export function promptForPendingUpdate(
     deps.reload().catch((err: unknown) => deps.log("OTA reload failed", err));
   });
 }
+
+export type ManualCheckResult = "prompted" | "up-to-date" | "error";
+
+/**
+ * User-initiated check from Settings. Unlike the automatic flow it reports an
+ * outcome, ignores the 30-minute throttle, and re-offers an update that is
+ * already downloaded and waiting for a restart.
+ */
+export async function manualUpdateCheck(
+  deps: OtaUpdateDeps & { isUpdatePending: boolean },
+): Promise<ManualCheckResult> {
+  if (!deps.isEnabled) return "up-to-date";
+  const prompt = () =>
+    deps.prompt(() => {
+      deps.reload().catch((err: unknown) => deps.log("OTA reload failed", err));
+    });
+  try {
+    if (deps.isUpdatePending) {
+      prompt();
+      return "prompted";
+    }
+    const { isAvailable } = await deps.check();
+    if (!isAvailable) return "up-to-date";
+    const { isNew } = await deps.fetch();
+    if (!isNew) return "up-to-date";
+    prompt();
+    return "prompted";
+  } catch (err) {
+    deps.log("OTA manual update check failed", err);
+    return "error";
+  }
+}

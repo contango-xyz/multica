@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   checkAndPromptForUpdate,
   createUpdatePromptGate,
+  manualUpdateCheck,
   promptForPendingUpdate,
   type OtaUpdateDeps,
 } from "./ota-update";
@@ -128,5 +129,43 @@ describe("promptForPendingUpdate", () => {
     const seen = createUpdatePromptGate();
     expect(seen("u1")).toBe(true);
     expect(seen("u1")).toBe(false);
+  });
+});
+
+describe("manualUpdateCheck", () => {
+  const manual = (over: Partial<OtaUpdateDeps> = {}, pending = false) =>
+    ({ ...makeDeps(over), isUpdatePending: pending });
+
+  it("prompts after fetching a new update", async () => {
+    const deps = manual();
+    expect(await manualUpdateCheck(deps)).toBe("prompted");
+    expect(deps.prompt).toHaveBeenCalledOnce();
+  });
+  it("reports up-to-date when nothing is available or fetched", async () => {
+    expect(await manualUpdateCheck(manual({ check: async () => ({ isAvailable: false }) }))).toBe("up-to-date");
+    const deps = manual({ fetch: async () => ({ isNew: false }) });
+    expect(await manualUpdateCheck(deps)).toBe("up-to-date");
+    expect(deps.prompt).not.toHaveBeenCalled();
+  });
+  it("re-prompts an already downloaded update without checking", async () => {
+    const deps = manual({}, true);
+    expect(await manualUpdateCheck(deps)).toBe("prompted");
+    expect(deps.check).not.toHaveBeenCalled();
+  });
+  it("returns error and logs when the check throws", async () => {
+    const deps = manual({ check: async () => { throw new Error("offline"); } });
+    expect(await manualUpdateCheck(deps)).toBe("error");
+    expect(deps.log).toHaveBeenCalled();
+  });
+  it("does nothing when updates are disabled", async () => {
+    const deps = manual({ isEnabled: false });
+    expect(await manualUpdateCheck(deps)).toBe("up-to-date");
+    expect(deps.check).not.toHaveBeenCalled();
+  });
+  it("reloads when the prompt's restart is chosen", async () => {
+    const deps = manual();
+    await manualUpdateCheck(deps);
+    deps.prompt.mock.calls[0][0]();
+    expect(deps.reload).toHaveBeenCalled();
   });
 });

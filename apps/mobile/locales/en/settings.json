@@ -80,5 +80,15 @@
     "system": "System",
     "system_notifications": "System notifications",
     "system_description": "Account changes, security alerts, product updates."
+  },
+  "about": {
+    "title": "About",
+    "version": "Version",
+    "built_in": "Built-in",
+    "development": "Development build",
+    "update_running": "Update {{date}} ({{id}})",
+    "check_updates": "Check for updates",
+    "up_to_date": "You're up to date",
+    "check_failed": "Couldn't check for updates. Try again later."
   }
 }

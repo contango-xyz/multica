@@ -16,6 +16,9 @@ import { unregisterForPush } from "@/data/push-registration";
 import { Alert, ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useState } from "react";
+import * as Application from "expo-application";
+import * as Updates from "expo-updates";
 import { useQuery } from "@tanstack/react-query";
 import type { Workspace } from "@multica/core/types";
 import { Text } from "@/components/ui/text";
@@ -33,6 +36,8 @@ import {
 import { THEME } from "@/lib/theme";
 import { useLocalePreference, useT, type LocalePreference } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { describeAppVersion } from "@/lib/app-version";
+import { checkForUpdateManually } from "@/lib/use-ota-update-prompt";
 
 const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "system"];
 const LANGUAGE_OPTIONS: LocalePreference[] = ["system", "en", "zh-Hans"];
@@ -93,6 +98,36 @@ export default function SettingsPage() {
         },
       ],
     );
+  };
+
+  const [checking, setChecking] = useState(false);
+  const { currentlyRunning, isUpdatePending } = Updates.useUpdates();
+  const about = describeAppVersion(
+    {
+      version: Application.nativeApplicationVersion,
+      build: Application.nativeBuildVersion,
+      isEnabled: Updates.isEnabled,
+      isEmbeddedLaunch: currentlyRunning.isEmbeddedLaunch,
+      updateId: currentlyRunning.updateId,
+      createdAt: currentlyRunning.createdAt,
+    },
+    {
+      builtIn: t("about.built_in"),
+      development: t("about.development"),
+      update: (date, id) => t("about.update_running", { date, id }),
+    },
+  );
+
+  const onCheckForUpdates = async () => {
+    if (checking) return;
+    setChecking(true);
+    try {
+      const result = await checkForUpdateManually(tCommon, isUpdatePending);
+      if (result === "up-to-date") Alert.alert(t("about.up_to_date"));
+      else if (result === "error") Alert.alert(t("about.check_failed"));
+    } finally {
+      setChecking(false);
+    }
   };
 
   const goProfile = () => router.push(`/${currentSlug}/more/settings/profile`);
@@ -220,6 +255,30 @@ export default function SettingsPage() {
             );
           })}
         </RadioGroup>
+      </SectionGroup>
+
+      <SectionGroup title={t("about.title")}>
+        <View className="px-4 py-3.5">
+          <Text className="text-base font-medium text-foreground">
+            {t("about.version")}: {about.version}
+          </Text>
+          <Text className="text-sm text-muted-foreground mt-0.5">{about.running}</Text>
+        </View>
+        {Updates.isEnabled ? (
+          <>
+            <Separator />
+            <Pressable
+              onPress={onCheckForUpdates}
+              disabled={checking}
+              className="flex-row items-center px-4 py-3.5 active:bg-secondary gap-3"
+            >
+              <Text className="flex-1 text-base font-medium text-foreground">
+                {t("about.check_updates")}
+              </Text>
+              {checking ? <ActivityIndicator /> : null}
+            </Pressable>
+          </>
+        ) : null}
       </SectionGroup>
 
       <View className="pt-2">
