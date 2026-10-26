@@ -96,6 +96,32 @@ editor, select an image, and confirm the upload completes. From the issue editor
 also attach a document and confirm its picker dismisses and the upload completes.
 Unit tests do not replace this device validation.
 
+## EAS build (TestFlight)
+
+`eas.json` has one profile, `production`: a store build on the `production`
+update channel with `APP_ENV=production`. Build numbers live on EAS
+(`appVersionSource: "remote"`, `autoIncrement`), so nothing in the repo changes
+per build.
+
+- **Image:** pinned to `macos-tahoe-26.6-xcode-27.0`, the newest EAS image
+  with a final (non-RC) Xcode. The `sdk-57` alias still points at Xcode 26.6;
+  the pin keeps the iOS 27 SDK that local builds use. Move the pin when Expo
+  publishes a newer final Xcode image.
+- **Native project:** `expo prebuild --clean` output builds and archives with
+  Xcode 27 without hand edits. Scene support comes from
+  `ios.enableSceneSupport` (above); SDK 57's defaults (iOS 16.4 minimum, pod
+  targets at 15.1 or later, no script sandboxing on the app target) cover the
+  other fixes the SDK 55 project needed.
+- **Environment:** the bundle id, team id, server URLs and associated domain
+  come from the EAS `production` environment, not from `eas.json`. OTA updates
+  read only that environment.
+- **Submit:** `submit.production.ios` is empty on purpose. EAS cannot read
+  `ascAppId` from an environment variable, so without it `eas submit` looks up
+  the App Store Connect app by bundle id, which needs an interactive Apple
+  sign-in.
+- `eas config --platform ios --profile production` needs `eas init` (the EAS
+  project id) first.
+
 ## First-time setup
 
 `.env.staging` is committed (public staging URL). `.env.development.local` is gitignored — copy the template once:
