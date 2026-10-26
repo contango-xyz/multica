@@ -29,4 +29,6 @@ ssh "$ADMIN" "mkdir -p ~/$STAGE"
 scp "$BASE.dmg" "$BASE.dmg.blockmap" "$BASE.zip" "$BASE.zip.blockmap" "$ADMIN:~/$STAGE/"
 scp "$DIST/contango-mac.yml" "$ADMIN:~/$STAGE/"
 # shellcheck disable=SC2029
-ssh "$ADMIN" "publish-desktop ~/$STAGE"
+# Login shell: publish-desktop lives in ~/.local/bin, which a non-interactive
+# ssh command's PATH does not include.
+ssh "$ADMIN" "bash -lc 'publish-desktop ~/$STAGE'"
