@@ -13,6 +13,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const env = process.env.APP_ENV ?? "development";
   const isProd = env === "production";
   const isStaging = env === "staging";
+  // EAS Update is enabled only once the project exists (`eas init`), so local
+  // dev / prebuild keep working without it. The id is not secret.
+  const easProjectId =
+    (config.extra?.eas as { projectId?: string } | undefined)?.projectId ??
+    process.env.EAS_PROJECT_ID;
 
   return {
     ...config,
@@ -105,6 +110,21 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
     ],
-    extra: { APP_ENV: env },
+    // Fingerprint policy: an OTA update only reaches builds whose native layer
+    // matches, so JS-only changes ship over the air and native ones need a build.
+    runtimeVersion: { policy: "fingerprint" },
+    ...(easProjectId
+      ? {
+          updates: {
+            url: `https://u.expo.dev/${easProjectId}`,
+            checkAutomatically: "ON_LOAD" as const,
+          },
+        }
+      : {}),
+    extra: {
+      ...config.extra,
+      APP_ENV: env,
+      ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
+    },
   };
 };

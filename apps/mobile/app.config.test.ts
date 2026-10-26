@@ -86,3 +86,31 @@ describe("universal links", () => {
     expect(config.ios?.associatedDomains).toEqual([]);
   });
 });
+
+describe("OTA updates", () => {
+  it("is off without an EAS project id, so local prebuilds keep working", () => {
+    vi.stubEnv("EAS_PROJECT_ID", undefined);
+    const config = createConfig({ config: {} } as ConfigContext);
+    expect(config.updates).toBeUndefined();
+    expect(config.runtimeVersion).toEqual({ policy: "fingerprint" });
+  });
+
+  it("points at EAS Update for the project id in extra.eas", () => {
+    vi.stubEnv("EAS_PROJECT_ID", undefined);
+    const config = createConfig({
+      config: { extra: { eas: { projectId: "proj-123" } } },
+    } as unknown as ConfigContext);
+    expect(config.updates).toEqual({
+      url: "https://u.expo.dev/proj-123",
+      checkAutomatically: "ON_LOAD",
+    });
+    expect(config.extra?.eas).toEqual({ projectId: "proj-123" });
+    expect(config.extra?.APP_ENV).toBe("development");
+  });
+
+  it("accepts the project id from EAS_PROJECT_ID", () => {
+    vi.stubEnv("EAS_PROJECT_ID", "proj-env");
+    const config = createConfig({ config: {} } as ConfigContext);
+    expect(config.updates?.url).toBe("https://u.expo.dev/proj-env");
+  });
+});

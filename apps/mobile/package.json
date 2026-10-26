@@ -60,6 +60,7 @@
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
+    "expo-updates": "~57.0.26",
     "i18next": "catalog:",
     "input-otp-native": "^0.5.0",
     "marked": "^18.0.3",
