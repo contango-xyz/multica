@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchDesktopFeedRelease,
@@ -158,5 +161,46 @@ describe("fetchDesktopFeedRelease", () => {
   it("marks the release as fork-only", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(YML)));
     expect((await fetchDesktopFeedRelease(BASE))?.forkOnly).toBe(true);
+  });
+
+  describe("with a local feed directory", () => {
+    let dir: string | undefined;
+    afterEach(async () => {
+      if (dir) await rm(dir, { recursive: true, force: true });
+      dir = undefined;
+    });
+
+    it("reads the yml from disk, never fetches, and links under the URL base", async () => {
+      dir = await mkdtemp(path.join(tmpdir(), "feed-"));
+      await writeFile(path.join(dir, "contango-mac.yml"), YML);
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const r = await fetchDesktopFeedRelease(BASE, dir);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(r?.version).toBe("0.7.0-contango.4");
+      expect(r?.assets).toEqual({
+        macArm64Dmg: `${BASE}Multica-0.7.0-contango.4-arm64.dmg`,
+      });
+    });
+
+    it("returns null when the file is missing or oversized", async () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      dir = await mkdtemp(path.join(tmpdir(), "feed-"));
+      expect(await fetchDesktopFeedRelease(BASE, dir)).toBeNull();
+      await writeFile(
+        path.join(dir, "contango-mac.yml"),
+        `${YML}#${"x".repeat(70000)}`,
+      );
+      expect(await fetchDesktopFeedRelease(BASE, dir)).toBeNull();
+    });
+
+    it("fetches over HTTP when the directory is blank", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(YML));
+      vi.stubGlobal("fetch", fetchMock);
+      expect((await fetchDesktopFeedRelease(BASE, "  "))?.version).toBe(
+        "0.7.0-contango.4",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

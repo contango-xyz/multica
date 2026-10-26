@@ -248,6 +248,8 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   upstream's GitHub release, and the Help menu's "Desktop app" link points at `/download`. Feed
   failure or unset env keeps upstream behaviour. Only bare `.dmg` file names under the base are
   accepted; the page then shows only that Mac build (no upstream links or other platforms).
+  Optional `MULTICA_DESKTOP_FEED_DIR` reads the yml from a mounted copy of the feed directory
+  instead of over HTTP (ops: the container cannot reach the VPN host); links stay under the URL.
 - **Touches:** ours: `apps/web/features/landing/utils/desktop-feed{,.test}.ts`. Upstream files:
   `apps/web/features/landing/utils/github-release{,.test}.ts`,
   `apps/web/app/(landing)/download/download-client{,.test}.tsx`, `apps/web/app/layout.tsx`,

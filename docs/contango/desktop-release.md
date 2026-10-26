@@ -47,6 +47,10 @@ env, not a build arg): the absolute feed base, `https://<server host>/desktop/`.
 feed cannot be read, the page shows upstream's releases. In this mode the page shows only our macOS (Apple Silicon) download and its version: no
 Windows/Linux/Intel buttons, CLI or cloud sections, and no upstream release links.
 
+On ops the web container cannot reach the VPN host, so it also gets `/srv/multica-desktop` mounted
+read-only at `/srv/multica-desktop` and `MULTICA_DESKTOP_FEED_DIR=/srv/multica-desktop`: the server
+reads `contango-mac.yml` from that directory, and the download links still use the feed URL.
+
 ## Opening links in the app
 
 Links to our server (GitHub PR bodies, web Slack, email, bookmarks) stay `https://`. In each browser,

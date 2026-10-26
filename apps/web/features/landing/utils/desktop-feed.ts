@@ -1,3 +1,5 @@
+import { open } from "node:fs/promises";
+import path from "node:path";
 import type { LatestRelease } from "./github-release";
 
 /**
@@ -6,6 +8,11 @@ import type { LatestRelease } from "./github-release";
  * GitHub releases. Only the version and the .dmg name are read, and the .dmg
  * must be a bare file name resolved under the feed base, so a tampered feed
  * cannot redirect the download elsewhere.
+ *
+ * When the web server cannot reach the feed URL itself (ops: the VPN host is
+ * firewalled from the container), `MULTICA_DESKTOP_FEED_DIR` names a local
+ * (mounted) copy of the feed directory to read the yml from instead; download
+ * links still resolve under the URL base.
  */
 
 const FEED_FILE = "contango-mac.yml";
@@ -87,16 +94,35 @@ async function readCapped(res: Response): Promise<string> {
   return new TextDecoder().decode(all);
 }
 
+async function readFeedFile(dir: string): Promise<string> {
+  const file = await open(path.join(dir, FEED_FILE), "r");
+  try {
+    const buf = Buffer.alloc(MAX_FEED_BYTES + 1);
+    const { bytesRead } = await file.read(buf, 0, buf.length, 0);
+    if (bytesRead > MAX_FEED_BYTES) throw new Error("desktop feed too large");
+    return buf.subarray(0, bytesRead).toString("utf8");
+  } finally {
+    await file.close();
+  }
+}
+
+async function fetchFeedYml(base: string): Promise<string> {
+  const res = await fetch(`${base}${FEED_FILE}`, {
+    next: { revalidate: REVALIDATE_SECONDS },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`desktop feed responded ${res.status}`);
+  return readCapped(res);
+}
+
 export async function fetchDesktopFeedRelease(
   base: string,
+  dir?: string,
 ): Promise<LatestRelease | null> {
   try {
-    const res = await fetch(`${base}${FEED_FILE}`, {
-      next: { revalidate: REVALIDATE_SECONDS },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) throw new Error(`desktop feed responded ${res.status}`);
-    const parsed = parseDesktopFeed(await readCapped(res), base);
+    const localDir = dir?.trim();
+    const yml = localDir ? await readFeedFile(localDir) : await fetchFeedYml(base);
+    const parsed = parseDesktopFeed(yml, base);
     if (!parsed) throw new Error("desktop feed has no usable version/dmg");
     return {
       version: parsed.version,
