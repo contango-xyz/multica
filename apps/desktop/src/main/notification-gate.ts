@@ -8,7 +8,12 @@ export class NotificationGate {
 
   constructor(private readonly maxRememberedItems = 1_000) {}
 
-  shouldShow(itemId: string, anyWindowFocused: boolean): boolean {
+  shouldShow(
+    itemId: string,
+    anyWindowFocused: boolean,
+    pushActive = false,
+  ): boolean {
+    if (pushActive) return false; // APNs already shows this one
     const normalizedItemId = itemId.trim();
     if (!normalizedItemId) return false;
     if (this.seenItemIds.has(normalizedItemId)) return false;
@@ -20,6 +25,21 @@ export class NotificationGate {
     }
     return !anyWindowFocused;
   }
+}
+
+// An Electron Notification that gets garbage collected loses its click
+// handler; macOS then only activates the app. Hold each one until it ends.
+const retained = new Set<object>();
+export function retainNotification(n: {
+  once(e: "click" | "close", cb: () => void): unknown;
+}): void {
+  retained.add(n);
+  const release = () => retained.delete(n);
+  n.once("click", release);
+  n.once("close", release);
+}
+export function retainedNotificationCount(): number {
+  return retained.size;
 }
 
 export interface NativeNotificationPayload {

@@ -44,6 +44,9 @@ test("notarization uses only the keychain profile", () => {
     APPLE_API_KEY: "k", APPLE_API_KEY_ID: "i", APPLE_API_ISSUER: "s", CSC_IDENTITY_AUTO_DISCOVERY: "false", PATH: "/bin" });
   assert.equal(e.APPLE_KEYCHAIN_PROFILE, "notary");
   assert.equal(e.PATH, "/bin");
+  // reaches `pnpm run build`, where electron.vite.config.ts bakes it in
+  assert.equal(e.CONTANGO_APP_ID, "com.example.desktop");
+  assert.equal(e.CONTANGO_API_URL, "https://srv.example.test");
   for (const k of ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER", "CSC_IDENTITY_AUTO_DISCOVERY"]) {
     assert.equal(k in e, false, k);
   }

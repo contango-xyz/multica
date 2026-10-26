@@ -7,6 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 // upstream's defaults.
 const define = {
   __CONTANGO_API_URL__: JSON.stringify(process.env.CONTANGO_API_URL ?? ""),
+  __CONTANGO_APP_ID__: JSON.stringify(process.env.CONTANGO_APP_ID ?? ""),
 };
 
 export default defineConfig({

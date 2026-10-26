@@ -89,6 +89,7 @@ import { MainWindowRegistry } from "./main-window-registry";
 import {
   NotificationGate,
   parseNativeNotificationPayload,
+  retainNotification,
 } from "./notification-gate";
 import {
   chatSessionPath,
@@ -188,7 +189,7 @@ let authSessionGeneration = 0;
 // Set by the renderer once this device is registered for APNs (Task 6 uses it
 // in `notification:show` to avoid a local banner duplicating a remote push).
 // Exported only so tsc's noUnusedLocals accepts it until Task 6 reads it.
-export let pushActive = false;
+let pushActive = false;
 // Route of the last APNs push received while running. Kept for a later
 // decision on click handling; receipt alone never navigates. Exported for the
 // same noUnusedLocals reason as `pushActive`.
@@ -1028,7 +1029,7 @@ if (!gotTheLock) {
       const anyWindowFocused = BrowserWindow.getAllWindows().some(
         (window) => !window.isDestroyed() && window.isFocused(),
       );
-      if (!notificationGate.shouldShow(payload.itemId, anyWindowFocused)) {
+      if (!notificationGate.shouldShow(payload.itemId, anyWindowFocused, pushActive)) {
         return;
       }
 
@@ -1054,6 +1055,7 @@ if (!gotTheLock) {
           mainWindows.findByWorkspace(payload.slug),
         );
       });
+      retainNotification(notification);
       notification.show();
     });
 
