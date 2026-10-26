@@ -15,7 +15,7 @@ import type { ExpoConfig, ConfigContext } from "expo/config";
  * the EAS environment. Set to the UUID printed by `eas init`
  * (docs/contango/ios-release.md, owner checklist step 3). Not secret.
  */
-export const EAS_PROJECT_ID_PROD: string | undefined = undefined;
+export const EAS_PROJECT_ID_PROD: string | undefined = "9aef661a-96e2-4d62-9134-fe0263a4578b";
 
 const UPSTREAM_HOST = "multica.ai";
 
