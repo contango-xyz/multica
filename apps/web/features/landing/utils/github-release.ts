@@ -58,7 +58,10 @@ export async function fetchLatestRelease(): Promise<LatestRelease> {
   // feed; any failure falls through to the upstream behaviour below.
   const feedBase = normalizeFeedBase(process.env.MULTICA_DESKTOP_FEED_URL);
   if (feedBase) {
-    const fork = await fetchDesktopFeedRelease(feedBase);
+    const fork = await fetchDesktopFeedRelease(
+      feedBase,
+      process.env.MULTICA_DESKTOP_FEED_DIR,
+    );
     if (fork) return fork;
   }
 
