@@ -64,6 +64,13 @@ vi.mock("@multica/views/workspace/use-workspace-seen", () => ({
   useWorkspaceSeen: () => state.hasBeenSeen,
 }));
 
+const openDesktopApp = vi.hoisted(() => vi.fn());
+
+vi.mock("@/platform/desktop-handoff", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/platform/desktop-handoff")>()),
+  openDesktopApp,
+}));
+
 vi.mock("@multica/ui/components/common/multica-icon", () => ({
   MulticaIcon: () => <div data-testid="workspace-loading" />,
 }));
@@ -211,6 +218,39 @@ describe("WorkspaceLayout workspace singleton", () => {
     // from the stale layout is one socket teardown and one empty mention list.
     for (const call of vi.mocked(setCurrentWorkspace).mock.calls) {
       expect(call).toEqual(["globex", "ws-globex"]);
+    }
+  });
+});
+
+describe("WorkspaceLayout desktop handoff", () => {
+  it("hands the original URL to the desktop app before the login redirect", async () => {
+    // The handoff checks once per document, so load a fresh module graph.
+    vi.resetModules();
+    const { default: FreshLayout } = await import("./layout");
+    localStorage.setItem("multica:open-links-in-desktop", "true");
+    vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+      { type: "navigate" },
+    ] as unknown as PerformanceEntryList);
+    window.history.replaceState(null, "", "/acme/issues/MUL-7");
+    state.user = null;
+
+    try {
+      renderTree(
+        <FreshLayout params={makeParams("acme")}>
+          <div data-testid="workspace-content" />
+        </FreshLayout>,
+      );
+
+      await waitFor(() => expect(state.replace).toHaveBeenCalledWith("/login"));
+      expect(openDesktopApp).toHaveBeenCalledWith(
+        "multica://open?path=%2Facme%2Fissues%2FMUL-7",
+      );
+      expect(openDesktopApp.mock.invocationCallOrder[0]).toBeLessThan(
+        state.replace.mock.invocationCallOrder[0]!,
+      );
+    } finally {
+      localStorage.clear();
+      vi.restoreAllMocks();
     }
   });
 });

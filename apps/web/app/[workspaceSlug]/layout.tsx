@@ -11,14 +11,26 @@ import { NoAccessPage } from "@multica/views/workspace/no-access-page";
 import { MulticaIcon } from "@multica/ui/components/common/multica-icon";
 import { useWorkspaceSeen } from "@multica/views/workspace/use-workspace-seen";
 import { workspaceSlugFromPathname } from "@/lib/workspace-slug-from-pathname";
+import { DesktopHandoff } from "@/components/desktop-handoff";
 
-export default function WorkspaceLayout({
-  children,
-  params,
-}: {
+type WorkspaceLayoutProps = {
   children: React.ReactNode;
   params: Promise<{ workspaceSlug: string }>;
-}) {
+};
+
+// DesktopHandoff is an earlier sibling of the gated layout, so its mount effect
+// runs before the layout's /login and /onboarding redirect effects and hands
+// over the original URL.
+export default function WorkspaceLayout(props: WorkspaceLayoutProps) {
+  return (
+    <>
+      <DesktopHandoff />
+      <GatedWorkspaceLayout {...props} />
+    </>
+  );
+}
+
+function GatedWorkspaceLayout({ children, params }: WorkspaceLayoutProps) {
   const { workspaceSlug } = use(params);
   const user = useAuthStore((s) => s.user);
   const isAuthLoading = useAuthStore((s) => s.isLoading);
