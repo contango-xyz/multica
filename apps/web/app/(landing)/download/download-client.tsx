@@ -33,6 +33,13 @@ export function DownloadClient({ release }: { release: LatestRelease }) {
     };
   }, []);
 
+  const forkOnly = release.forkOnly === true;
+  // Fork mode offers one build; present it as the macOS (Apple Silicon)
+  // download whatever the visitor's OS, with no upstream binaries beside it.
+  const heroDetected = forkOnly
+    ? ({ os: "mac", arch: "arm64", archConfident: true } as const)
+    : detected;
+
   const releaseHtmlUrl = release.htmlUrl ?? ALL_RELEASES_URL;
 
   return (
@@ -46,21 +53,26 @@ export function DownloadClient({ release }: { release: LatestRelease }) {
       <div className="relative">
         <LandingHeader variant="dark" />
         <DownloadHero
-          detected={detected}
+          detected={heroDetected}
           assets={release.assets}
           versionUnavailable={versionUnavailable}
         />
       </div>
 
-      <AllPlatforms
-        assets={release.assets}
-        fallbackHref={ALL_RELEASES_URL}
-      />
-      <CliSection />
-      <CloudSection />
+      {!forkOnly && (
+        <>
+          <AllPlatforms
+            assets={release.assets}
+            fallbackHref={ALL_RELEASES_URL}
+          />
+          <CliSection />
+          <CloudSection />
+        </>
+      )}
       <VersionInfoFooter
         version={release.version}
         releaseHtmlUrl={releaseHtmlUrl}
+        showLinks={!forkOnly}
       />
       <LandingFooter />
     </>
@@ -70,9 +82,11 @@ export function DownloadClient({ release }: { release: LatestRelease }) {
 function VersionInfoFooter({
   version,
   releaseHtmlUrl,
+  showLinks,
 }: {
   version: string | null;
   releaseHtmlUrl: string;
+  showLinks: boolean;
 }) {
   const { t } = useLocale();
   const d = t.download.footer;
@@ -81,41 +95,40 @@ function VersionInfoFooter({
     <section className="bg-white pb-16 text-[#0a0d12] sm:pb-20">
       <div className="mx-auto flex max-w-[920px] flex-wrap items-center gap-x-6 gap-y-2 border-t border-[#0a0d12]/8 px-4 pt-8 text-label text-[#0a0d12]/60 sm:px-6 lg:px-8">
         {version ? (
+          <span>{d.currentVersion.replace("{version}", version)}</span>
+        ) : (
+          <span>{d.versionUnavailable}</span>
+        )}
+        {showLinks && (
           <>
-            <span>
-              {d.currentVersion.replace("{version}", version)}
-            </span>
             <span aria-hidden className="text-[#0a0d12]/25">
               ·
             </span>
+            {version && (
+              <>
+                <Link
+                  href={releaseHtmlUrl}
+                  className="underline decoration-[#0a0d12]/30 underline-offset-4 hover:text-[#0a0d12] hover:decoration-[#0a0d12]/70"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {d.releaseNotes.replace("{version}", version)}
+                </Link>
+                <span aria-hidden className="text-[#0a0d12]/25">
+              ·
+            </span>
+              </>
+            )}
             <Link
-              href={releaseHtmlUrl}
+              href={ALL_RELEASES_URL}
               className="underline decoration-[#0a0d12]/30 underline-offset-4 hover:text-[#0a0d12] hover:decoration-[#0a0d12]/70"
               target="_blank"
               rel="noreferrer"
             >
-              {d.releaseNotes.replace("{version}", version)}
+              {d.allReleases}
             </Link>
-            <span aria-hidden className="text-[#0a0d12]/25">
-              ·
-            </span>
-          </>
-        ) : (
-          <>
-            <span>{d.versionUnavailable}</span>
-            <span aria-hidden className="text-[#0a0d12]/25">
-              ·
-            </span>
           </>
         )}
-        <Link
-          href={ALL_RELEASES_URL}
-          className="underline decoration-[#0a0d12]/30 underline-offset-4 hover:text-[#0a0d12] hover:decoration-[#0a0d12]/70"
-          target="_blank"
-          rel="noreferrer"
-        >
-          {d.allReleases}
-        </Link>
       </div>
     </section>
   );

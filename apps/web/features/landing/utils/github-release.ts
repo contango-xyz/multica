@@ -31,6 +31,8 @@ export interface LatestRelease {
   publishedAt: string | null;
   htmlUrl: string | null;
   assets: DownloadAssets;
+  /** Fork feed in use: the page shows only that build, no upstream links. */
+  forkOnly?: boolean;
 }
 
 // Five candidates tolerates four consecutive incomplete releases before

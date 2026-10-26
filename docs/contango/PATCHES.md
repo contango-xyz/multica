@@ -247,9 +247,10 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `/download` offers the macOS DMG and version read from `<base>/contango-mac.yml` instead of
   upstream's GitHub release, and the Help menu's "Desktop app" link points at `/download`. Feed
   failure or unset env keeps upstream behaviour. Only bare `.dmg` file names under the base are
-  accepted.
+  accepted; the page then shows only that Mac build (no upstream links or other platforms).
 - **Touches:** ours: `apps/web/features/landing/utils/desktop-feed{,.test}.ts`. Upstream files:
-  `apps/web/features/landing/utils/github-release{,.test}.ts`, `apps/web/app/layout.tsx`,
+  `apps/web/features/landing/utils/github-release{,.test}.ts`,
+  `apps/web/app/(landing)/download/download-client{,.test}.tsx`, `apps/web/app/layout.tsx`,
   `apps/web/components/web-providers.tsx`, `packages/core/config/index.ts` (`desktopDownloadUrl`),
   `packages/views/layout/help-launcher{,.test}.tsx`.
 - **Upstream status:** none as of v0.7.0.
