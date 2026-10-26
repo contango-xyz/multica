@@ -70,7 +70,7 @@ export function mobilePathForWebPath(pathWithQuery: string): string {
   }
   if (page === "projects" && id) return `${ws}/project/${id}`;
   if (page === "my-issues" && !id) return `${ws}/my-issues`;
-  if (page && MOBILE_ROUTES.has(page)) return pathWithQuery;
+  if (page && MOBILE_ROUTES.has(page)) return query ? `${path}?${query}` : path;
   return `${ws}/inbox`;
 }
 

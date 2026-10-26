@@ -62,6 +62,13 @@ describe("redirectLink", () => {
     expect(redirectLink("multica:///")).toBe("multica:///");
     expect(redirectLink("/acme/issue/MUL-1")).toBe("/acme/issue/MUL-1");
   });
+
+  it("keeps a universal link already in mobile form relative", () => {
+    expect(redirectLink("https://example.com/acme/issue/MUL-1?highlight=c1")).toBe(
+      "/acme/issue/MUL-1?highlight=c1",
+    );
+    expect(redirectLink("https://example.com/acme/search?q=a%20b#x")).toBe("/acme/search?q=a%20b");
+  });
 });
 
 describe("createPendingPath", () => {

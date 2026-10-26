@@ -33,32 +33,35 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   initialize: async () => {
-    // Restore the persisted workspace slug alongside the auth token so the
-    // entry redirect (app/index.tsx) can route directly to the last-used
-    // workspace without flashing /select-workspace.
-    await useWorkspaceStore.getState().restoreSlug();
-
-    const token = await getToken();
-    if (!token) {
-      set({ isLoading: false });
-      return;
-    }
-    api.setToken(token);
+    // isLoading ends on every path: a throwing Keychain read or workspace
+    // restore would otherwise leave the app on its loading screen forever.
     try {
-      const user = await api.getMe();
-      set({ user, isLoading: false });
-    } catch (err) {
-      // Only clear token on a genuine 401. Network blips / 5xx keep the
-      // token so the next launch (or a manual refresh) can retry.
-      if (err instanceof ApiError && err.status === 401) {
-        // Synchronous first, before the awaited delete: anything already
-        // in flight has to learn the credential is dead now, not once the
-        // Keychain write lands.
-        invalidateSessionEpoch();
-        await clearToken();
-        api.setToken(null);
+      // Restore the persisted workspace slug alongside the auth token so the
+      // entry redirect (app/index.tsx) can route directly to the last-used
+      // workspace without flashing /select-workspace.
+      await useWorkspaceStore.getState().restoreSlug();
+
+      const token = await getToken();
+      if (!token) return;
+      api.setToken(token);
+      try {
+        const user = await api.getMe();
+        set({ user });
+      } catch (err) {
+        // Only clear token on a genuine 401. Network blips / 5xx keep the
+        // token so the next launch (or a manual refresh) can retry.
+        if (err instanceof ApiError && err.status === 401) {
+          // Synchronous first, before the awaited delete: anything already
+          // in flight has to learn the credential is dead now, not once the
+          // Keychain write lands.
+          invalidateSessionEpoch();
+          await clearToken();
+          api.setToken(null);
+        }
+        set({ user: null });
       }
-      set({ user: null, isLoading: false });
+    } finally {
+      set({ isLoading: false });
     }
   },
 
