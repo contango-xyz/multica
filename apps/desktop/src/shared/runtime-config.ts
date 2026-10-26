@@ -13,12 +13,31 @@ export type RuntimeConfigResult =
   | { ok: true; config: RuntimeConfig }
   | { ok: false; error: RuntimeConfigError };
 
-export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = Object.freeze({
+export const DEFAULT_RUNTIME_CONFIG_UPSTREAM: RuntimeConfig = Object.freeze({
   schemaVersion: 1,
   apiUrl: "https://api.multica.ai",
   wsUrl: "wss://api.multica.ai/ws",
   appUrl: "https://multica.ai",
 });
+
+declare const __CONTANGO_API_URL__: string;
+
+// Fork builds bake their server in (see scripts/contango-build.mjs) so a
+// fresh install needs no ~/.multica/desktop.json. The file still wins.
+export function defaultRuntimeConfigFor(apiUrl: string): RuntimeConfig {
+  if (!apiUrl) return DEFAULT_RUNTIME_CONFIG_UPSTREAM;
+  const base = apiUrl.replace(/\/+$/, "");
+  return Object.freeze({
+    schemaVersion: 1,
+    apiUrl: base,
+    wsUrl: `${base.replace(/^http/, "ws")}/ws`,
+    appUrl: base,
+  });
+}
+
+export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = defaultRuntimeConfigFor(
+  typeof __CONTANGO_API_URL__ === "string" ? __CONTANGO_API_URL__ : "",
+);
 
 const LOCAL_DEV_RUNTIME_CONFIG: RuntimeConfig = Object.freeze({
   schemaVersion: 1,

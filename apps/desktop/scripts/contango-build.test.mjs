@@ -1,0 +1,51 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { renderEntitlements, builderOverrides, builderConfig, builderEnv } from "./contango-build.mjs";
+
+const env = {
+  CONTANGO_APP_ID: "com.example.desktop", CONTANGO_TEAM_ID: "ABCDE12345",
+  CONTANGO_PROVISIONING_PROFILE: "/tmp/p.provisionprofile",
+  CONTANGO_API_URL: "https://srv.example.test", CONTANGO_UPDATE_URL: "https://srv.example.test/desktop/",
+};
+
+test("entitlements carry push + identity", () => {
+  const xml = renderEntitlements("<dict>{{APP_IDENTIFIER}}|{{TEAM_ID}}</dict>", env);
+  assert.equal(xml, "<dict>ABCDE12345.com.example.desktop|ABCDE12345</dict>");
+});
+
+test("overrides point at our id, profile and feed", () => {
+  const o = builderOverrides(env, "/tmp/ent.plist");
+  assert.equal(o.appId, "com.example.desktop");
+  assert.equal(o.mac.provisioningProfile, "/tmp/p.provisionprofile");
+  assert.equal(o.mac.entitlements, "/tmp/ent.plist");
+  assert.deepEqual(o.publish, { provider: "generic", url: "https://srv.example.test/desktop/", channel: "contango" });
+});
+
+test("missing variable fails loudly", () => {
+  assert.throws(() => builderOverrides({ ...env, CONTANGO_APP_ID: "" }, "/tmp/e"), /CONTANGO_APP_ID/);
+});
+
+// electron-builder deep-merges an object `publish` (from -c.publish.* or an
+// extending config) into upstream's github publish, keeping owner/repo. An
+// array replaces it outright, so app-update.yml carries only our feed.
+test("generated config extends the base and replaces publish", () => {
+  const c = builderConfig(builderOverrides(env, "/tmp/ent.plist"), "/x/electron-builder.yml", "0.7.0-contango.3");
+  assert.equal(c.extends, "/x/electron-builder.yml");
+  assert.equal(c.appId, "com.example.desktop");
+  assert.deepEqual(c.extraMetadata, { version: "0.7.0-contango.3" });
+  assert.deepEqual(c.mac, { entitlements: "/tmp/ent.plist", provisioningProfile: "/tmp/p.provisionprofile", notarize: true });
+  assert.deepEqual(c.publish, [{ provider: "generic", url: "https://srv.example.test/desktop/", channel: "contango" }]);
+});
+
+// electron-builder prefers APPLE_ID / APPLE_API_KEY credentials over a
+// keychain profile and silently skips notarization when none is set.
+test("notarization uses only the keychain profile", () => {
+  const e = builderEnv({ ...env, APPLE_KEYCHAIN_PROFILE: "notary", APPLE_ID: "a@b", APPLE_APP_SPECIFIC_PASSWORD: "x",
+    APPLE_API_KEY: "k", APPLE_API_KEY_ID: "i", APPLE_API_ISSUER: "s", PATH: "/bin" });
+  assert.equal(e.APPLE_KEYCHAIN_PROFILE, "notary");
+  assert.equal(e.PATH, "/bin");
+  for (const k of ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"]) {
+    assert.equal(k in e, false, k);
+  }
+  assert.throws(() => builderEnv(env), /APPLE_KEYCHAIN_PROFILE/);
+});
