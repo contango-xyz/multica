@@ -83,6 +83,20 @@ function startWith(clicks: PushClicks, launchInfo: unknown, active = true) {
   return { started, click: (c: unknown) => onClick(c) };
 }
 
+describe("startNativePushClicks diagnostics", () => {
+  it.each([
+    ["on", options(), "native push clicks: on"],
+    ["start() refused", options({ load: () => ({ start: () => false }) }), "native push clicks: off (start() refused the delegate)"],
+    ["no start()", options({ load: () => ({}) }), "native push clicks: off (addon has no start())"],
+    ["load throws", options({ load: () => { throw new Error("dlopen failed"); } }), "native push clicks: off (dlopen failed)"],
+    ["dev build", options({ isPackaged: false }), "native push clicks: off (not a packaged macOS app)"],
+  ])("logs why when %s", (_name, opts, message) => {
+    const log = vi.fn();
+    startNativePushClicks({ ...opts, log });
+    expect(log).toHaveBeenCalledWith(message);
+  });
+});
+
 describe("PushClicks", () => {
   it("opens the route of the clicked notification", () => {
     const { open, focus, clicks } = pushClicks();
