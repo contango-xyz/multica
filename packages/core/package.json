@@ -147,6 +147,7 @@
     "./modals": "./modals/index.ts",
     "./onboarding": "./onboarding/index.ts",
     "./paths": "./paths/index.ts",
+    "./paths/reserved-slugs": "./paths/reserved-slugs.ts",
     "./hooks": "./hooks.tsx",
     "./hooks/*": "./hooks/*.ts",
     "./query-client": "./query-client.ts",

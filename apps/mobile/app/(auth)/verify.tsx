@@ -10,6 +10,7 @@ import { MulticaLogo } from "@/components/brand/multica-logo";
 import { useAuthStore } from "@/data/auth-store";
 import { i18n, useT } from "@/lib/i18n";
 import { mapAuthError } from "@/lib/auth-error";
+import { pendingLink } from "@/lib/universal-links";
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -42,7 +43,8 @@ export default function Verify() {
     try {
       await verifyCode(email, value);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/");
+      // A link opened while logged out lands on its screen, not the default tab.
+      router.replace(pendingLink.take() ?? "/");
     } catch (err) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError(mapAuthError(err, t("verify.verify_failed"), (key) => i18n.t(`auth:${key}`)));

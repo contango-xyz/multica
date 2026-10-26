@@ -63,3 +63,26 @@ describe("iOS scene lifecycle configuration", () => {
     expect(config.scheme).toBe("multica");
   });
 });
+
+describe("universal links", () => {
+  it("associates the production app with the configured domain", () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("EXPO_ASSOCIATED_DOMAIN", "app.example.com");
+    const config = createConfig({ config: {} } as ConfigContext);
+    expect(config.ios?.associatedDomains).toEqual(["applinks:app.example.com"]);
+  });
+
+  it("has no associated domain when the variable is unset", () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("EXPO_ASSOCIATED_DOMAIN", undefined);
+    const config = createConfig({ config: {} } as ConfigContext);
+    expect(config.ios?.associatedDomains).toEqual([]);
+  });
+
+  it.each(["development", "staging"])("never associates the %s variant", (env) => {
+    vi.stubEnv("APP_ENV", env);
+    vi.stubEnv("EXPO_ASSOCIATED_DOMAIN", "app.example.com");
+    const config = createConfig({ config: {} } as ConfigContext);
+    expect(config.ios?.associatedDomains).toEqual([]);
+  });
+});

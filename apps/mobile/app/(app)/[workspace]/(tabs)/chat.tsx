@@ -37,7 +37,7 @@ import {
   Platform,
   View,
 } from "react-native";
-import { router, useFocusEffect, useIsFocused } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Agent,
@@ -148,6 +148,24 @@ export default function ChatTab() {
     setHydratedWs(wsId);
     if (sessions.length > 0) setActiveSessionId(sessions[0].id);
   }
+  // A chat link (`?session=`, lib/universal-links.ts) opens that session, as
+  // a chat push does. Applied once the workspace store matches the URL's
+  // workspace and after the hydration above, so neither overrides it; the
+  // param is then cleared so the same link can be opened again.
+  const { workspace: urlSlug, session: linkedSession } = useLocalSearchParams<{
+    workspace: string;
+    session?: string;
+  }>();
+  const [appliedLink, setAppliedLink] = useState<string | null>(null);
+  if (linkedSession && linkedSession !== appliedLink && wsSlug === urlSlug && hydratedWs === wsId) {
+    setAppliedLink(linkedSession);
+    setSelectedAgentId(null);
+    setActiveSessionId(linkedSession);
+  }
+  if (!linkedSession && appliedLink) setAppliedLink(null);
+  useEffect(() => {
+    if (appliedLink) router.setParams({ session: undefined });
+  }, [appliedLink]);
   const { data: messages = [], isLoading: messagesLoading } = useQuery(
     chatMessagesOptions(activeSessionId),
   );

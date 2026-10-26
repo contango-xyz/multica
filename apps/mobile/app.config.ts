@@ -64,6 +64,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         : isStaging
           ? (process.env.EXPO_BUNDLE_IDENTIFIER_STAGING ?? "ai.multica.mobile.staging")
           : (process.env.EXPO_BUNDLE_IDENTIFIER_DEV ?? "ai.multica.mobile.dev"),
+      // Universal links (lib/universal-links.ts). Host only, from env so the
+      // server hostname stays out of the repo; production variant only, since
+      // the server's association file names the production app id.
+      associatedDomains:
+        isProd && process.env.EXPO_ASSOCIATED_DOMAIN
+          ? [`applinks:${process.env.EXPO_ASSOCIATED_DOMAIN}`]
+          : [],
     },
     plugins: [
       "expo-router",
