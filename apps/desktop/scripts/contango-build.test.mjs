@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderEntitlements, builderOverrides, builderConfig, builderEnv, parseEnvFile, verifyCommands } from "./contango-build.mjs";
+import { renderEntitlements, builderOverrides, builderConfig, builderEnv, parseEnvFile, verifyCommands, assertCleanTree } from "./contango-build.mjs";
 
 const env = {
   CONTANGO_APP_ID: "com.example.desktop", CONTANGO_TEAM_ID: "ABCDE12345",
@@ -93,4 +93,14 @@ test("post-build gate verifies signature and stapled ticket", () => {
     ["codesign", ["--verify", "--deep", "--strict", "--verbose=2", "/d/Multica.app"]],
     ["xcrun", ["stapler", "validate", "/d/Multica.app"]],
   ]);
+});
+
+// A release tag must equal the shipped code.
+test("a clean tree passes", () => {
+  assert.doesNotThrow(() => assertCleanTree(""));
+  assert.doesNotThrow(() => assertCleanTree("\n"));
+});
+
+test("tracked changes refuse the build and name the files", () => {
+  assert.throws(() => assertCleanTree(" M apps/desktop/src/main/index.ts\nA  docs/x.md\n"), /dirty.*index\.ts.*docs\/x\.md/s);
 });
