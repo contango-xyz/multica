@@ -18,6 +18,7 @@ import { setupDaemonManager } from "./daemon-manager";
 import { setupLocalDirectory } from "./local-directory";
 import { configureLinuxFileDialogs } from "./linux-file-dialog";
 import { openExternalSafely, downloadURLSafely } from "./external-url";
+import { appPathForWebUrl } from "./web-link";
 import { installContextMenu } from "./context-menu";
 import { handleAppShortcut } from "./keyboard-shortcuts";
 import { installNavigationGestures } from "./navigation-gestures";
@@ -251,6 +252,34 @@ function handleDeepLink(url: string): void {
   } catch {
     // Ignore malformed URLs
   }
+}
+
+// http(s) links arrive only in builds that declare those schemes (the fork
+// build, via a link router). They need runtime config to know which origin is
+// ours, so those arriving before it loads wait here and are flushed once it
+// has; the route itself then rides the normal renderer-message queue.
+let pendingWebLinks: string[] | null = [];
+
+function handleWebLink(url: string): void {
+  if (pendingWebLinks) {
+    pendingWebLinks.push(url);
+    return;
+  }
+  const path = runtimeConfigResult.ok
+    ? appPathForWebUrl(url, runtimeConfigResult.config.appUrl)
+    : null;
+  if (path) dispatchToMainRenderer("route:open", path);
+  else void openExternalSafely(url);
+}
+
+function flushPendingWebLinks(): void {
+  const queued = pendingWebLinks ?? [];
+  pendingWebLinks = null;
+  for (const url of queued) handleWebLink(url);
+}
+
+function isWebUrl(url: string): boolean {
+  return /^https?:/i.test(url);
 }
 
 // --- Window creation -----------------------------------------------------
@@ -639,7 +668,8 @@ if (!gotTheLock) {
   // main window and its matching React listener exist.
   app.on("open-url", (event, url) => {
     event.preventDefault();
-    handleDeepLink(url);
+    if (isWebUrl(url)) handleWebLink(url);
+    else handleDeepLink(url);
   });
 
   // Windows/Linux: second instance passes deep link via argv
@@ -692,6 +722,7 @@ if (!gotTheLock) {
         appUrl: viteEnv.VITE_APP_URL,
       },
     });
+    flushPendingWebLinks();
 
     electronApp.setAppUserModelId(
       is.dev ? "ai.multica.desktop.dev" : "ai.multica.desktop",
