@@ -258,6 +258,17 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream offers a configurable download source.
 
+### 13. Daemon owner allowlist
+
+- **What:** with `MULTICA_DAEMON_ALLOWED_EMAILS` set (comma-separated, backend env), every
+  `/api/daemon/*` request whose authenticated owner isn't on the list gets 403, so only those
+  accounts can register, heartbeat or claim with a runtime. People can't bring their own desktop
+  daemon. Unset or empty keeps upstream behaviour. Decisions are cached per user until restart.
+- **Touches:** ours: `server/internal/middleware/daemon_owner_allowlist{,_test}.go`. Upstream file:
+  `server/cmd/server/router.go` (one `r.Use` in the `/api/daemon` route).
+- **Upstream status:** none as of v0.7.0.
+- **Drop when:** upstream can restrict who registers runtimes in a workspace.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
