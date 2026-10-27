@@ -1562,6 +1562,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// Daemon API routes (require daemon token or valid user token)
 	r.Route("/api/daemon", func(r chi.Router) {
 		r.Use(middleware.DaemonAuth(queries, patCache, daemonTokenCache, cloudPATVerifier))
+		r.Use(middleware.DaemonOwnerAllowlist(
+			middleware.ParseDaemonAllowedEmails(os.Getenv("MULTICA_DAEMON_ALLOWED_EMAILS")),
+			middleware.UserEmailLookupFor(queries),
+		))
 
 		r.Post("/register", h.DaemonRegister)
 		r.Post("/deregister", h.DaemonDeregister)
