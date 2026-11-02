@@ -91,10 +91,25 @@ separately from Classic's 260 px) and Smart row titles wrap to two lines; badges
 on their own id (`inboxRowKey`), other rows on their issue as before. The archived view stays Classic.
 Below 1024 px the single-column flow described next is unchanged (list → focused detail → back).
 
+**One row per card, and landing on the comment (fifth revision, 2026-11-02):**
+- In Smart, a card with an unresolved action signal (any group but fyi) is ONE row: the card's other
+  entries (the mention that tagged you, replies, status changes) fold into its newest action signal.
+  The row keeps the signal's group, title, summary and rank, shows the sender of the latest mention as
+  its avatar, and is unread while any folded entry is; opening or marking it read reads them all, and
+  archiving archives the card (the server's archive is issue-wide). "Mentions & reviews" keeps only
+  mentions on cards without an action signal. Do this first and the counters count cards.
+  (`packages/core/inbox/smart-fold.ts`.)
+- Selecting an entry created by a comment (mention, review request, reply: its `details.comment_id`)
+  scrolls the right pane's thread to that comment and flashes it, in Smart and Classic: the issue
+  detail's existing `highlightCommentId` landing (the `#comment-<id>` anchor). A folded row lands on
+  its latest mention's comment; signal-only cards (stalled, blocking, alert) open without scrolling.
+- The amber "needs you" bar and bold title are gone from Smart rows (nearly every row had them);
+  priority badges and the age tint carry urgency and staleness.
+
 **Dashboard (fourth revision, 2026-11-02, owner: "a mixture of an inbox with a dashboard/control
 panel"):** above the two panes (phones: above the sections) the Smart view shows:
 - **Do this first:** the top 3 entries waiting on you (action_required signals, mentions, review
-  requests) by rank score, numbered 1-3, each with its one action (the signal's first action, else
+  requests) by rank score, one per card, numbered 1-3, each with its one action (the signal's first action, else
   Open) and the reason in plain words ("urgent · blocks 4 cards · waiting 9h"). Computed from the live
   list, so clearing one promotes the next; "Nothing waiting on you" when empty.
 - **Counters:** waiting on you, per group, the oldest wait (amber over 4 h, red over 24 h; click
