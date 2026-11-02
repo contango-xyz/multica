@@ -1191,7 +1191,16 @@ describe("InboxPage smart two-pane (contango)", () => {
     expect(screen.getByTestId("section-mentions")).toHaveTextContent("mention");
     expect(screen.getByTestId("section-fyi")).toHaveTextContent("status");
     expect(screen.getByRole("button", { name: "Filter by group" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter inbox" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter inbox" })).toBeInTheDocument();    // The dashboard sits above both panes; Classic has none.
+    expect(screen.getByTestId("smart-dashboard")).toBeInTheDocument();
+  });
+
+  it("classic mode has no dashboard", () => {
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [signal("sig", "merge", { issue_id: "issue-1" })];
+    render(<InboxPage />);
+    expect(screen.queryByTestId("smart-dashboard")).toBeNull();
   });
 
   it("selecting a signal keeps the list and shows its brief above the issue thread", () => {

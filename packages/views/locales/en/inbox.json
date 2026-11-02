@@ -155,11 +155,31 @@
     "archive_section": "Archive all",
     "filters": {
       "tooltip": "Filter by group",
-      "needs_you": "Needs my action only"
+      "needs_you": "Needs my action only",
+      "urgent_only": "Urgent only"
     },
     "show_more_one": "Show {{count}} more",
     "show_more_other": "Show {{count}} more",
     "switch_to_classic": "Switch to Classic",
-    "switch_to_smart": "Switch to Smart"
+    "switch_to_smart": "Switch to Smart",
+    "dashboard": {
+      "do_first": "Do this first",
+      "nothing_waiting": "Nothing waiting on you",
+      "waiting_one": "{{count}} waiting on you",
+      "waiting_other": "{{count}} waiting on you",
+      "oldest": "oldest {{age}}",
+      "urgent_one": "{{count}} urgent",
+      "urgent_other": "{{count}} urgent",
+      "blocks_cards_one": "blocks {{count}} card",
+      "blocks_cards_other": "blocks {{count}} cards",
+      "waiting_for": "waiting {{age}}",
+      "stalled_one": "{{count}} stalled",
+      "stalled_other": "{{count}} stalled",
+      "blocking_one": "{{count}} blocking",
+      "blocking_other": "{{count}} blocking",
+      "open": "Open",
+      "dashboard": "Overview",
+      "health": "Squad health"
+    }
   }
 }

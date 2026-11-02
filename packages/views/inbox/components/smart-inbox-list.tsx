@@ -8,7 +8,7 @@
 import { useCallback, useRef, type KeyboardEvent } from "react";
 import { Archive, CheckCheck, ChevronRight, Inbox, MoreHorizontal } from "lucide-react";
 import { inboxRowKey } from "@multica/core/inbox/filter-store";
-import type { SmartEntry, SmartSection } from "@multica/core/inbox/smart";
+import { ageTint, type SmartEntry, type SmartSection } from "@multica/core/inbox/smart";
 import { isEditableShortcutTarget } from "@multica/core/shortcuts";
 import { isImeComposing } from "@multica/core/utils";
 import type { InboxItem } from "@multica/core/types";
@@ -187,6 +187,13 @@ function SmartListSection({
                 isSelected={key === selectedKey}
                 needsYou={entry.needsYou}
                 inSmartSection
+                priority={
+                  entry.reason.priority === "urgent" || entry.reason.priority === "high"
+                    ? entry.reason.priority
+                    : undefined
+                }
+                ageTint={ageTint(entry)}
+                waitingSince={entry.signal?.rank.since ?? undefined}
                 onClick={() => onSelect(entry.item)}
                 onAction={() => onAction(entry.item.id)}
               />

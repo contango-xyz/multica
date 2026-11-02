@@ -152,10 +152,25 @@
     "archive_section": "全部归档",
     "filters": {
       "tooltip": "按分组筛选",
-      "needs_you": "仅显示需要我处理的"
+      "needs_you": "仅显示需要我处理的",
+      "urgent_only": "仅紧急"
     },
     "show_more_other": "再显示 {{count}} 项",
     "switch_to_classic": "切换到经典视图",
-    "switch_to_smart": "切换到智能视图"
+    "switch_to_smart": "切换到智能视图",
+    "dashboard": {
+      "do_first": "先处理这些",
+      "nothing_waiting": "没有等待你处理的事项",
+      "waiting_other": "{{count}} 项等待你处理",
+      "oldest": "最久 {{age}}",
+      "urgent_other": "{{count}} 项紧急",
+      "blocks_cards_other": "阻塞 {{count}} 张卡片",
+      "waiting_for": "已等待 {{age}}",
+      "stalled_other": "{{count}} 项停滞",
+      "blocking_other": "{{count}} 项阻塞他人",
+      "open": "打开",
+      "dashboard": "概览",
+      "health": "团队状态"
+    }
   }
 }

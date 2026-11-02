@@ -155,11 +155,31 @@
     "archive_section": "Tout archiver",
     "filters": {
       "tooltip": "Filtrer par groupe",
-      "needs_you": "Seulement ce qui requiert mon action"
+      "needs_you": "Seulement ce qui requiert mon action",
+      "urgent_only": "Urgent uniquement"
     },
     "show_more_one": "Afficher {{count}} de plus",
     "show_more_other": "Afficher {{count}} de plus",
     "switch_to_classic": "Passer en vue classique",
-    "switch_to_smart": "Passer en vue intelligente"
+    "switch_to_smart": "Passer en vue intelligente",
+    "dashboard": {
+      "do_first": "À faire d'abord",
+      "nothing_waiting": "Rien ne vous attend",
+      "waiting_one": "{{count}} vous attend",
+      "waiting_other": "{{count}} vous attendent",
+      "oldest": "le plus ancien {{age}}",
+      "urgent_one": "{{count}} urgent",
+      "urgent_other": "{{count}} urgents",
+      "blocks_cards_one": "bloque {{count}} carte",
+      "blocks_cards_other": "bloque {{count}} cartes",
+      "waiting_for": "en attente depuis {{age}}",
+      "stalled_one": "{{count}} bloqué",
+      "stalled_other": "{{count}} bloqués",
+      "blocking_one": "{{count}} bloquant",
+      "blocking_other": "{{count}} bloquants",
+      "open": "Ouvrir",
+      "dashboard": "Vue d'ensemble",
+      "health": "Santé de l'équipe"
+    }
   }
 }

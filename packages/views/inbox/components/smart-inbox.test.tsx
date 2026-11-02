@@ -60,6 +60,11 @@ vi.mock("../../issues/surface/activity", () => ({
 vi.mock("./inbox-filter-menu", () => ({
   InboxFilterMenu: () => <div data-testid="classic-filters" />,
 }));
+vi.mock("./smart-dashboard", () => ({
+  SmartDashboard: ({ compact, sections }: { compact?: boolean; sections: unknown[] }) => (
+    <div data-testid="dashboard" data-compact={String(!!compact)} data-sections={sections.length} />
+  ),
+}));
 let compact = false;
 vi.mock("@multica/ui/hooks/use-mobile", () => ({ useIsCompact: () => compact }));
 
@@ -158,6 +163,12 @@ describe("SmartInboxPage", () => {
     expect(within(row!).getByRole("img", { name: "smart.needs_you" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /sections\.mentions/ })).toHaveTextContent("@you can you look?");
     expect(within(screen.getByRole("region", { name: /sections\.fyi/ })).queryByRole("img", { name: "smart.needs_you" })).toBeNull();
+  });
+
+  it("shows the compact dashboard above the sections", () => {
+    renderPage();
+    expect(screen.getByTestId("dashboard")).toHaveAttribute("data-compact", "true");
+    expect(screen.getByTestId("dashboard")).toHaveAttribute("data-sections", "4");
   });
 
   it("keeps Classic's filters and bulk actions in the header", () => {

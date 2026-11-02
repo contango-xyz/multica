@@ -134,6 +134,8 @@ export interface SmartEntry {
   reason: RankReason;
   /** Waits on the reader: an action_required signal, a mention or a review request. */
   needsYou: boolean;
+  /** Hours since the wait started (rank.since, else created_at). */
+  waitedHours: number;
 }
 
 export type SmartSectionId = Exclude<SignalGroup, "fyi"> | "mentions" | "fyi";
@@ -188,6 +190,7 @@ export function buildSmartSections(items: InboxItem[], now: number): SmartSectio
       score: rankScore(input, now),
       reason: rankReason(input, now),
       needsYou: isWaitingOnYou(item),
+      waitedHours: ageHours(input.since, now),
     };
     const id = sectionFor(item, signal);
     const list = buckets.get(id) ?? [];
@@ -208,6 +211,80 @@ export function buildSmartSections(items: InboxItem[], now: number): SmartSectio
   // Stable sort: equal top scores keep SECTION_ORDER.
   ranked.sort((a, b) => b.entries[0]!.score - a.entries[0]!.score);
   return fyi ? [...ranked, fyi] : ranked;
+}
+
+// --- Dashboard ---------------------------------------------------------------
+
+/** The top `n` entries waiting on the reader, by rank score (ties: older first). */
+export function doThisFirst(sections: SmartSection[], n = 3): SmartEntry[] {
+  return sections
+    .flatMap((section) => section.entries)
+    .filter((entry) => entry.needsYou)
+    .sort((a, b) => b.score - a.score || b.waitedHours - a.waitedHours)
+    .slice(0, n);
+}
+
+export interface SmartCounters {
+  /** Entries waiting on the reader. */
+  waiting: number;
+  /** Waiting entries per section, in display order, zero counts left out. */
+  byGroup: Array<{ id: SmartSectionId; count: number }>;
+  /** The longest wait among waiting entries, in hours; null when none wait. */
+  oldestWaitHours: number | null;
+  /** Urgent entries waiting on the reader. */
+  urgent: number;
+}
+
+const COUNTER_ORDER: SmartSectionId[] = [
+  "merge",
+  "decision",
+  "access",
+  "stalled",
+  "blocking",
+  "alert",
+  "mentions",
+  "fyi",
+];
+
+export function smartCounters(sections: SmartSection[]): SmartCounters {
+  const waiting = sections.flatMap((s) => s.entries.filter((e) => e.needsYou).map((e) => ({ id: s.id, e })));
+  const byGroup = COUNTER_ORDER.map((id) => ({
+    id,
+    count: waiting.filter((w) => w.id === id).length,
+  })).filter((g) => g.count > 0);
+  return {
+    waiting: waiting.length,
+    byGroup,
+    oldestWaitHours: waiting.length ? Math.max(...waiting.map((w) => w.e.waitedHours)) : null,
+    urgent: waiting.filter((w) => w.e.reason.priority === "urgent").length,
+  };
+}
+
+export interface SquadHealth {
+  stalled: number;
+  blocking: number;
+  /** Alert signals (e.g. "main red", "CD red"); shown as red chips by title. */
+  alerts: SmartEntry[];
+}
+
+/**
+ * Squad health from what is already in the reader's inbox: their stalled,
+ * blocking and alert signals. No other source is consulted.
+ */
+export function squadHealth(sections: SmartSection[]): SquadHealth {
+  const of = (id: SmartSectionId) =>
+    sections.find((s) => s.id === id)?.entries.filter((e) => e.signal) ?? [];
+  return { stalled: of("stalled").length, blocking: of("blocking").length, alerts: of("alert") };
+}
+
+export type AgeTint = "none" | "amber" | "red";
+
+/** Amber after 4 h, red after 24 h; urgent entries after 1 h and 4 h. */
+export function ageTint(entry: Pick<SmartEntry, "waitedHours" | "reason">): AgeTint {
+  const [amber, red] = entry.reason.priority === "urgent" ? [1, 4] : [4, 24];
+  if (entry.waitedHours > red) return "red";
+  if (entry.waitedHours > amber) return "amber";
+  return "none";
 }
 
 // --- Opt-in -----------------------------------------------------------------
