@@ -34,6 +34,61 @@ function item(overrides: Partial<InboxItem>): InboxItem {
   };
 }
 
+describe("deduplicateInboxItems with smart-inbox signals", () => {
+  const signalDetails = { key: "k", group: "merge", summary: "why" } as unknown as InboxItem["details"];
+
+  it("shows the newest non-signal row's sender while the group keeps the newest row's id and state", () => {
+    const merged = deduplicateInboxItems([
+      item({
+        id: "mention",
+        type: "mentioned",
+        actor_type: "agent",
+        actor_id: "brooks",
+        body: "@you please approve",
+        read: true,
+        created_at: "2026-06-15T08:00:00Z",
+        details: { comment_id: "comment-1" },
+      }),
+      item({
+        id: "signal",
+        type: "signal",
+        actor_type: "system",
+        actor_id: null,
+        title: "Approve merge #1",
+        read: false,
+        created_at: "2026-06-15T09:00:00Z",
+        details: signalDetails,
+      }),
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({
+      id: "signal",
+      read: false,
+      type: "mentioned",
+      actor_type: "agent",
+      actor_id: "brooks",
+      body: "@you please approve",
+      created_at: "2026-06-15T08:00:00Z",
+      details: { comment_id: "comment-1" },
+    });
+  });
+
+  it("keeps a signal-only group as the signal", () => {
+    const merged = deduplicateInboxItems([
+      item({ id: "s1", type: "signal", actor_type: "system", actor_id: null, details: signalDetails }),
+    ]);
+    expect(merged[0]).toMatchObject({ id: "s1", type: "signal", actor_type: "system" });
+  });
+
+  it("applies the same rule to the archived list", () => {
+    const merged = deduplicateArchivedInboxItems([
+      item({ id: "status", type: "status_changed", archived: true, created_at: "2026-06-15T08:00:00Z" }),
+      item({ id: "signal", type: "signal", archived: true, created_at: "2026-06-15T09:00:00Z", details: signalDetails }),
+    ]);
+    expect(merged[0]).toMatchObject({ id: "signal", type: "status_changed" });
+  });
+});
+
 describe("deduplicateInboxItems", () => {
   it("keeps the newest issue row while preserving an older comment anchor", () => {
     const merged = deduplicateInboxItems([

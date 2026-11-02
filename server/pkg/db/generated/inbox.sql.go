@@ -395,7 +395,8 @@ WITH eligible_archived AS MATERIALIZED (
     SELECT i.id,
            COALESCE(i.issue_id, i.id) AS group_id,
            i.created_at,
-           i.details
+           i.details,
+           i.type
     FROM inbox_item i
     WHERE i.workspace_id = $1
       AND i.recipient_type = $2
@@ -416,7 +417,9 @@ WITH eligible_archived AS MATERIALIZED (
            id AS newest_id,
            created_at AS newest_created_at
     FROM eligible_archived
-    ORDER BY group_id, created_at DESC, id DESC
+    -- Newest row a person or agent caused; a contango smart-inbox signal only
+    -- when the group has nothing else (same rule as ListArchivedInboxPage).
+    ORDER BY group_id, (type = 'signal'), created_at DESC, id DESC
 ), limited_groups AS (
     SELECT group_id, newest_id
     FROM newest_groups

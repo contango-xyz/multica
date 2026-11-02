@@ -29,7 +29,9 @@ WITH newest AS MATERIALIZED (
             AND active.recipient_id = i.recipient_id
             AND active.issue_id = i.issue_id AND active.archived = false
       ))
-    ORDER BY COALESCE(i.issue_id, i.id), i.created_at DESC, i.id DESC
+    -- A group is represented by its newest row a person or agent caused; a
+    -- contango smart-inbox signal only when the group has nothing else.
+    ORDER BY COALESCE(i.issue_id, i.id), (i.type = 'signal'), i.created_at DESC, i.id DESC
 ), projected AS (
     SELECT newest.id, newest.issue_id, newest.created_at, newest.read, newest.actor, iss.status AS issue_status, iss.priority AS issue_priority
     FROM newest
@@ -123,7 +125,9 @@ WITH newest AS MATERIALIZED (
             AND active.recipient_id = i.recipient_id
             AND active.issue_id = i.issue_id AND active.archived = false
       ))
-    ORDER BY COALESCE(i.issue_id, i.id), i.created_at DESC, i.id DESC
+    -- A group is represented by its newest row a person or agent caused; a
+    -- contango smart-inbox signal only when the group has nothing else.
+    ORDER BY COALESCE(i.issue_id, i.id), (i.type = 'signal'), i.created_at DESC, i.id DESC
 ), projected AS (
     SELECT newest.id, newest.issue_id, newest.created_at, newest.read, newest.actor, iss.status AS issue_status, iss.priority AS issue_priority
     FROM newest
