@@ -163,6 +163,19 @@ describe("InboxDetailLabel smart-inbox signals", () => {
     expect(container.textContent).toBe(`${en.smart.sections.stalled} · no update for 6 h`);
   });
 
+  it("shows the summary alone under a smart section header", () => {
+    const { container } = render(
+      <InboxDetailLabel
+        signalGroup={false}
+        item={item({
+          type: "signal",
+          details: { key: "k", group: "merge", summary: "CTG-1718 · blocks 3 cards" } as unknown as InboxItem["details"],
+        })}
+      />,
+    );
+    expect(container.textContent).toBe("CTG-1718 · blocks 3 cards");
+  });
+
   it("shows the group alone without a summary", () => {
     const { container } = render(
       <InboxDetailLabel

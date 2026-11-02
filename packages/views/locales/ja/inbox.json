@@ -154,6 +154,8 @@
       "tooltip": "グループで絞り込み",
       "needs_you": "自分の対応が必要なもののみ"
     },
-    "show_more_other": "さらに {{count}} 件表示"
+    "show_more_other": "さらに {{count}} 件表示",
+    "switch_to_classic": "クラシックに切り替え",
+    "switch_to_smart": "スマートに切り替え"
   }
 }

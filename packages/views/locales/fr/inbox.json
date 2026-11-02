@@ -158,6 +158,8 @@
       "needs_you": "Seulement ce qui requiert mon action"
     },
     "show_more_one": "Afficher {{count}} de plus",
-    "show_more_other": "Afficher {{count}} de plus"
+    "show_more_other": "Afficher {{count}} de plus",
+    "switch_to_classic": "Passer en vue classique",
+    "switch_to_smart": "Passer en vue intelligente"
   }
 }

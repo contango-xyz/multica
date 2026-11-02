@@ -470,3 +470,24 @@ describe("InboxListItem smart-inbox signal sender", () => {
     expect(screen.getByTestId("actor-avatar")).toHaveAttribute("data-actor-type", "system");
   });
 });
+
+describe("InboxListItem smart needs-you cue", () => {
+  it("shows the cue only when asked", () => {
+    const { container, rerender } = render(
+      <WorkspaceSlugProvider slug="acme">
+        <NavigationProvider value={makeAdapter()}>
+          <InboxListItem item={item()} view="inbox" isSelected={false} onClick={vi.fn()} onAction={vi.fn()} needsYou />
+        </NavigationProvider>
+      </WorkspaceSlugProvider>,
+    );
+    expect(container.querySelector(".bg-warning")).not.toBeNull();
+    rerender(
+      <WorkspaceSlugProvider slug="acme">
+        <NavigationProvider value={makeAdapter()}>
+          <InboxListItem item={item()} view="inbox" isSelected={false} onClick={vi.fn()} onAction={vi.fn()} />
+        </NavigationProvider>
+      </WorkspaceSlugProvider>,
+    );
+    expect(container.querySelector(".bg-warning")).toBeNull();
+  });
+});

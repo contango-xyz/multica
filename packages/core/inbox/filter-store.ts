@@ -41,6 +41,17 @@ export function inboxActorKeyParts(key: string): { type: string; id: string } {
   return { type: key.slice(0, separator), id: key.slice(separator + 1) };
 }
 
+/**
+ * Selection key of an inbox row (the `?issue=` value): its issue for issue
+ * rows, so one issue is one row, else the row's own id. A contango smart-inbox
+ * signal always keys on its own id: the Smart view lists it beside the
+ * mention on the same issue, and each must be selectable on its own.
+ */
+export function inboxRowKey(item: Pick<InboxItem, "id" | "issue_id" | "type">): string {
+  if (item.type === "signal") return item.id;
+  return item.issue_id ?? item.id;
+}
+
 export type InboxPriorityFilterSupport =
   | "unknown"
   | "supported"
@@ -204,7 +215,7 @@ export interface InboxFilterContext {
   /** Issues an agent is running or queued on. Read only by `idleOnly`. */
   readonly activeIssueIds?: ReadonlySet<string>;
   /**
-   * Group key (`issue_id ?? id`) of the open notification, pinned against the
+   * Row key (`inboxRowKey`) of the open notification, pinned against the
    * unread dimension only. Set by the page after opening marks the row read.
    */
   readonly pinnedUnreadKey?: string | null;
@@ -279,7 +290,7 @@ export function filterInboxItems(
         (item.issue_priority != null && priorities.has(item.issue_priority))) &&
       (actors.size === 0 || (actor != null && actors.has(actor)));
     if (!matchesOtherDimensions) return false;
-    const key = item.issue_id ?? item.id;
+    const key = inboxRowKey(item);
     const matchesUnread =
       !filters.unreadOnly ||
       item.read !== true ||

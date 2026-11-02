@@ -154,6 +154,8 @@
       "tooltip": "按分组筛选",
       "needs_you": "仅显示需要我处理的"
     },
-    "show_more_other": "再显示 {{count}} 项"
+    "show_more_other": "再显示 {{count}} 项",
+    "switch_to_classic": "切换到经典视图",
+    "switch_to_smart": "切换到智能视图"
   }
 }
