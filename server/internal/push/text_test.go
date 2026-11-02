@@ -28,6 +28,8 @@ func TestInboxText(t *testing.T) {
 			"MUL-1 · Brand new thing", "T", ""},
 		{"no issue", inboxInfo{typ: "autopilot_paused", title: "Nightly sweep", body: "b"},
 			"Autopilot paused", "Nightly sweep", "b"},
+		{"signal", inboxInfo{typ: "signal", identifier: "CTG-1", title: "Approve merge #3204", body: "long context", summary: "CTG-1 · blocks 3 cards"},
+			"Approve merge #3204", "", "CTG-1 · blocks 3 cards"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

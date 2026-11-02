@@ -25,6 +25,15 @@ var validNotifGroups = map[string]bool{
 	"updates":              true,
 	"agent_activity":       true,
 	"system_notifications": true,
+	// Push toggles for smart-inbox signal groups (contango); see
+	// signalPushEnabled for the defaults.
+	"signal_merge":    true,
+	"signal_decision": true,
+	"signal_access":   true,
+	"signal_stalled":  true,
+	"signal_blocking": true,
+	"signal_alert":    true,
+	"signal_fyi":      true,
 }
 
 // validNotifValues is the set of allowed preference values per group.

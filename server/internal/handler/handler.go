@@ -227,6 +227,9 @@ type Handler struct {
 	PluginService          *service.PluginService
 	IssueService           *service.IssueService
 	AutopilotService       *service.AutopilotService
+	// SmartInboxEmails is the lowercase MULTICA_SMART_INBOX_EMAILS set
+	// (contango smart inbox); empty means nobody gets signals.
+	SmartInboxEmails map[string]bool
 	// Entitlements supplies workspace-scoped commercial gates. A nil provider
 	// preserves self-hosted behavior without extra reads.
 	Entitlements entitlement.Provider
@@ -496,6 +499,7 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 	// a disabled client, which turns the feature off rather than failing.
 	taskSvc.QuickActions = llmClient
 	h := &Handler{
+		SmartInboxEmails:             smartInboxEmailsFromEnv(),
 		Queries:                      queries,
 		ReadSelector:                 dbreader.NewPrimaryOnly(queries),
 		DB:                           executor,

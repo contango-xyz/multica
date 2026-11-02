@@ -85,6 +85,7 @@ func registerListeners(bus *events.Bus, b realtime.Broadcaster) {
 		protocol.EventInboxUnarchived:    true,
 		protocol.EventInboxBatchRead:     true,
 		protocol.EventInboxBatchArchived: true,
+		protocol.EventInboxUpdated:       true,
 		protocol.EventInvitationCreated:  true,
 		protocol.EventInvitationRevoked:  true,
 		protocol.EventChatSessionCreated: true,
@@ -123,6 +124,7 @@ func registerListeners(bus *events.Bus, b realtime.Broadcaster) {
 	for _, eventType := range []string{
 		protocol.EventInboxRead, protocol.EventInboxArchived, protocol.EventInboxUnarchived,
 		protocol.EventInboxBatchRead, protocol.EventInboxBatchArchived,
+		protocol.EventInboxUpdated,
 	} {
 		bus.Subscribe(eventType, func(e events.Event) {
 			payload, ok := e.Payload.(map[string]any)

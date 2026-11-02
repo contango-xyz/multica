@@ -49,6 +49,9 @@ const (
 	EventInboxUnarchived    = "inbox:unarchived"
 	EventInboxBatchRead     = "inbox:batch-read"
 	EventInboxBatchArchived = "inbox:batch-archived"
+	// EventInboxUpdated: an existing item changed in place without a new
+	// notification (contango smart-inbox signals). Clients refetch the inbox.
+	EventInboxUpdated = "inbox:updated"
 
 	// Workspace events
 	EventWorkspaceUpdated = "workspace:updated"

@@ -11,6 +11,7 @@ type inboxInfo struct {
 	title      string // the issue title for issue items
 	body       string
 	to         string // details.to for *_changed items
+	summary    string // details.summary for signal items
 }
 
 // Labels match the web inbox ("types" in locales/en/inbox.json) for types
@@ -50,6 +51,11 @@ var inboxChangeFields = map[string]string{
 // inboxText lays a push out as "<ID> · <what happened>" / issue title /
 // detail, so the lock screen shows which ticket and why at a glance.
 func inboxText(in inboxInfo) (title, subtitle, body string) {
+	// Smart-inbox signals (contango) carry their own two lines: what to do and
+	// why it's here.
+	if in.typ == "signal" {
+		return in.title, "", in.summary
+	}
 	what := ""
 	body = in.body
 	if v, ok := inboxActorVerbs[in.typ]; ok {

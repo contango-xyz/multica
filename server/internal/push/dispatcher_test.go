@@ -135,6 +135,24 @@ func TestInboxNewStatusChangeUsesDetails(t *testing.T) {
 	}
 }
 
+func TestInboxNewSignalUsesTitleAndSummary(t *testing.T) {
+	item := memberItem()
+	item["type"] = "signal"
+	item["title"] = "Approve merge #3204"
+	item["body"] = "long context"
+	item["details"] = map[string]any{"key": "k", "group": "merge", "summary": "CTG-1 · blocks 3 cards",
+		"actions": []any{map[string]any{"label": "Open PR", "url": "https://example.com"}}, "rank": map[string]any{"priority": "high"}}
+	store := &fakeStore{devices: map[string][]Device{"u1": {{Token: "a"}}}}
+	sender := &fakeSender{}
+	d := newTestDispatcher(store, sender)
+	d.onInboxNew(inboxEvent(item))
+	drain(d)
+	n := sender.got[0].n
+	if n.Title != "Approve merge #3204" || n.Subtitle != "" || n.Body != "CTG-1 · blocks 3 cards" {
+		t.Fatalf("notification = %+v", n)
+	}
+}
+
 func TestInboxNewDegradesWhenLookupsFail(t *testing.T) {
 	item := memberItem()
 	item["issue_id"] = "missing"
