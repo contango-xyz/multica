@@ -86,7 +86,8 @@ its summary (the section header already names the group) and a needs-you row get
 right pane is Classic's detail; for a signal, a compact brief (ask, summary, reason, body, action
 buttons) sits above the issue thread, so nothing is lost; a mention's pane is exactly Classic's. The
 header is Classic's (filters, bulk menu, archive entry) plus the group filter and the Smart/Classic
-toggle as one icon button. A signal and a mention on the same issue are separate rows: signals key
+toggle as one icon button. The list pane starts at 400 px (min 360, max 640, resizable, remembered
+separately from Classic's 260 px) and Smart row titles wrap to two lines; badges stay on the right. A signal and a mention on the same issue are separate rows: signals key
 on their own id (`inboxRowKey`), other rows on their issue as before. The archived view stays Classic.
 Below 1024 px the single-column flow described next is unchanged (list → focused detail → back).
 
