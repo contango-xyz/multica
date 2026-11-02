@@ -38,6 +38,7 @@ export function useTypeLabels(): Record<InboxItemType, string> {
     autopilot_paused: t(($) => $.types.autopilot_paused),
     autopilot_quota_exceeded: t(($) => $.types.autopilot_quota_exceeded),
     children_done: t(($) => $.types.children_done),
+    signal: t(($) => $.types.signal),
   };
 }
 
@@ -143,6 +144,9 @@ export function InboxDetailLabel({ item }: { item: InboxItem }) {
       if (stage) return <span>{t(($) => $.labels.children_done_stage, { stage })}</span>;
       return <span>{typeLabels[item.type]}</span>;
     }
+    case "signal":
+      // Smart-inbox signal (contango): line 2 is the feeder's "why it's here".
+      return <span>{details.summary || typeLabels[item.type]}</span>;
     default:
       return <span>{typeLabels[item.type] ?? item.type}</span>;
   }

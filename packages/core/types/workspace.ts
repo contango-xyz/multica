@@ -79,6 +79,8 @@ export interface User {
   timezone: string | null;
   created_at: string;
   updated_at: string;
+  /** Smart inbox enabled for this user on the server (contango). */
+  smart_inbox?: boolean;
 }
 
 export interface MemberWithUser {

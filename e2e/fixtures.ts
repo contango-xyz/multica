@@ -465,6 +465,29 @@ export class TestApiClient {
     return this.email;
   }
 
+  async getMe(): Promise<{ id: string; email: string; smart_inbox?: boolean }> {
+    const res = await this.authedFetch("/api/me");
+    if (!res.ok) throw new Error(`getMe failed: ${res.status}`);
+    return res.json();
+  }
+
+  // contango smart inbox: raise a signal for a member (caller must be admin).
+  async upsertInboxSignal(body: Record<string, unknown>): Promise<number> {
+    const res = await this.authedFetch("/api/inbox/signals", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return res.status;
+  }
+
+  async resolveInboxSignal(body: { recipient_member_id: string; key: string }): Promise<number> {
+    const res = await this.authedFetch("/api/inbox/signals/resolve", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return res.status;
+  }
+
   private async authedFetch(path: string, init?: RequestInit) {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",

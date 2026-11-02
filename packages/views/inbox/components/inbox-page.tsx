@@ -7,6 +7,7 @@ import {
   useDeferredValue,
   useMemo,
   useRef,
+  type ReactNode,
 } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -115,7 +116,12 @@ const INBOX_LIST_DEFAULT_SIZE = 260;
 const INBOX_LIST_MIN_SIZE = 240;
 const INBOX_LIST_MAX_SIZE = 400;
 
-export function InboxPage() {
+export function InboxPage({
+  headerAccessory,
+}: {
+  /** Extra header control; the contango smart-inbox toggle when enabled. */
+  headerAccessory?: ReactNode;
+} = {}) {
   const queryClient = useQueryClient();
   const { t } = useT("inbox");
   const { t: tCommon } = useT("common");
@@ -599,6 +605,7 @@ export function InboxPage() {
           />
         )}
       </div>
+      {headerAccessory}
       <InboxFilterMenu
         wsId={wsId}
         items={viewItems}
