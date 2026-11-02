@@ -38,16 +38,32 @@ test("smart inbox works at phone width", async ({ page }) => {
     localStorage.setItem("multica:chat:isOpen", "false");
   }, token);
   await page.goto(`/${slug}/inbox?smart-inbox=1`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: /Waiting on you/ })).toBeVisible({ timeout: 30000 });
+  // Sections by group, with count and the top entry's reason.
+  const merge = page.getByRole("region", { name: /Merge approvals/ });
+  await expect(merge).toBeVisible({ timeout: 30000 });
+  await expect(merge.getByRole("heading", { level: 2 })).toContainText(/Merge approvals · \d+ · Urgent · blocks 3/);
+  await expect(page.getByRole("heading", { name: /Waiting on you/ })).toHaveCount(0);
   const row = page.getByRole("button", { name: new RegExp(title) });
   await expect(row).toBeVisible();
+  await expect(merge.getByRole("img", { name: "Needs you" }).first()).toBeVisible();
+
+  // Classic's header tools are still there, plus the group filter.
+  await expect(page.getByRole("button", { name: "Filter inbox" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Filter by group" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Inbox actions" })).toBeVisible();
+  // Section actions and the per-row archive are reachable by touch at 44px.
+  const sectionMenu = merge.getByRole("button", { name: "Section actions" });
+  expect((await sectionMenu.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  const rowArchive = merge.getByRole("listitem").filter({ hasText: title }).getByRole("button", { name: "Archive" });
+  await expect(rowArchive).toBeVisible();
+  expect((await rowArchive.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
   const noHorizontalScroll = () =>
     page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   expect(await noHorizontalScroll()).toBe(true);
   const rowBox = await row.boundingBox();
   expect(rowBox?.height ?? 0).toBeGreaterThanOrEqual(44);
-  const action = page.getByRole("button", { name: "Open PR" });
+  const action = merge.getByRole("listitem").filter({ hasText: title }).getByRole("button", { name: "Open PR" });
   expect((await action.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   await page.screenshot({ path: "test-results/smart-inbox-390-list.png", fullPage: true });
 
@@ -58,6 +74,6 @@ test("smart inbox works at phone width", async ({ page }) => {
 
   // The remembered opt-in survives a reload without the param.
   await page.goto(`/${slug}/inbox`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: /Waiting on you/ })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("region", { name: /Merge approvals/ })).toBeVisible({ timeout: 30000 });
   expect(await api.resolveInboxSignal({ recipient_member_id: me.id, key })).toBe(200);
 });

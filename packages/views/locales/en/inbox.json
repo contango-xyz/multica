@@ -126,13 +126,13 @@
     "smart": "Smart",
     "classic": "Classic",
     "sections": {
-      "waiting": "Waiting on you",
       "merge": "Merge approvals",
       "decision": "Decisions",
       "access": "Access & funding",
       "stalled": "Stalled",
       "blocking": "Blocking others",
       "alert": "Alerts",
+      "mentions": "Mentions & reviews",
       "fyi": "FYI"
     },
     "priority": {
@@ -147,6 +147,17 @@
     "open": "Open",
     "open_issue": "Open issue",
     "back": "Inbox",
-    "empty": "Nothing needs you right now"
+    "empty": "Nothing needs you right now",
+    "needs_you": "Needs you",
+    "bulk_menu": "Inbox actions",
+    "section_actions": "Section actions",
+    "mark_section_read": "Mark read",
+    "archive_section": "Archive all",
+    "filters": {
+      "tooltip": "Filter by group",
+      "needs_you": "Needs my action only"
+    },
+    "show_more_one": "Show {{count}} more",
+    "show_more_other": "Show {{count}} more"
   }
 }
