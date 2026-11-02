@@ -45,11 +45,15 @@ vi.mock("@multica/core/inbox/mutations", () => ({
   useArchiveAllReadInbox: () => archiveAllRead,
   useArchiveCompletedInbox: () => archiveCompleted,
 }));
-vi.mock("@multica/core/inbox/queries", () => ({
-  inboxListOptions: () => ({}),
-  deduplicateInboxItems: (list: InboxItem[]) => list.filter((i) => !i.archived),
-  useInboxUnreadCount: () => 2,
-}));
+vi.mock("@multica/core/inbox/queries", async () => {
+  const actual = await vi.importActual<typeof import("@multica/core/inbox/queries")>("@multica/core/inbox/queries");
+  return {
+    inboxListOptions: () => ({}),
+    // The real per-issue grouping, so signal/mention interplay is covered.
+    deduplicateInboxItems: actual.deduplicateInboxItems,
+    useInboxUnreadCount: () => 2,
+  };
+});
 vi.mock("../../issues/surface/activity", () => ({
   useIssueSurfaceActivity: () => ({ activityByIssueId: new Map() }),
 }));
@@ -199,6 +203,18 @@ describe("SmartInboxPage", () => {
     fireEvent.click(within(decision).getByRole("button", { name: "smart.section_actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "smart.archive_section" }));
     expect(archive.mutateAsync.mock.calls.map((c) => c[0]).sort()).toEqual(["dec", "dec2"]);
+  });
+
+  it("shows a signal in its section and the mention on the same issue under Mentions", () => {
+    items = [
+      base({ id: "m", type: "mentioned", title: "Tagged", body: "@you approve?", issue_id: "issue-9", actor_type: "agent", actor_id: "brooks", created_at: hoursAgo(2) }),
+      sig("s", "merge", { priority: "high", since: hoursAgo(2) }, { issue_id: "issue-9", created_at: hoursAgo(0.1) }),
+    ];
+    renderPage();
+    const merge = screen.getByRole("region", { name: /sections\.merge/ });
+    expect(within(merge).getByRole("listitem")).toHaveTextContent("Signal s");
+    const mentions = screen.getByRole("region", { name: /sections\.mentions/ });
+    expect(within(mentions).getByRole("listitem")).toHaveTextContent("@you approve?");
   });
 
   it("archives a single row", () => {

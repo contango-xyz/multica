@@ -5,6 +5,7 @@ import { buildIssueStatusCatalog } from "@multica/core/issue-statuses";
 import type { InboxItem, IssueStatusEntry } from "@multica/core/types";
 import { NavigationProvider } from "../../navigation";
 import type { NavigationAdapter } from "../../navigation";
+import { deduplicateInboxItems } from "@multica/core/inbox/queries";
 import { InboxListItem } from "./inbox-list-item";
 
 // The catalog is server state; these suites render leaves without a
@@ -423,6 +424,24 @@ describe("InboxListItem status glyph", () => {
 });
 
 describe("InboxListItem smart-inbox signal sender", () => {
+  it("shows the agent who tagged you when the issue also has a newer signal", () => {
+    const [row] = deduplicateInboxItems([
+      item({ id: "mention", type: "mentioned", actor_type: "agent", actor_id: "brooks", created_at: "2026-06-15T08:00:00Z" }),
+      item({
+        id: "signal",
+        type: "signal",
+        actor_type: "system",
+        actor_id: null,
+        created_at: "2026-06-15T09:00:00Z",
+        details: { key: "k", group: "merge", summary: "why" } as unknown as InboxItem["details"],
+      }),
+    ]);
+    renderRow({ item: row!, view: "inbox" });
+    const avatar = screen.getByTestId("actor-avatar");
+    expect(avatar).toHaveAttribute("data-actor-type", "agent");
+    expect(avatar).toHaveAttribute("data-actor-id", "brooks");
+  });
+
   const signalDetails = {
     key: "k",
     group: "merge",
