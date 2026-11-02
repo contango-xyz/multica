@@ -77,6 +77,19 @@ priority weight (urgent 8, high 4, medium 2, low/none 1) × (1 + blocks) × age 
 recomputed every minute; non-signal entries use the issue priority and their own age. Signals are one
 row each; other entries are grouped per issue like Classic.
 
+**Classic++ (third revision, 2026-11-02, owner: "it should look like classic++"):** from 1024 px up
+(Classic's own two-pane breakpoint) Smart IS the Classic page: list on the left, the selected item's
+detail on the right, selection only rewrites `?issue=` on the same route. The list is Smart's sections
+(below) over Classic's own rows (`InboxListItem`): avatar of whoever poked you (system mark for a
+signal-only row), status icon, agent-working badge, unread dot, time, title; a signal row's line 2 is
+its summary (the section header already names the group) and a needs-you row gets the amber bar. The
+right pane is Classic's detail; for a signal, a compact brief (ask, summary, reason, body, action
+buttons) sits above the issue thread, so nothing is lost; a mention's pane is exactly Classic's. The
+header is Classic's (filters, bulk menu, archive entry) plus the group filter and the Smart/Classic
+toggle as one icon button. A signal and a mention on the same issue are separate rows: signals key
+on their own id (`inboxRowKey`), other rows on their issue as before. The archived view stays Classic.
+Below 1024 px the single-column flow described next is unchanged (list → focused detail → back).
+
 **Layout (revised 2026-11-02 after the owner's first look):** one section per kind — Merge approvals,
 Decisions, Access & funding, Stalled, Blocking others, Alerts (the signal groups), Mentions & reviews
 (`mentioned` / `review_requested` entries) and FYI (fyi signals and every other entry). There is no
