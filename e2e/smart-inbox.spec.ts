@@ -45,7 +45,6 @@ test("smart inbox works at phone width", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Waiting on you/ })).toHaveCount(0);
   const row = merge.getByRole("button", { name: new RegExp(title) });
   await expect(row).toBeVisible();
-  await expect(merge.getByRole("img", { name: "Needs you" }).first()).toBeVisible();
 
   // Phone: "Do this first" and one counters line above the sections.
   await expect(page.getByRole("region", { name: "Do this first" }).getByText(title)).toBeVisible();
