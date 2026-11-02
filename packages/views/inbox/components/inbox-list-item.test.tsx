@@ -513,6 +513,20 @@ describe("InboxListItem smart priority badge and age tint", () => {
     expect(none.container.querySelector(".bg-destructive\\/15, .bg-priority-high\\/15")).toBeNull();
   });
 
+  it("lets a smart row's title wrap to two lines and keeps the badge on the right", () => {
+    const { container, unmount } = renderWith({ inSmartSection: true, priority: "urgent", item: item({ title: "A long title" }) });
+    const titleEl = Array.from(container.querySelectorAll("span")).find((el) => el.textContent === "A long title")!;
+    expect(titleEl.className).toContain("line-clamp-2");
+    expect(titleEl.className).not.toContain("truncate");
+    const badge = container.querySelector(".bg-destructive\\/15")!;
+    // The badge sits in the right-hand cluster, not beside the title.
+    expect(titleEl.parentElement!.contains(badge)).toBe(false);
+    unmount();
+    const classic = renderWith({ item: item({ title: "A long title" }) });
+    const classicTitle = Array.from(classic.container.querySelectorAll("span")).find((el) => el.textContent === "A long title")!;
+    expect(classicTitle.className).toContain("truncate");
+  });
+
   it("tints the age amber or red", () => {
     const amber = renderWith({ ageTint: "amber" });
     expect(amber.container.querySelector('[data-age-tint="amber"]')!.className).toContain("text-warning");
