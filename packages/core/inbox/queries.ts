@@ -224,20 +224,32 @@ function groupInboxItemsByIssue(items: InboxItem[]): InboxItem[] {
     );
     const newest = group[0];
     if (!newest) continue;
+    // What the row SHOWS (sender, title, preview, time) is the newest entry a
+    // person or agent caused. A contango smart-inbox signal is refreshed by
+    // the ops feeder on exactly the issues where someone tagged you, so as the
+    // newest row it would hide that sender behind the system one. A group of
+    // signals only still shows its newest signal. Identity and state (id,
+    // read, archived) stay the newest row's, so read/archive act on the group
+    // exactly as before.
+    const shown = group.find((item) => item.type !== "signal") ?? newest;
+    const row: InboxItem =
+      shown === newest
+        ? newest
+        : { ...shown, id: newest.id, read: newest.read, archived: newest.archived };
 
     const commentId =
-      newest.details?.comment_id ??
+      row.details?.comment_id ??
       group.find((item) => item.details?.comment_id)?.details?.comment_id;
 
-    if (commentId && newest.details?.comment_id !== commentId) {
+    if (commentId && row.details?.comment_id !== commentId) {
       merged.push({
-        ...newest,
-        details: { ...(newest.details ?? {}), comment_id: commentId },
+        ...row,
+        details: { ...(row.details ?? {}), comment_id: commentId },
       });
       continue;
     }
 
-    merged.push(newest);
+    merged.push(row);
   }
   return merged.sort(
     (a, b) =>
