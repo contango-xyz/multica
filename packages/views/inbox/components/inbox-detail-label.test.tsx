@@ -149,3 +149,26 @@ describe("InboxDetailLabel localized values", () => {
     expect(container.textContent).not.toContain("Aug");
   });
 });
+
+describe("InboxDetailLabel smart-inbox signals", () => {
+  it("names the group as the sender, then the summary", () => {
+    const { container } = render(
+      <InboxDetailLabel
+        item={item({
+          type: "signal",
+          details: { key: "k", group: "stalled", summary: "no update for 6 h" } as unknown as InboxItem["details"],
+        })}
+      />,
+    );
+    expect(container.textContent).toBe(`${en.smart.sections.stalled} · no update for 6 h`);
+  });
+
+  it("shows the group alone without a summary", () => {
+    const { container } = render(
+      <InboxDetailLabel
+        item={item({ type: "signal", details: { key: "k", group: "alert" } as unknown as InboxItem["details"] })}
+      />,
+    );
+    expect(container.textContent).toBe(en.smart.sections.alert);
+  });
+});

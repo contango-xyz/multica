@@ -4,6 +4,7 @@ import { useIssueStatuses } from "@multica/core/issue-statuses/hooks";
 import { formatDateOnly } from "@multica/core/issues/date";
 import { useActorName } from "@multica/core/workspace/hooks";
 import { StatusIcon, PriorityIcon } from "../../issues/components";
+import { signalDetails } from "@multica/core/inbox/smart";
 import type { InboxItem, InboxItemType, IssueStatus, IssuePriority } from "@multica/core/types";
 import { getQuickCreateOutcomeDetail } from "./inbox-display";
 import { useLocale, useT } from "../../i18n";
@@ -144,9 +145,13 @@ export function InboxDetailLabel({ item }: { item: InboxItem }) {
       if (stage) return <span>{t(($) => $.labels.children_done_stage, { stage })}</span>;
       return <span>{typeLabels[item.type]}</span>;
     }
-    case "signal":
-      // Smart-inbox signal (contango): line 2 is the feeder's "why it's here".
-      return <span>{details.summary || typeLabels[item.type]}</span>;
+    case "signal": {
+      // Smart-inbox signal (contango): the group names the system sender
+      // ("Stalled"), then the feeder's "why it's here".
+      const signal = signalDetails(item);
+      const group = signal ? t(($) => $.smart.sections[signal.group]) : typeLabels[item.type];
+      return <span>{signal?.summary ? `${group} · ${signal.summary}` : group}</span>;
+    }
     default:
       return <span>{typeLabels[item.type] ?? item.type}</span>;
   }
