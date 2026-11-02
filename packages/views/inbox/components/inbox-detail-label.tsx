@@ -49,7 +49,14 @@ function shortDate(dateStr: string, locale: string): string {
   return formatDateOnly(dateStr, { month: "short", day: "numeric" }, locale);
 }
 
-export function InboxDetailLabel({ item }: { item: InboxItem }) {
+export function InboxDetailLabel({
+  item,
+  signalGroup = true,
+}: {
+  item: InboxItem;
+  /** Prefix a signal's summary with its group; off where a section header names it. */
+  signalGroup?: boolean;
+}) {
   const { t } = useT("inbox");
   const { t: tIssues } = useT("issues");
   const locale = useLocale();
@@ -150,7 +157,8 @@ export function InboxDetailLabel({ item }: { item: InboxItem }) {
       // ("Stalled"), then the feeder's "why it's here".
       const signal = signalDetails(item);
       const group = signal ? t(($) => $.smart.sections[signal.group]) : typeLabels[item.type];
-      return <span>{signal?.summary ? `${group} · ${signal.summary}` : group}</span>;
+      if (!signal?.summary) return <span>{group}</span>;
+      return <span>{signalGroup ? `${group} · ${signal.summary}` : signal.summary}</span>;
     }
     default:
       return <span>{typeLabels[item.type] ?? item.type}</span>;

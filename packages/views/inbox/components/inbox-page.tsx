@@ -44,6 +44,7 @@ import {
 } from "@multica/core/inbox/mutations";
 import {
   filterInboxItems,
+  inboxRowKey,
   inboxFiltersForArchive,
   inboxFiltersForPrioritySupport,
   inboxFilterCount,
@@ -110,15 +111,31 @@ import {
   resolveDetailItem,
 } from "./inbox-display";
 import { AutopilotQuotaNotice } from "./autopilot-quota-notice";
+import { buildSmartSections, type SmartEntry } from "@multica/core/inbox/smart";
+import {
+  filterSmartSections,
+  smartInboxFilterCount,
+  useSmartInboxFilters,
+} from "@multica/core/inbox/smart-filter-store";
+import { SignalBrief, SmartFilterMenu } from "./smart-inbox";
+import { SmartInboxList } from "./smart-inbox-list";
+import { smartInboxItems } from "./smart-items";
 import { useT } from "../../i18n";
 import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade-prompt";
 
 
 export function InboxPage({
   headerAccessory,
+  smart = false,
 }: {
   /** Extra header control; the contango smart-inbox toggle when enabled. */
   headerAccessory?: ReactNode;
+  /**
+   * contango smart inbox, two-pane layout: the main list is grouped into
+   * Smart's ranked sections over the same rows, and a signal's detail adds
+   * its brief above the issue thread. The archive stays classic.
+   */
+  smart?: boolean;
 } = {}) {
   const queryClient = useQueryClient();
   const { t } = useT("inbox");
@@ -160,7 +177,10 @@ export function InboxPage({
   const { data: rawItems = [], isLoading: loading } = useQuery({
     ...inboxListOptions(wsId), enabled: !isArchivedView,
   });
-  const items = useMemo(() => deduplicateInboxItems(rawItems), [rawItems]);
+  const items = useMemo(
+    () => (smart ? smartInboxItems(rawItems) : deduplicateInboxItems(rawItems)),
+    [rawItems, smart],
+  );
   const archiveQuery = useInfiniteQuery({
     ...archivedInboxPagesOptions(wsId, filters), enabled: isArchivedView,
   });
@@ -200,12 +220,43 @@ export function InboxPage({
     () => ({ activeIssueIds: idleFilterIssueIds, pinnedUnreadKey, pinnedIdleKey }),
     [idleFilterIssueIds, pinnedUnreadKey, pinnedIdleKey],
   );
-  const filteredItems = useMemo(
+  const classicFilteredItems = useMemo(
     () => filterInboxItems(viewItems, effectiveFilters, filterContext),
     [viewItems, effectiveFilters, filterContext],
   );
+  // Smart: ranked sections over the filtered rows. Re-ranked every minute so
+  // waiting entries climb while the page is open.
+  const smartFilters = useSmartInboxFilters(wsId);
+  const [rankNow, setRankNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!smart) return;
+    const id = setInterval(() => setRankNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [smart]);
+  const smartSections = useMemo(
+    () =>
+      smart && !isArchivedView
+        ? filterSmartSections(buildSmartSections(classicFilteredItems, rankNow), smartFilters)
+        : null,
+    [smart, isArchivedView, classicFilteredItems, rankNow, smartFilters],
+  );
+  // Selection walks the rows in the order the list shows them.
+  const filteredItems = useMemo(
+    () =>
+      smartSections
+        ? smartSections.flatMap((section) => section.entries.map((entry) => entry.item))
+        : classicFilteredItems,
+    [smartSections, classicFilteredItems],
+  );
+  const smartEntryById = useMemo(() => {
+    const byId = new Map<string, SmartEntry>();
+    for (const section of smartSections ?? []) {
+      for (const entry of section.entries) byId.set(entry.item.id, entry);
+    }
+    return byId;
+  }, [smartSections]);
   const hasActiveFilters = inboxFilterCount(effectiveFilters) > 0;
-  const selectedOnPage = viewItems.find((i) => (i.issue_id ?? i.id) === selectedKey);
+  const selectedOnPage = viewItems.find((i) => inboxRowKey(i) === selectedKey);
   // A deep link can point beyond every loaded page. Resolve its group directly
   // without adding it to the cursor chain or mistaking a page miss for a 404.
   const lookup = useQuery({
@@ -232,8 +283,8 @@ export function InboxPage({
     setPrevInboxZeroCount(inboxZeroCount);
     setInboxZeroRises(prevInboxZeroCount > 0 && inboxZeroCount === 0);
   }
-  const selected = selectionItems.find((i) => (i.issue_id ?? i.id) === selectedKey) ?? null;
-  const selectedInView = selectedOnPage ?? (isArchivedView ? lookupItems.find((i) => (i.issue_id ?? i.id) === selectedKey) : null);
+  const selected = selectionItems.find((i) => inboxRowKey(i) === selectedKey) ?? null;
+  const selectedInView = selectedOnPage ?? (isArchivedView ? lookupItems.find((i) => inboxRowKey(i) === selectedKey) : null);
   const selectionFilteredOut = !!selectedKey && !!selectedInView && !selected;
 
   // What the DETAIL pane shows, one React transition behind the click.
@@ -437,7 +488,7 @@ export function InboxPage({
   // by issue) and a fresh mount with a cleared memento entry lands by itself.
   const [highlightRequestToken, setHighlightRequestToken] = useState(0);
   const handleSelect = (item: InboxItem) => {
-    const nextKey = item.issue_id ?? item.id;
+    const nextKey = inboxRowKey(item);
     // Every click on a notification row is a fresh deep-link intent: clear
     // the "highlight already landed" memento entry so the comment jump runs
     // again even if this issue's detail was opened (and its landing
@@ -488,13 +539,13 @@ export function InboxPage({
   const advanceSelectionPast = (id: string, list: InboxItem[]) => {
     const idx = list.findIndex((i) => i.id === id);
     const target = idx >= 0 ? list[idx] : null;
-    const wasSelected = !!target && (target.issue_id ?? target.id) === selectedKey;
+    const wasSelected = !!target && inboxRowKey(target) === selectedKey;
     if (!wasSelected) return;
     // List is sorted newest-first; prefer the next (older) item, fall back
     // to the previous (newer) one when actioning at the bottom, and only
     // clear the selection when nothing else is left.
     const next = list[idx + 1] ?? list[idx - 1] ?? null;
-    setSelectedKey(next ? (next.issue_id ?? next.id) : "");
+    setSelectedKey(next ? inboxRowKey(next) : "");
   };
 
   // Toasts live in these shared handlers so every archive surface confirms alike.
@@ -521,6 +572,23 @@ export function InboxPage({
             ? err.message
             : t(($) => $.errors.unarchive_failed),
         ),
+    });
+  };
+
+  // Smart section actions: one toast for the whole section.
+  const archiveMutateAsync = archiveMutation.mutateAsync;
+  const markReadMutateAsync = markReadMutation.mutateAsync;
+  const handleArchiveSection = (entries: SmartEntry[]) => {
+    if (entries.some((entry) => inboxRowKey(entry.item) === selectedKey)) setSelectedKey("");
+    void Promise.allSettled(entries.map((entry) => archiveMutateAsync(entry.item.id))).then((results) => {
+      if (results.some((r) => r.status === "rejected")) toast.error(t(($) => $.errors.archive_failed));
+      else toast.success(t(($) => $.toasts.archived));
+    });
+  };
+  const handleMarkSectionRead = (entries: SmartEntry[]) => {
+    const unread = entries.filter((entry) => !entry.item.read);
+    void Promise.allSettled(unread.map((entry) => markReadMutateAsync(entry.item.id))).then((results) => {
+      if (results.some((r) => r.status === "rejected")) toast.error(t(($) => $.errors.mark_read_failed));
     });
   };
 
@@ -573,7 +641,7 @@ export function InboxPage({
   };
 
   const handleArchiveAllRead = () => {
-    const readKeys = items.filter((i) => i.read).map((i) => i.issue_id ?? i.id);
+    const readKeys = items.filter((i) => i.read).map((i) => inboxRowKey(i));
     if (readKeys.includes(selectedKey)) setSelectedKey("");
     archiveAllReadMutation.mutate(undefined, {
       onError: (err) =>
@@ -686,6 +754,7 @@ export function InboxPage({
         activeIssueIds={activeIssueIds}
         archived={isArchivedView}
       />
+      {smartSections && <SmartFilterMenu wsId={wsId} />}
       {/* Batch actions are main-view only. Every entry archives from the MAIN
           inbox, so offering them while the archived list is on screen reads as
           "archive all of these" and does the opposite of what it looks like. */}
@@ -745,6 +814,22 @@ export function InboxPage({
         onAction: isArchivedView ? handleUnarchive : handleArchive,
       }}
     >
+      {smartSections ? (
+        <SmartInboxList
+          sections={smartSections}
+          selectedKey={selectedKey}
+          onSelect={handleSelect}
+          onAction={handleArchive}
+          onArchiveSection={handleArchiveSection}
+          onMarkSectionRead={handleMarkSectionRead}
+          onOpenArchived={openArchived}
+          emptyLabel={
+            hasActiveFilters || smartInboxFilterCount(smartFilters) > 0
+              ? t(($) => $.filters.empty)
+              : undefined
+          }
+        />
+      ) : (
       <InboxList
         items={visibleItems}
         view={view}
@@ -771,6 +856,7 @@ export function InboxPage({
           ) : undefined
         }
       />
+      )}
     </InboxContextMenuProvider>
   );
 
@@ -823,7 +909,7 @@ export function InboxPage({
     </div>
   ) : null;
 
-  const detailContent = detailItem?.issue_id ? (
+  const classicDetailContent = detailItem?.issue_id ? (
     // Key by issue_id (not inbox-item id): a new comment/reaction generates a
     // new inbox notification for the same issue, and the dedup helper picks the
     // newest one — keying on its id would remount IssueDetail on every event,
@@ -987,6 +1073,26 @@ export function InboxPage({
       </div>
     </div>
   ) : null;
+
+  // Smart: a signal's brief (the ask, why it ranks here, its actions) sits
+  // compactly above the classic detail, so the thread is still one click away.
+  const detailSignalEntry =
+    smart && detailItem?.type === "signal" ? smartEntryById.get(detailItem.id) ?? null : null;
+  const detailContent =
+    detailSignalEntry && classicDetailContent ? (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="max-h-[40%] shrink-0 overflow-y-auto border-b px-6 py-3">
+          <SignalBrief
+            entry={detailSignalEntry}
+            compact
+            showTitleAndBody={!!detailItem?.issue_id}
+          />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col">{classicDetailContent}</div>
+      </div>
+    ) : (
+      classicDetailContent
+    );
 
   // -- Compact layout: list / detail toggle -----------------------------------
 

@@ -11,10 +11,12 @@ vi.mock("@multica/core/auth", () => {
 });
 vi.mock("../../i18n", () => ({ useT: () => ({ t: () => "label" }) }));
 vi.mock("./inbox-page", () => ({
-  InboxPage: ({ headerAccessory }: { headerAccessory?: ReactNode }) => (
-    <div data-testid="classic">{headerAccessory}</div>
+  InboxPage: ({ headerAccessory, smart }: { headerAccessory?: ReactNode; smart?: boolean }) => (
+    <div data-testid={smart ? "smart-two-pane" : "classic"}>{headerAccessory}</div>
   ),
 }));
+let compact = true;
+vi.mock("@multica/ui/hooks/use-mobile", () => ({ useIsCompact: () => compact }));
 vi.mock("./smart-inbox", () => ({
   SmartInboxPage: ({ headerAccessory }: { headerAccessory?: ReactNode }) => (
     <div data-testid="smart">{headerAccessory}</div>
@@ -40,7 +42,10 @@ function renderAt(query: string) {
 }
 
 describe("InboxEntryPage", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    compact = true;
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it("is classic without a toggle for users the server has not enabled", () => {
@@ -77,10 +82,30 @@ describe("InboxEntryPage", () => {
     expect(localStorage.getItem("multica:smart-inbox")).toBeNull();
   });
 
-  it("keeps the archive sub-view in classic", () => {
+  it("uses Classic's two panes with smart sections from tablet width up", () => {
+    user = { smart_inbox: true };
+    compact = false;
+    renderAt("smart-inbox=1");
+    expect(screen.getByTestId("smart-two-pane")).not.toBeEmptyDOMElement();
+    expect(screen.queryByTestId("smart")).toBeNull();
+  });
+
+  it("toggles with a single icon button in the two-pane header", () => {
+    user = { smart_inbox: true };
+    compact = false;
+    renderAt("smart-inbox=1");
+    const toggle = screen.getByRole("button", { pressed: true });
+    fireEvent.click(toggle);
+    expect(screen.getByTestId("classic")).not.toBeEmptyDOMElement();
+    expect(screen.getByRole("button", { pressed: false })).toBeInTheDocument();
+    expect(localStorage.getItem("multica:smart-inbox")).toBe("classic");
+  });
+
+  it("keeps the archive sub-view in the classic layout (the page renders it classic)", () => {
     user = { smart_inbox: true };
     renderAt("smart-inbox=1&view=archived");
-    expect(screen.getByTestId("classic")).not.toBeEmptyDOMElement();
+    expect(screen.getByTestId("smart-two-pane")).not.toBeEmptyDOMElement();
+    expect(screen.queryByTestId("smart")).toBeNull();
   });
 
   it("still works when storage throws", () => {

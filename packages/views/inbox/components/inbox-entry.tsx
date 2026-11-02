@@ -14,6 +14,9 @@ import {
   type SmartInboxMode,
 } from "@multica/core/inbox/smart";
 import { Button } from "@multica/ui/components/ui/button";
+import { useIsCompact } from "@multica/ui/hooks/use-mobile";
+import { IconButton } from "@multica/ui/components/common/icon-button";
+import { Sparkles } from "lucide-react";
 import { useNavigation } from "../../navigation";
 import { useT } from "../../i18n";
 import { InboxPage as ClassicInboxPage } from "./inbox-page";
@@ -66,6 +69,24 @@ function InboxModeToggle({
   onChange: (m: SmartInboxMode) => void;
 }) {
   const { t } = useT("inbox");
+  const isCompact = useIsCompact();
+  if (!isCompact) {
+    // The two-pane list header is narrow and also carries Classic's filter
+    // and bulk menus, so the toggle is one icon button there.
+    const next = mode === "smart" ? "classic" : "smart";
+    return (
+      <IconButton
+        label={next === "classic" ? t(($) => $.smart.switch_to_classic) : t(($) => $.smart.switch_to_smart)}
+        tooltipSide="bottom"
+        variant={mode === "smart" ? "secondary" : "ghost"}
+        aria-pressed={mode === "smart"}
+        className="text-muted-foreground"
+        onClick={() => onChange(next)}
+      >
+        <Sparkles className="size-4" />
+      </IconButton>
+    );
+  }
   return (
     <div role="group" aria-label={t(($) => $.smart.toggle_aria)} className="flex shrink-0 rounded-md border p-0.5">
       {(["smart", "classic"] as const).map((m) => (
@@ -90,10 +111,14 @@ export function InboxEntryPage() {
   const [mode, setMode] = useSmartInboxMode();
   const { searchParams } = useNavigation();
   const archived = searchParams.get("view") === ARCHIVED_VIEW_PARAM;
+  const isCompact = useIsCompact();
 
   if (!enabledForUser || !mode) return <ClassicInboxPage />;
   const toggle = <InboxModeToggle mode={mode} onChange={setMode} />;
-  // The archive sub-view only exists in the classic layout.
-  if (mode === "smart" && !archived) return <SmartInboxPage headerAccessory={toggle} />;
-  return <ClassicInboxPage headerAccessory={toggle} />;
+  if (mode === "classic") return <ClassicInboxPage headerAccessory={toggle} />;
+  // Phones: the single-column list -> focused detail -> back flow. The archive
+  // sub-view only exists in the classic layout.
+  if (isCompact && !archived) return <SmartInboxPage headerAccessory={toggle} />;
+  // Tablet and up: Classic's two panes with Smart's sections and signal briefs.
+  return <ClassicInboxPage headerAccessory={toggle} smart />;
 }

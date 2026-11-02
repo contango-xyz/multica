@@ -154,6 +154,8 @@
       "tooltip": "그룹으로 필터",
       "needs_you": "내 조치가 필요한 항목만"
     },
-    "show_more_other": "{{count}}개 더 보기"
+    "show_more_other": "{{count}}개 더 보기",
+    "switch_to_classic": "클래식으로 전환",
+    "switch_to_smart": "스마트로 전환"
   }
 }

@@ -47,11 +47,17 @@ export function InboxListItem({
   isSelected,
   onClick,
   onAction,
+  needsYou = false,
+  inSmartSection = false,
 }: {
   item: InboxItem;
   view: InboxView;
   isSelected: boolean;
   onClick: () => void;
+  /** Smart inbox (contango): the entry waits on the reader; adds an amber cue. */
+  needsYou?: boolean;
+  /** Listed under a smart-inbox section header, which already names the group. */
+  inSmartSection?: boolean;
   // Archive in the main list, unarchive in the archived one — the row action is
   // always the reversal of the current view, so the two lists share this row.
   onAction: () => void;
@@ -160,8 +166,15 @@ export function InboxListItem({
             {showUnread && (
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
             )}
+            {needsYou && (
+              <span
+                role="img"
+                aria-label={t(($) => $.smart.needs_you)}
+                className="h-3.5 w-1 shrink-0 rounded-full bg-warning"
+              />
+            )}
             <span
-              className={`truncate text-body ${showUnread ? "font-medium" : "text-muted-foreground"}`}
+              className={`truncate text-body ${showUnread ? "font-medium" : "text-muted-foreground"} ${needsYou ? "font-semibold text-foreground" : ""}`}
             >
               {displayTitle}
             </span>
@@ -192,7 +205,7 @@ export function InboxListItem({
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <p className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-caption ${showUnread ? "text-muted-foreground" : "text-muted-foreground"}`}>
-            <InboxDetailLabel item={item} />
+            <InboxDetailLabel item={item} signalGroup={!inSmartSection} />
           </p>
           <div className="flex shrink-0 items-center gap-1.5">
             {/* Badge only, no hover card (MUL-5189). "An agent is on this"

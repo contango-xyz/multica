@@ -84,6 +84,7 @@ vi.mock("@multica/core/inbox/queries", () => ({
 const markReadMutate = vi.fn();
 const markUnreadMutate = vi.fn();
 const archiveMutate = vi.fn();
+const archiveMutateAsync = vi.fn((_id: string) => Promise.resolve());
 const unarchiveMutate = vi.fn();
 const retrySourceContextMutateAsync = vi.fn();
 const showIssueLimitUpgradePrompt = vi.hoisted(() => vi.fn());
@@ -101,7 +102,7 @@ vi.mock("@multica/core/inbox/mutations", () => {
   return {
     useMarkInboxRead: () => ({ mutate: markReadMutate }),
     useMarkInboxUnread: () => ({ mutate: markUnreadMutate }),
-    useArchiveInbox: () => ({ mutate: archiveMutate }),
+    useArchiveInbox: () => ({ mutate: archiveMutate, mutateAsync: archiveMutateAsync }),
     useUnarchiveInbox: () => ({ mutate: unarchiveMutate }),
     useMarkAllInboxRead: mutation,
     useArchiveAllInbox: mutation,
@@ -178,6 +179,45 @@ vi.mock("./inbox-list", () => ({
       {items.length === 0 && emptyAction}
     </div>
   ),
+}));
+// Smart (contango) pieces, stubbed to their wiring: the grouped list reports
+// its sections and rows, the brief names the signal it describes.
+vi.mock("./smart-inbox-list", () => ({
+  SmartInboxList: ({
+    sections,
+    onSelect,
+    onArchiveSection,
+  }: {
+    sections: Array<{ id: string; entries: Array<{ item: InboxItem; needsYou: boolean }> }>;
+    onSelect: (item: InboxItem) => void;
+    onArchiveSection: (entries: Array<{ item: InboxItem }>) => void;
+  }) => (
+    <div data-testid="smart-list">
+      {sections.map((section) => (
+        <section key={section.id} data-testid={`section-${section.id}`}>
+          <button type="button" onClick={() => onArchiveSection(section.entries)}>
+            archive {section.id}
+          </button>
+          {section.entries.map((entry) => (
+            <button
+              key={entry.item.id}
+              data-testid="smart-row"
+              data-needs-you={String(entry.needsYou)}
+              onClick={() => onSelect(entry.item)}
+            >
+              {entry.item.id}
+            </button>
+          ))}
+        </section>
+      ))}
+    </div>
+  ),
+}));
+vi.mock("./smart-inbox", () => ({
+  SignalBrief: ({ entry }: { entry: { item: InboxItem } }) => (
+    <div data-testid="signal-brief">{entry.item.id}</div>
+  ),
+  SmartFilterMenu: () => <button type="button">Filter by group</button>,
 }));
 vi.mock("./inbox-filter-menu", () => ({
   InboxFilterMenu: () => <button type="button">Filter inbox</button>,
@@ -1125,5 +1165,87 @@ describe("InboxPage", () => {
 
     expect(replace).toHaveBeenCalledWith("/acme/issues/issue-404");
     expect(replace).not.toHaveBeenCalledWith("/acme/inbox");
+  });
+});
+
+describe("InboxPage smart two-pane (contango)", () => {
+  const signal = (id: string, group: string, over: Partial<InboxItem> = {}) =>
+    item({
+      id,
+      type: "signal",
+      severity: "action_required",
+      actor_type: "system",
+      actor_id: null,
+      read: false,
+      details: { key: id, group, summary: "why", actions: [], rank: { priority: "high", blocks: 1 } } as unknown as InboxItem["details"],
+      ...over,
+    });
+
+  it("groups the rows into sections with the mention and the signal on one issue listed apart", () => {
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [
+      item({ id: "mention", type: "mentioned", issue_id: "issue-1", created_at: "2026-06-15T08:00:00Z" }),
+      signal("sig", "merge", { issue_id: "issue-1", created_at: "2026-06-15T09:00:00Z" }),
+      item({ id: "status", type: "status_changed", issue_id: "issue-2" }),
+    ];
+    render(<InboxPage smart />);
+    expect(screen.queryByTestId("list")).toBeNull();
+    expect(screen.getByTestId("section-merge")).toHaveTextContent("sig");
+    expect(screen.getByTestId("section-mentions")).toHaveTextContent("mention");
+    expect(screen.getByTestId("section-fyi")).toHaveTextContent("status");
+    expect(screen.getByRole("button", { name: "Filter by group" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter inbox" })).toBeInTheDocument();
+  });
+
+  it("selecting a signal keeps the list and shows its brief above the issue thread", () => {
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [
+      item({ id: "mention", type: "mentioned", issue_id: "issue-1" }),
+      signal("sig", "merge", { issue_id: "issue-1" }),
+    ];
+    render(<InboxPage smart />);
+    fireEvent.click(screen.getByText("sig"));
+    // Same route: only the ?issue= selector is rewritten, keyed on the signal.
+    expect(replace).toHaveBeenLastCalledWith("/acme/inbox?issue=sig");
+    expect(screen.getByTestId("smart-list")).toBeInTheDocument();
+    expect(screen.getByTestId("signal-brief")).toHaveTextContent("sig");
+    expect(issueDetailProps.at(-1)?.issueId).toBe("issue-1");
+    expect(markReadMutate).toHaveBeenCalledWith("sig", expect.anything());
+  });
+
+  it("a mention's detail is exactly Classic's, without a brief", () => {
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [
+      item({ id: "mention", type: "mentioned", issue_id: "issue-1" }),
+      signal("sig", "merge", { issue_id: "issue-1" }),
+    ];
+    render(<InboxPage smart />);
+    fireEvent.click(screen.getByText("mention"));
+    expect(replace).toHaveBeenLastCalledWith("/acme/inbox?issue=issue-1");
+    expect(screen.queryByTestId("signal-brief")).toBeNull();
+    expect(issueDetailProps.at(-1)?.issueId).toBe("issue-1");
+  });
+
+  it("archives a whole section", () => {
+    reset();
+    layout.width = DESKTOP;
+    archiveMutateAsync.mockClear();
+    listData.active = [signal("a", "stalled", { issue_id: "i-a" }), signal("b", "stalled", { issue_id: "i-b" })];
+    render(<InboxPage smart />);
+    fireEvent.click(screen.getByRole("button", { name: "archive stalled" }));
+    expect(archiveMutateAsync.mock.calls.map((c) => c[0]).sort()).toEqual(["a", "b"]);
+  });
+
+  it("keeps the archive sub-view classic", () => {
+    reset();
+    layout.width = DESKTOP;
+    searchParams = new URLSearchParams("view=archived");
+    listData.archived = [item({ id: "old", archived: true })];
+    render(<InboxPage smart />);
+    expect(screen.getByTestId("list")).toHaveAttribute("data-view", "archived");
+    expect(screen.queryByTestId("smart-list")).toBeNull();
   });
 });

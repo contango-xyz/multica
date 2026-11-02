@@ -11,6 +11,7 @@ import {
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { Inbox } from "@multica/ui/icons";
 import { isEditableShortcutTarget } from "@multica/core/shortcuts";
+import { inboxRowKey } from "@multica/core/inbox/filter-store";
 import { isImeComposing } from "@multica/core/utils";
 import type { InboxItem } from "@multica/core/types";
 import type { InboxView } from "./inbox-view";
@@ -136,7 +137,7 @@ export function InboxList({
     focusList();
 
     const current = items.findIndex(
-      (item) => (item.issue_id ?? item.id) === selectedKey,
+      (item) => inboxRowKey(item) === selectedKey,
     );
     const step = event.key === "ArrowDown" ? 1 : -1;
     // Nothing selected yet: Down enters the list at the top, Up at the bottom.
@@ -201,7 +202,7 @@ export function InboxList({
     <InboxListItem
       item={item}
       view={view}
-      isSelected={(item.issue_id ?? item.id) === selectedKey}
+      isSelected={inboxRowKey(item) === selectedKey}
       onClick={() => selectItem(item)}
       onAction={() => onAction(item.id)}
     />

@@ -24,11 +24,8 @@ import {
 import { toast } from "sonner";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
-import {
-  deduplicateInboxItems,
-  inboxListOptions,
-  useInboxUnreadCount,
-} from "@multica/core/inbox/queries";
+import { inboxListOptions, useInboxUnreadCount } from "@multica/core/inbox/queries";
+import { smartInboxItems } from "./smart-items";
 import {
   useArchiveAllInbox,
   useArchiveAllReadInbox,
@@ -55,7 +52,6 @@ import {
   useSmartInboxFilters,
   useSmartInboxFilterStore,
 } from "@multica/core/inbox/smart-filter-store";
-import type { InboxItem } from "@multica/core/types";
 import { Button } from "@multica/ui/components/ui/button";
 import { IconButton } from "@multica/ui/components/common/icon-button";
 import {
@@ -93,12 +89,7 @@ const SECTION_IDS: SmartSectionId[] = [
   "fyi",
 ];
 
-/** Signals one row each; other entries grouped per issue like the classic list. */
-export function smartInboxItems(raw: InboxItem[]): InboxItem[] {
-  const signals = raw.filter((i) => i.type === "signal" && !i.archived);
-  const others = deduplicateInboxItems(raw.filter((i) => i.type !== "signal"));
-  return [...signals, ...others];
-}
+export { smartInboxItems };
 
 function useErrorToast() {
   return (fallback: string) => (err: unknown) =>
@@ -282,7 +273,7 @@ export function SmartInboxPage({ headerAccessory }: { headerAccessory?: ReactNod
   );
 }
 
-function SmartFilterMenu({ wsId }: { wsId: string }) {
+export function SmartFilterMenu({ wsId }: { wsId: string }) {
   const { t } = useT("inbox");
   const filters = useSmartInboxFilters(wsId);
   const toggleGroup = useSmartInboxFilterStore((s) => s.toggleGroup);
@@ -443,7 +434,7 @@ function useLine2() {
   };
 }
 
-function useReasonText() {
+export function useReasonText() {
   const { t } = useT("inbox");
   const timeAgo = useTimeAgo();
   return (entry: SmartEntry): string => {
@@ -572,6 +563,60 @@ function SmartInboxRow({
   );
 }
 
+/**
+ * The smart part of a signal's detail: why it's here, the ask, and its
+ * actions. Phones show it as the whole focused detail; the two-pane layout
+ * shows it compactly above the issue thread.
+ */
+export function SignalBrief({
+  entry,
+  compact = false,
+  showTitleAndBody = true,
+}: {
+  entry: SmartEntry;
+  /** Above the issue thread: tighter spacing, buttons in one row. */
+  compact?: boolean;
+  /** Off where the surrounding detail already shows the title and body. */
+  showTitleAndBody?: boolean;
+}) {
+  const line2 = useLine2();
+  const reasonText = useReasonText();
+  const { item, signal } = entry;
+  const body = signal && showTitleAndBody ? item.body : null;
+  return (
+    <div data-testid="signal-brief" className={cn(compact ? "space-y-2" : "space-y-4")}>
+      <header className="space-y-1">
+        {showTitleAndBody &&
+          (compact ? (
+            <h2 className="break-words text-body font-semibold">{getInboxDisplayTitle(item)}</h2>
+          ) : (
+            <h1 className="break-words text-title font-semibold">{getInboxDisplayTitle(item)}</h1>
+          ))}
+        <p className="break-words text-body text-muted-foreground">{line2(entry)}</p>
+        <p className="text-caption text-muted-foreground">{reasonText(entry)}</p>
+      </header>
+      {body && <p className="whitespace-pre-wrap break-words text-body">{body}</p>}
+      {signal && signal.actions.length > 0 && (
+        <div className={cn("flex gap-2", compact ? "flex-row flex-wrap" : "flex-col sm:flex-row sm:flex-wrap")}>
+          {signal.actions.map((action, i) => (
+            <Button
+              key={`${action.url}-${i}`}
+              variant={i === 0 ? "default" : "outline"}
+              size={compact ? "sm" : "default"}
+              className={compact ? undefined : TAP}
+              render={<a href={action.url} target="_blank" rel="noopener noreferrer" />}
+              nativeButton={false}
+            >
+              <span className="truncate">{action.label}</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SmartInboxDetail({
   entry,
   onBack,
@@ -584,10 +629,7 @@ function SmartInboxDetail({
   const { t } = useT("inbox");
   const { push } = useNavigation();
   const wsPaths = useWorkspacePaths();
-  const line2 = useLine2();
-  const reasonText = useReasonText();
   const { item, signal } = entry;
-  const body = signal ? item.body : null;
   const issueId = item.issue_id;
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-x-hidden">
@@ -599,27 +641,8 @@ function SmartInboxDetail({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <article className={cn("mx-auto w-full max-w-2xl space-y-4 py-4", PAGE_GUTTER)}>
-          <header className="space-y-1">
-            <h1 className="break-words text-title font-semibold">{getInboxDisplayTitle(item)}</h1>
-            <p className="break-words text-body text-muted-foreground">{line2(entry)}</p>
-            <p className="text-caption text-muted-foreground">{reasonText(entry)}</p>
-          </header>
-          {body && (
-            <p className="whitespace-pre-wrap break-words text-body">{body}</p>
-          )}
+          <SignalBrief entry={entry} />
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {signal?.actions.map((action, i) => (
-              <Button
-                key={`${action.url}-${i}`}
-                variant={i === 0 ? "default" : "outline"}
-                className={TAP}
-                render={<a href={action.url} target="_blank" rel="noopener noreferrer" />}
-                nativeButton={false}
-              >
-                <span className="truncate">{action.label}</span>
-                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-              </Button>
-            ))}
             {issueId && (
               <Button
                 variant={signal?.actions.length ? "outline" : "default"}
