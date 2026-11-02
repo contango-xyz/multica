@@ -4,6 +4,7 @@ import type { InboxItem } from "@multica/core/types";
 import {
   getInboxDisplayTitle,
   getQuickCreateOutcomeDetail,
+  inboxScrollTarget,
   isAutopilotQuotaNotice,
   isQuickCreateOutcome,
   resolveDetailItem,
@@ -150,5 +151,14 @@ describe("resolveDetailItem", () => {
   // redirects to the issue page, and the pane must not invent a row meanwhile.
   it("resolves nothing when neither key is in the list", () => {
     expect(resolveDetailItem(list, "issue-gone", "issue-also-gone")).toBeNull();
+  });
+});
+
+describe("inboxScrollTarget", () => {
+  it("lands on the comment that created the entry, and nowhere for entries without one", () => {
+    expect(inboxScrollTarget({ details: { comment_id: "c-1" } })).toBe("c-1");
+    expect(inboxScrollTarget({ details: { comment_id: "" } })).toBeUndefined();
+    expect(inboxScrollTarget({ details: { key: "stall", group: "stalled" } })).toBeUndefined();
+    expect(inboxScrollTarget({ details: null })).toBeUndefined();
   });
 });

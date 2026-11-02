@@ -1181,18 +1181,20 @@ describe("InboxPage smart two-pane (contango)", () => {
       ...over,
     });
 
-  it("groups the rows into sections with the mention and the signal on one issue listed apart", () => {
+  it("groups one row per card: a card's mention folds into its action signal", () => {
     reset();
     layout.width = DESKTOP;
     listData.active = [
       item({ id: "mention", type: "mentioned", issue_id: "issue-1", created_at: "2026-06-15T08:00:00Z" }),
       signal("sig", "merge", { issue_id: "issue-1", created_at: "2026-06-15T09:00:00Z" }),
+      item({ id: "lone-mention", type: "mentioned", issue_id: "issue-3" }),
       item({ id: "status", type: "status_changed", issue_id: "issue-2" }),
     ];
     render(<InboxPage smart />);
     expect(screen.queryByTestId("list")).toBeNull();
+    expect(screen.getAllByTestId("smart-row").map((r) => r.textContent)).not.toContain("mention");
     expect(screen.getByTestId("section-merge")).toHaveTextContent("sig");
-    expect(screen.getByTestId("section-mentions")).toHaveTextContent("mention");
+    expect(screen.getByTestId("section-mentions")).toHaveTextContent("lone-mention");
     expect(screen.getByTestId("section-fyi")).toHaveTextContent("status");
     expect(screen.getByRole("button", { name: "Filter by group" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Filter inbox" })).toBeInTheDocument();    // The dashboard sits above both panes; Classic has none.
@@ -1207,11 +1209,11 @@ describe("InboxPage smart two-pane (contango)", () => {
     expect(screen.queryByTestId("smart-dashboard")).toBeNull();
   });
 
-  it("selecting a signal keeps the list and shows its brief above the issue thread", () => {
+  it("selecting a folded row shows the brief over the thread, scrolls to the tagging comment and reads every folded entry", () => {
     reset();
     layout.width = DESKTOP;
     listData.active = [
-      item({ id: "mention", type: "mentioned", issue_id: "issue-1" }),
+      item({ id: "mention", type: "mentioned", issue_id: "issue-1", read: false, details: { comment_id: "c-tag" } }),
       signal("sig", "merge", { issue_id: "issue-1" }),
     ];
     render(<InboxPage smart />);
@@ -1221,21 +1223,34 @@ describe("InboxPage smart two-pane (contango)", () => {
     expect(screen.getByTestId("smart-list")).toBeInTheDocument();
     expect(screen.getByTestId("signal-brief")).toHaveTextContent("sig");
     expect(issueDetailProps.at(-1)?.issueId).toBe("issue-1");
-    expect(markReadMutate).toHaveBeenCalledWith("sig", expect.anything());
+    expect(issueDetailProps.at(-1)?.highlightCommentId).toBe("c-tag");
+    // (The mutate stub never flips `read`, so the effect may fire again.)
+    expect([...new Set(markReadMutate.mock.calls.map((c) => c[0]))].sort()).toEqual(["mention", "sig"]);
   });
 
-  it("a mention's detail is exactly Classic's, without a brief", () => {
+  it("a signal-only card opens the thread without scrolling", () => {
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [signal("stall", "stalled", { issue_id: "issue-5" })];
+    render(<InboxPage smart />);
+    fireEvent.click(screen.getByText("stall"));
+    expect(issueDetailProps.at(-1)?.issueId).toBe("issue-5");
+    expect(issueDetailProps.at(-1)?.highlightCommentId).toBeUndefined();
+  });
+
+  it("a mention's detail is exactly Classic's, without a brief, and lands on its comment", () => {
     reset();
     layout.width = DESKTOP;
     listData.active = [
-      item({ id: "mention", type: "mentioned", issue_id: "issue-1" }),
-      signal("sig", "merge", { issue_id: "issue-1" }),
+      item({ id: "mention", type: "mentioned", issue_id: "issue-1", details: { comment_id: "c-1" } }),
+      signal("note", "fyi", { issue_id: "issue-1" }),
     ];
     render(<InboxPage smart />);
     fireEvent.click(screen.getByText("mention"));
     expect(replace).toHaveBeenLastCalledWith("/acme/inbox?issue=issue-1");
     expect(screen.queryByTestId("signal-brief")).toBeNull();
     expect(issueDetailProps.at(-1)?.issueId).toBe("issue-1");
+    expect(issueDetailProps.at(-1)?.highlightCommentId).toBe("c-1");
   });
 
   it("archives a whole section", () => {

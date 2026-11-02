@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
 import { inboxListOptions, useInboxUnreadCount } from "@multica/core/inbox/queries";
-import { smartInboxItems } from "./smart-items";
+import { buildSmartRows, smartRowUnreadIds } from "@multica/core/inbox/smart-fold";
 import {
   useArchiveAllInbox,
   useArchiveAllReadInbox,
@@ -90,7 +90,6 @@ const SECTION_IDS: SmartSectionId[] = [
   "fyi",
 ];
 
-export { smartInboxItems };
 
 function useErrorToast() {
   return (fallback: string) => (err: unknown) =>
@@ -127,7 +126,9 @@ export function SmartInboxPage({ headerAccessory }: { headerAccessory?: ReactNod
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
-  const items = useMemo(() => smartInboxItems(raw), [raw]);
+  // One row per card; a card's entries fold into its action signal.
+  const rows = useMemo(() => buildSmartRows(raw), [raw]);
+  const items = rows.items;
   const allSections = useMemo(() => buildSmartSections(items, now), [items, now]);
   const sections = useMemo(() => {
     const filtered = filterInboxItems(items, effectiveFilters, {
@@ -149,7 +150,7 @@ export function SmartInboxPage({ headerAccessory }: { headerAccessory?: ReactNod
 
   const openEntry = (entry: SmartEntry) => {
     setOpenId(entry.item.id);
-    if (!entry.item.read) markRead.mutate(entry.item.id);
+    for (const id of smartRowUnreadIds(rows, entry.item)) markRead.mutate(id);
   };
   const handleArchive = (id: string) => {
     if (openId === id) setOpenId(null);
@@ -167,8 +168,8 @@ export function SmartInboxPage({ headerAccessory }: { headerAccessory?: ReactNod
     );
   };
   const markSectionRead = (section: SmartSection) => {
-    const unread = section.entries.filter((e) => !e.item.read);
-    void Promise.allSettled(unread.map((e) => markRead.mutateAsync(e.item.id))).then((results) => {
+    const unread = section.entries.flatMap((e) => smartRowUnreadIds(rows, e.item));
+    void Promise.allSettled(unread.map((id) => markRead.mutateAsync(id))).then((results) => {
       if (results.some((r) => r.status === "rejected")) toast.error(t(($) => $.errors.mark_read_failed));
     });
   };
@@ -523,19 +524,10 @@ function SmartInboxRow({
       >
         <span className="flex w-full min-w-0 items-center gap-2">
           {unread && <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand" />}
-          {entry.needsYou && (
-            // At-a-glance cue for entries waiting on the reader.
-            <span
-              role="img"
-              aria-label={t(($) => $.smart.needs_you)}
-              className="h-3.5 w-1 shrink-0 rounded-full bg-warning"
-            />
-          )}
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-body",
               unread && "font-medium",
-              entry.needsYou && "font-semibold",
             )}
           >
             {getInboxDisplayTitle(entry.item)}

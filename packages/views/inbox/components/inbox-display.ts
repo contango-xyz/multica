@@ -91,3 +91,14 @@ export function resolveDetailItem(
   if (!detailKey || detailKey === selectedKey) return null;
   return selectedKey ? byKey(selectedKey) : null;
 }
+
+/**
+ * The comment the detail pane scrolls to and flashes when this row opens: the
+ * comment that created the entry (a mention, review request, reply). A folded
+ * Smart row carries its latest mention's comment. Entries no comment created
+ * (a stalled or alert signal, a status change) don't scroll.
+ */
+export function inboxScrollTarget(item: Pick<InboxItem, "details">): string | undefined {
+  const id = item.details?.comment_id;
+  return typeof id === "string" && id !== "" ? id : undefined;
+}

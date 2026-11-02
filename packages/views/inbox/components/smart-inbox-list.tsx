@@ -185,7 +185,6 @@ function SmartListSection({
                 item={entry.item}
                 view="inbox"
                 isSelected={key === selectedKey}
-                needsYou={entry.needsYou}
                 inSmartSection
                 priority={
                   entry.reason.priority === "urgent" || entry.reason.priority === "high"
