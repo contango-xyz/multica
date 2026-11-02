@@ -285,7 +285,7 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Touches:** ours: `server/internal/handler/inbox_signal{,_test}.go`,
   `server/pkg/db/queries/inbox_signal.sql` (+ generated), `packages/core/inbox/smart{,.test}.ts`,
   `packages/core/inbox/smart-filter-store{,.test}.ts`,
-  `packages/views/inbox/components/{smart-inbox,smart-inbox-list,inbox-entry}{,.test}.tsx`,
+  `packages/views/inbox/components/{smart-inbox,smart-inbox-list,smart-dashboard,inbox-entry}{,.test}.tsx`,
   `packages/views/inbox/components/smart-items.ts`,
   `e2e/smart-inbox{,-desktop}.spec.ts`. Upstream files: `server/cmd/server/{router,listeners}.go`,
   `server/cmd/migrate/main.go` (concurrent-index cleanup entry), `server/internal/handler/{handler,auth,notification_preference}.go`,
