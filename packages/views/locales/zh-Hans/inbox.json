@@ -124,13 +124,13 @@
     "smart": "智能",
     "classic": "经典",
     "sections": {
-      "waiting": "等待你处理",
       "merge": "合并审批",
       "decision": "决策",
       "access": "权限与资金",
       "stalled": "停滞",
       "blocking": "阻塞他人",
       "alert": "告警",
+      "mentions": "提及与评审",
       "fyi": "知悉"
     },
     "priority": {
@@ -144,6 +144,16 @@
     "open": "打开",
     "open_issue": "打开事项",
     "back": "收件箱",
-    "empty": "目前没有需要你处理的事项"
+    "empty": "目前没有需要你处理的事项",
+    "needs_you": "需要你处理",
+    "bulk_menu": "收件箱操作",
+    "section_actions": "分组操作",
+    "mark_section_read": "标为已读",
+    "archive_section": "全部归档",
+    "filters": {
+      "tooltip": "按分组筛选",
+      "needs_you": "仅显示需要我处理的"
+    },
+    "show_more_other": "再显示 {{count}} 项"
   }
 }

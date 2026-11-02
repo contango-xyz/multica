@@ -126,13 +126,13 @@
     "smart": "Intelligente",
     "classic": "Classique",
     "sections": {
-      "waiting": "En attente de vous",
       "merge": "Approbations de fusion",
       "decision": "Décisions",
       "access": "Accès et financement",
       "stalled": "Bloqué",
       "blocking": "Bloque d'autres tâches",
       "alert": "Alertes",
+      "mentions": "Mentions et revues",
       "fyi": "Pour info"
     },
     "priority": {
@@ -147,6 +147,17 @@
     "open": "Ouvrir",
     "open_issue": "Ouvrir le ticket",
     "back": "Boîte de réception",
-    "empty": "Rien ne vous attend pour le moment"
+    "empty": "Rien ne vous attend pour le moment",
+    "needs_you": "Requiert votre action",
+    "bulk_menu": "Actions de la boîte de réception",
+    "section_actions": "Actions de la section",
+    "mark_section_read": "Marquer comme lu",
+    "archive_section": "Tout archiver",
+    "filters": {
+      "tooltip": "Filtrer par groupe",
+      "needs_you": "Seulement ce qui requiert mon action"
+    },
+    "show_more_one": "Afficher {{count}} de plus",
+    "show_more_other": "Afficher {{count}} de plus"
   }
 }

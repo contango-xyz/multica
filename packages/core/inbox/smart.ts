@@ -132,31 +132,46 @@ export interface SmartEntry {
   signal: SignalDetails | null;
   score: number;
   reason: RankReason;
+  /** Waits on the reader: an action_required signal, a mention or a review request. */
+  needsYou: boolean;
 }
 
-export type SmartSectionId = "waiting" | Exclude<SignalGroup, "fyi"> | "fyi";
+export type SmartSectionId = Exclude<SignalGroup, "fyi"> | "mentions" | "fyi";
 
 export interface SmartSection {
   id: SmartSectionId;
+  /** Ranked; FYI is newest first. */
   entries: SmartEntry[];
 }
 
+// Tie-break between sections whose top entries score the same.
 const SECTION_ORDER: SmartSectionId[] = [
-  "waiting",
   "merge",
   "decision",
   "access",
   "stalled",
   "blocking",
   "alert",
+  "mentions",
   "fyi",
 ];
 
+function sectionFor(item: InboxItem, signal: SignalDetails | null): SmartSectionId {
+  if (signal) return signal.group;
+  if (ADDRESSED_TYPES.has(item.type)) return "mentions";
+  return "fyi";
+}
+
+const byScore = (a: SmartEntry, b: SmartEntry) =>
+  b.score - a.score || Date.parse(b.item.created_at) - Date.parse(a.item.created_at);
+const byNewest = (a: SmartEntry, b: SmartEntry) =>
+  Date.parse(b.item.created_at) - Date.parse(a.item.created_at);
+
 /**
- * Splits active entries into sections: "waiting" (action_required signals and
- * entries addressed to you), then one per signal group, then FYI (fyi signals
- * and every other entry). Waiting and group sections rank by score; FYI is
- * newest first. Empty sections are dropped.
+ * Splits active entries into one section per signal group, plus "mentions"
+ * (mentions and review requests) and FYI (fyi signals and every other entry).
+ * Each section ranks by score (FYI: newest first); sections are ordered by
+ * their top entry's score, FYI always last. Empty sections are dropped.
  *
  * Signals are kept one row each; other entries are expected to be deduplicated
  * per issue by the caller, as the classic list does.
@@ -172,31 +187,27 @@ export function buildSmartSections(items: InboxItem[], now: number): SmartSectio
       signal,
       score: rankScore(input, now),
       reason: rankReason(input, now),
+      needsYou: isWaitingOnYou(item),
     };
-    let id: SmartSectionId;
-    if (isWaitingOnYou(item)) id = "waiting";
-    else if (signal) id = signal.group;
-    else id = "fyi";
+    const id = sectionFor(item, signal);
     const list = buckets.get(id) ?? [];
     list.push(entry);
     buckets.set(id, list);
   }
-  const sections: SmartSection[] = [];
+  const ranked: SmartSection[] = [];
+  let fyi: SmartSection | null = null;
   for (const id of SECTION_ORDER) {
     const entries = buckets.get(id);
     if (!entries?.length) continue;
     if (id === "fyi") {
-      entries.sort((a, b) => Date.parse(b.item.created_at) - Date.parse(a.item.created_at));
+      fyi = { id, entries: entries.sort(byNewest) };
     } else {
-      entries.sort(
-        (a, b) =>
-          b.score - a.score ||
-          Date.parse(b.item.created_at) - Date.parse(a.item.created_at),
-      );
+      ranked.push({ id, entries: entries.sort(byScore) });
     }
-    sections.push({ id, entries });
   }
-  return sections;
+  // Stable sort: equal top scores keep SECTION_ORDER.
+  ranked.sort((a, b) => b.entries[0]!.score - a.entries[0]!.score);
+  return fyi ? [...ranked, fyi] : ranked;
 }
 
 // --- Opt-in -----------------------------------------------------------------

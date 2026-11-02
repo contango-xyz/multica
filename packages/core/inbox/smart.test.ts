@@ -101,23 +101,43 @@ describe("ranking", () => {
 });
 
 describe("buildSmartSections", () => {
-  it("puts waiting first, then groups in order, FYI last; drops empty and archived", () => {
+  it("groups by type, orders sections by their top entry, FYI last; drops empty and archived", () => {
     const mention = item({ type: "mentioned", issue_priority: "medium", created_at: hoursAgo(1) });
-    const ask = signal("decision", { priority: "urgent", blocks: 2, since: hoursAgo(5) }, { severity: "action_required" });
-    const stalled = signal("stalled", { priority: "low" });
-    const merge = signal("merge", { priority: "high" });
-    const fyiSignal = signal("fyi", {}, { created_at: hoursAgo(0.5) });
+    const review = item({ type: "review_requested", issue_priority: "low", created_at: hoursAgo(1) });
+    const decision = signal("decision", { priority: "urgent", blocks: 2, since: hoursAgo(5) }, { severity: "action_required" });
+    const merge = signal("merge", { priority: "high", since: hoursAgo(1) }, { severity: "action_required" });
+    const access = signal("access", { priority: "high", since: hoursAgo(2) }, { severity: "action_required" });
+    const stalled = signal("stalled", { priority: "low", since: hoursAgo(1) });
+    const fyiSignal = signal("fyi", { priority: "urgent", blocks: 9, since: hoursAgo(50) }, { created_at: hoursAgo(0.5) });
     const status = item({ type: "status_changed", created_at: hoursAgo(2) });
-    const archived = signal("alert", {}, { archived: true });
+    const archived = signal("alert", { priority: "urgent", since: hoursAgo(99) }, { archived: true });
 
     const sections = buildSmartSections(
-      [status, stalled, mention, merge, ask, fyiSignal, archived],
+      [status, stalled, mention, review, merge, access, decision, fyiSignal, archived],
       NOW,
     );
-    expect(sections.map((s) => s.id)).toEqual(["waiting", "merge", "stalled", "fyi"]);
-    expect(sections[0]!.entries.map((e) => e.item.id)).toEqual([ask.id, mention.id]);
+    // decision 8*3*5=120, access 4*1*2=8, merge 4*1*1=4, mentions top 2*1*1=2,
+    // stalled 1*1*1=1; FYI last despite its huge score.
+    expect(sections.map((s) => s.id)).toEqual(["decision", "access", "merge", "mentions", "stalled", "fyi"]);
+    expect(sections[3]!.entries.map((e) => e.item.id)).toEqual([mention.id, review.id]);
     // FYI is newest first and holds both fyi signals and plain entries.
-    expect(sections[3]!.entries.map((e) => e.item.id)).toEqual([fyiSignal.id, status.id]);
+    expect(sections[5]!.entries.map((e) => e.item.id)).toEqual([fyiSignal.id, status.id]);
+  });
+
+  it("marks entries that need the reader", () => {
+    const ask = signal("merge", {}, { severity: "action_required" });
+    const info = signal("merge", {}, { severity: "attention" });
+    const mention = item({ type: "mentioned" });
+    const status = item({ type: "status_changed" });
+    const needs = new Map(
+      buildSmartSections([ask, info, mention, status], NOW)
+        .flatMap((s) => s.entries)
+        .map((e) => [e.item.id, e.needsYou]),
+    );
+    expect(needs.get(ask.id)).toBe(true);
+    expect(needs.get(info.id)).toBe(false);
+    expect(needs.get(mention.id)).toBe(true);
+    expect(needs.get(status.id)).toBe(false);
   });
 
   it("ranks within a group by score", () => {

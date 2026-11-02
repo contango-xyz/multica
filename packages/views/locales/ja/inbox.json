@@ -124,13 +124,13 @@
     "smart": "スマート",
     "classic": "クラシック",
     "sections": {
-      "waiting": "あなたの対応待ち",
       "merge": "マージ承認",
       "decision": "意思決定",
       "access": "アクセスと資金",
       "stalled": "停滞中",
       "blocking": "他をブロック中",
       "alert": "アラート",
+      "mentions": "メンションとレビュー",
       "fyi": "お知らせ"
     },
     "priority": {
@@ -144,6 +144,16 @@
     "open": "開く",
     "open_issue": "課題を開く",
     "back": "受信トレイ",
-    "empty": "今対応が必要なものはありません"
+    "empty": "今対応が必要なものはありません",
+    "needs_you": "対応が必要",
+    "bulk_menu": "受信トレイの操作",
+    "section_actions": "セクションの操作",
+    "mark_section_read": "既読にする",
+    "archive_section": "すべてアーカイブ",
+    "filters": {
+      "tooltip": "グループで絞り込み",
+      "needs_you": "自分の対応が必要なもののみ"
+    },
+    "show_more_other": "さらに {{count}} 件表示"
   }
 }

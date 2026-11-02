@@ -124,13 +124,13 @@
     "smart": "스마트",
     "classic": "클래식",
     "sections": {
-      "waiting": "내 응답 대기",
       "merge": "병합 승인",
       "decision": "결정",
       "access": "접근 및 자금",
       "stalled": "정체됨",
       "blocking": "다른 작업 차단 중",
       "alert": "알림",
+      "mentions": "멘션 및 리뷰",
       "fyi": "참고"
     },
     "priority": {
@@ -144,6 +144,16 @@
     "open": "열기",
     "open_issue": "이슈 열기",
     "back": "받은편지함",
-    "empty": "지금 처리할 항목이 없습니다"
+    "empty": "지금 처리할 항목이 없습니다",
+    "needs_you": "내 조치 필요",
+    "bulk_menu": "받은편지함 작업",
+    "section_actions": "섹션 작업",
+    "mark_section_read": "읽음으로 표시",
+    "archive_section": "모두 보관",
+    "filters": {
+      "tooltip": "그룹으로 필터",
+      "needs_you": "내 조치가 필요한 항목만"
+    },
+    "show_more_other": "{{count}}개 더 보기"
   }
 }
