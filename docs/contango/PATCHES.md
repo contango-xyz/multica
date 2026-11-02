@@ -284,12 +284,14 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   Per-group push preferences `signal_<group>` (default on, `fyi` off).
 - **Touches:** ours: `server/internal/handler/inbox_signal{,_test}.go`,
   `server/pkg/db/queries/inbox_signal.sql` (+ generated), `packages/core/inbox/smart{,.test}.ts`,
+  `packages/core/inbox/smart-filter-store{,.test}.ts`,
   `packages/views/inbox/components/{smart-inbox,inbox-entry}{,.test}.tsx`,
   `e2e/smart-inbox.spec.ts`. Upstream files: `server/cmd/server/{router,listeners}.go`,
   `server/cmd/migrate/main.go` (concurrent-index cleanup entry), `server/internal/handler/{handler,auth,notification_preference}.go`,
   `server/internal/push/{dispatcher,text}.go` (+ tests), `server/pkg/protocol/events.go`,
   `packages/core/{types/inbox,types/workspace,types/events,api/schemas}.ts`, `packages/core/package.json`
-  (export), `packages/views/inbox/components/{index.ts,inbox-page.tsx,inbox-detail-label.tsx}`,
+  (exports), `packages/views/inbox/components/{index.ts,inbox-page.tsx,inbox-detail-label.tsx,inbox-list-item.tsx}`
+  (the last: signals render with the system sender),
   `packages/views/locales/*/inbox.json`, `apps/mobile/components/inbox/detail-label.tsx` +
   `apps/mobile/locales/*/inbox.json` (compile-only: the new type's label), `e2e/fixtures.ts`.
 - **Migrations:** `607_inbox_signal_key_index` (unique partial expression index on

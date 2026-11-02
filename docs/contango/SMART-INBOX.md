@@ -74,15 +74,38 @@ As built: the view is used when `user.smart_inbox` is true and the browser has o
 (`?smart-inbox=1` → localStorage `multica:smart-inbox` = `smart`; the toggle stores `smart` /
 `classic`; `?smart-inbox=0` removes it). The Archived sub-view always uses Classic. Ranking score =
 priority weight (urgent 8, high 4, medium 2, low/none 1) × (1 + blocks) × age in hours (floor 0.1),
-recomputed every minute; non-signal entries use the issue priority and their own age. "Waiting on
-you" = `action_required` signals + `mentioned` / `review_requested` entries; every other non-signal
-entry is FYI (newest first). Signals are one row each; other entries are grouped per issue like
-Classic. Rows: line 1 title + age (from `sm` up, the full reason "Urgent · blocks 3 · 6h" in Waiting
-on you), line 2 summary or comment preview, one action (the signal's first action as an external
-link, else "Open"/"Open issue"). Tapping opens a focused detail (summary, reason, body, all actions,
-Open issue, Archive) and marks it read. Desktop and mobile apps are unchanged (classic only; the
-desktop shares the web view code but never sees the opt-in param). Classic rows show a signal's
-summary as their second line.
+recomputed every minute; non-signal entries use the issue priority and their own age. Signals are one
+row each; other entries are grouped per issue like Classic.
+
+**Layout (revised 2026-11-02 after the owner's first look):** one section per kind — Merge approvals,
+Decisions, Access & funding, Stalled, Blocking others, Alerts (the signal groups), Mentions & reviews
+(`mentioned` / `review_requested` entries) and FYI (fyi signals and every other entry). There is no
+single "Waiting on you" bucket any more. Each section ranks its entries by score (FYI: newest first);
+sections are ordered by their top entry's score, FYI always last; empty sections are hidden. A section
+header shows its label, count and its top entry's reason ("Urgent · blocks 3 · 6h"), plus a menu with
+**Mark read** and **Archive all** for that section. Entries that need you (`action_required` signals,
+mentions, review requests) carry an amber bar and a bold title. On phone widths a section header folds
+the section, and a section shows its top 3 rows with "Show N more".
+
+Rows: line 1 title + age (from `sm` up, the full reason in ranked sections), line 2 summary or comment
+preview, one action (the signal's first action as an external link, else "Open"/"Open issue"), and an
+archive button (on hover/focus with a mouse; always shown, muted, on touch). Tapping opens a focused
+detail (summary, reason, body, all actions, Open issue, Archive) and marks it read.
+
+**Header:** the same tools as Classic — the classic filter menu (status, priority, from, unread only,
+no agents working) applied to the same entries, and the bulk menu (mark all read, archive all, archive
+all read, archive completed) — plus a **group filter** (multi-select sections, and "Needs my action
+only"). Smart filters live per workspace in memory, like the classic ones. Filtering by project was
+left out: inbox entries don't carry the project, so it would need an issue lookup per entry.
+
+**Sender in Classic:** signals show the Multica system mark named after their group, never a person.
+Signals used to be stored without an actor, and the classic row fell back to the recipient's own
+avatar, so every signal looked like it came from the reader. The server now writes
+`actor_type = 'system'` on insert and on every update (old rows heal on the feeder's next pass), and
+the classic row ignores the actor for type `signal`, so old rows render correctly either way.
+
+Desktop and mobile apps are unchanged (classic only; the desktop shares the web view code but never
+sees the opt-in param). Classic rows show a signal's summary as their second line.
 
 ## What the feeder produces (ops job, every 2 min)
 - **merge / decision / access**: each open `[NEEDS HUMAN]` ask (needs-human set) → its Responsible human; group from the ask's text (merge ask, plan/design approval, login/access/funding, other decision). Also a merge-ready PR whose approval is owned by that human (pr-watch's merge asks).
