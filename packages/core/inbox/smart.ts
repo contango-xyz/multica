@@ -215,23 +215,38 @@ export function buildSmartSections(items: InboxItem[], now: number): SmartSectio
 
 // --- Dashboard ---------------------------------------------------------------
 
-/** The top `n` entries waiting on the reader, by rank score (ties: older first). */
+/** A card: its issue, else the entry itself. The dashboard counts cards. */
+export function cardKey(item: Pick<InboxItem, "id" | "issue_id">): string {
+  return item.issue_id ?? item.id;
+}
+
+/**
+ * The top `n` cards waiting on the reader, by their best entry's rank score
+ * (ties: longer wait first).
+ */
 export function doThisFirst(sections: SmartSection[], n = 3): SmartEntry[] {
+  const seen = new Set<string>();
   return sections
     .flatMap((section) => section.entries)
     .filter((entry) => entry.needsYou)
     .sort((a, b) => b.score - a.score || b.waitedHours - a.waitedHours)
+    .filter((entry) => {
+      const key = cardKey(entry.item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, n);
 }
 
 export interface SmartCounters {
-  /** Entries waiting on the reader. */
+  /** Cards waiting on the reader. */
   waiting: number;
-  /** Waiting entries per section, in display order, zero counts left out. */
+  /** Waiting cards per section, in display order, zero counts left out. */
   byGroup: Array<{ id: SmartSectionId; count: number }>;
   /** The longest wait among waiting entries, in hours; null when none wait. */
   oldestWaitHours: number | null;
-  /** Urgent entries waiting on the reader. */
+  /** Urgent cards waiting on the reader. */
   urgent: number;
 }
 
@@ -247,16 +262,19 @@ const COUNTER_ORDER: SmartSectionId[] = [
 ];
 
 export function smartCounters(sections: SmartSection[]): SmartCounters {
-  const waiting = sections.flatMap((s) => s.entries.filter((e) => e.needsYou).map((e) => ({ id: s.id, e })));
+  const waiting = sections.flatMap((s) =>
+    s.entries.filter((e) => e.needsYou).map((e) => ({ id: s.id, e, card: cardKey(e.item) })),
+  );
+  const cards = (list: typeof waiting) => new Set(list.map((w) => w.card)).size;
   const byGroup = COUNTER_ORDER.map((id) => ({
     id,
-    count: waiting.filter((w) => w.id === id).length,
+    count: cards(waiting.filter((w) => w.id === id)),
   })).filter((g) => g.count > 0);
   return {
-    waiting: waiting.length,
+    waiting: cards(waiting),
     byGroup,
     oldestWaitHours: waiting.length ? Math.max(...waiting.map((w) => w.e.waitedHours)) : null,
-    urgent: waiting.filter((w) => w.e.reason.priority === "urgent").length,
+    urgent: cards(waiting.filter((w) => w.e.reason.priority === "urgent")),
   };
 }
 

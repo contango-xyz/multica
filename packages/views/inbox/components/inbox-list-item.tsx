@@ -47,7 +47,6 @@ export function InboxListItem({
   isSelected,
   onClick,
   onAction,
-  needsYou = false,
   inSmartSection = false,
   priority,
   ageTint = "none",
@@ -57,8 +56,6 @@ export function InboxListItem({
   view: InboxView;
   isSelected: boolean;
   onClick: () => void;
-  /** Smart inbox (contango): the entry waits on the reader; adds an amber cue. */
-  needsYou?: boolean;
   /** Listed under a smart-inbox section header, which already names the group. */
   inSmartSection?: boolean;
   /** Smart inbox: a coloured badge for urgent / high entries. */
@@ -103,6 +100,16 @@ export function InboxListItem({
     : t(($) => $.list.archive_tooltip);
   const actorType = item.actor_type ?? item.recipient_type;
   const signal = signalDetails(item);
+  // A Smart row folds a card's mention into its signal and carries the
+  // tagger as the actor. A stored signal's actor is the system (or, on old
+  // rows, nothing), and the recipient is never the sender.
+  const signalTagger =
+    signal &&
+    (item.actor_type === "agent" || item.actor_type === "member") &&
+    item.actor_id &&
+    item.actor_id !== item.recipient_id
+      ? item.actor_id
+      : null;
   // The glyph is per CATEGORY, so it alone cannot tell "In Review" from a
   // custom "Human Review" — moving between two statuses of the same category
   // left this row pixel-identical and read as "the inbox never updated"
@@ -149,10 +156,11 @@ export function InboxListItem({
           : "hover:bg-accent/50 data-[popup-open]:bg-accent/50"
       }`}
     >
-      {signal ? (
+      {signal && !signalTagger ? (
         // contango smart-inbox signal: raised by the ops feeder, not by a
         // person. Older rows carry no actor, which used to fall back to the
-        // recipient's own avatar; always show the system mark and group.
+        // recipient's own avatar; show the system mark and group unless a
+        // folded Smart row names who tagged the reader.
         <ActorAvatar
           actorType="system"
           actorId=""
@@ -175,15 +183,8 @@ export function InboxListItem({
             {showUnread && (
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
             )}
-            {needsYou && (
-              <span
-                role="img"
-                aria-label={t(($) => $.smart.needs_you)}
-                className="h-3.5 w-1 shrink-0 rounded-full bg-warning"
-              />
-            )}
             <span
-              className={`${inSmartSection ? "line-clamp-2 break-words" : "truncate"} text-body ${showUnread ? "font-medium" : "text-muted-foreground"} ${needsYou ? "font-semibold text-foreground" : ""}`}
+              className={`${inSmartSection ? "line-clamp-2 break-words" : "truncate"} text-body ${showUnread ? "font-medium" : "text-muted-foreground"}`}
             >
               {displayTitle}
             </span>

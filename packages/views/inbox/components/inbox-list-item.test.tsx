@@ -462,33 +462,22 @@ describe("InboxListItem smart-inbox signal sender", () => {
     expect(avatar).not.toHaveAttribute("data-actor-id", "member-1");
   });
 
+  it("shows the agent who tagged you on a folded Smart row", () => {
+    renderRow({
+      item: item({ type: "signal", actor_type: "agent", actor_id: "brooks", details: signalDetails }),
+      view: "inbox",
+    });
+    const avatar = screen.getByTestId("actor-avatar");
+    expect(avatar).toHaveAttribute("data-actor-type", "agent");
+    expect(avatar).toHaveAttribute("data-actor-id", "brooks");
+  });
+
   it("shows the system sender even if a signal row carries a member actor", () => {
     renderRow({
       item: item({ type: "signal", actor_type: "member", actor_id: "member-1", details: signalDetails }),
       view: "inbox",
     });
     expect(screen.getByTestId("actor-avatar")).toHaveAttribute("data-actor-type", "system");
-  });
-});
-
-describe("InboxListItem smart needs-you cue", () => {
-  it("shows the cue only when asked", () => {
-    const { container, rerender } = render(
-      <WorkspaceSlugProvider slug="acme">
-        <NavigationProvider value={makeAdapter()}>
-          <InboxListItem item={item()} view="inbox" isSelected={false} onClick={vi.fn()} onAction={vi.fn()} needsYou />
-        </NavigationProvider>
-      </WorkspaceSlugProvider>,
-    );
-    expect(container.querySelector(".bg-warning")).not.toBeNull();
-    rerender(
-      <WorkspaceSlugProvider slug="acme">
-        <NavigationProvider value={makeAdapter()}>
-          <InboxListItem item={item()} view="inbox" isSelected={false} onClick={vi.fn()} onAction={vi.fn()} />
-        </NavigationProvider>
-      </WorkspaceSlugProvider>,
-    );
-    expect(container.querySelector(".bg-warning")).toBeNull();
   });
 });
 

@@ -106,6 +106,7 @@ import { useTypeLabels } from "./inbox-detail-label";
 import {
   getInboxDisplayTitle,
   isAutopilotQuotaNotice,
+  inboxScrollTarget,
   isQuickCreateOutcome,
   resolveDetailItem,
 } from "./inbox-display";
@@ -119,7 +120,7 @@ import {
 import { SignalBrief, SmartFilterMenu } from "./smart-inbox";
 import { SmartInboxList } from "./smart-inbox-list";
 import { SmartDashboard } from "./smart-dashboard";
-import { smartInboxItems } from "./smart-items";
+import { buildSmartRows, smartRowUnreadIds } from "@multica/core/inbox/smart-fold";
 import { useT } from "../../i18n";
 import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade-prompt";
 
@@ -185,9 +186,11 @@ export function InboxPage({
   const { data: rawItems = [], isLoading: loading } = useQuery({
     ...inboxListOptions(wsId), enabled: !isArchivedView,
   });
+  // Smart: one row per card; a card's entries fold into its action signal.
+  const smartRows = useMemo(() => (smart ? buildSmartRows(rawItems) : null), [rawItems, smart]);
   const items = useMemo(
-    () => (smart ? smartInboxItems(rawItems) : deduplicateInboxItems(rawItems)),
-    [rawItems, smart],
+    () => smartRows?.items ?? deduplicateInboxItems(rawItems),
+    [rawItems, smartRows],
   );
   const archiveQuery = useInfiniteQuery({
     ...archivedInboxPagesOptions(wsId, filters), enabled: isArchivedView,
@@ -441,15 +444,19 @@ export function InboxPage({
         });
       }
     }
-    markReadMutate(selectedId, {
-      onError: (err) =>
-        toast.error(
-          err instanceof Error && err.message
-            ? err.message
-            : t(($) => $.errors.mark_read_failed),
-        ),
-    });
-  }, [selectedId, selectedRead, selectedKey, selected, filters.unreadOnly, isArchivedView, queryClient, wsId, markReadMutate, t]);
+    // A folded Smart row stands for several entries; opening it reads them all.
+    const ids = smartRows && selected ? smartRowUnreadIds(smartRows, selected) : [selectedId];
+    for (const id of ids) {
+      markReadMutate(id, {
+        onError: (err) =>
+          toast.error(
+            err instanceof Error && err.message
+              ? err.message
+              : t(($) => $.errors.mark_read_failed),
+          ),
+      });
+    }
+  }, [selectedId, selectedRead, selectedKey, selected, smartRows, filters.unreadOnly, isArchivedView, queryClient, wsId, markReadMutate, t]);
 
   // Release the guards as soon as the selection moves off their row.
   useEffect(() => {
@@ -510,14 +517,18 @@ export function InboxPage({
   const handleMarkRead = (id: string) => {
     // Reading it back explicitly cancels an earlier park on the same row.
     if (manualUnreadIdRef.current === id) manualUnreadIdRef.current = null;
-    markReadMutation.mutate(id, {
-      onError: (err) =>
-        toast.error(
-          err instanceof Error && err.message
-            ? err.message
-            : t(($) => $.errors.mark_read_failed),
-        ),
-    });
+    const row = smartRows?.items.find((i) => i.id === id);
+    const ids = smartRows && row ? smartRowUnreadIds(smartRows, row) : [id];
+    for (const target of ids.length ? ids : [id]) {
+      markReadMutation.mutate(target, {
+        onError: (err) =>
+          toast.error(
+            err instanceof Error && err.message
+              ? err.message
+              : t(($) => $.errors.mark_read_failed),
+          ),
+      });
+    }
   };
 
   const handleMarkUnread = (id: string) => {
@@ -589,8 +600,10 @@ export function InboxPage({
     });
   };
   const handleMarkSectionRead = (entries: SmartEntry[]) => {
-    const unread = entries.filter((entry) => !entry.item.read);
-    void Promise.allSettled(unread.map((entry) => markReadMutateAsync(entry.item.id))).then((results) => {
+    const unread = entries.flatMap((entry) =>
+      smartRows ? smartRowUnreadIds(smartRows, entry.item) : entry.item.read ? [] : [entry.item.id],
+    );
+    void Promise.allSettled(unread.map((id) => markReadMutateAsync(id))).then((results) => {
       if (results.some((r) => r.status === "rejected")) toast.error(t(($) => $.errors.mark_read_failed));
     });
   };
@@ -889,7 +902,7 @@ export function InboxPage({
           issueId={detailItem.issue_id}
           defaultSidebarOpen={false}
           layoutId="multica_inbox_issue_detail_layout"
-          highlightCommentId={detailItem.details?.comment_id ?? undefined}
+          highlightCommentId={inboxScrollTarget(detailItem)}
           highlightRequestToken={highlightRequestToken}
           // The split layout already has a nav trigger in the list header.
           // Explicit false suppresses the detail header's fallback trigger.

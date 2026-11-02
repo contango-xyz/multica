@@ -159,10 +159,8 @@ describe("SmartInboxPage", () => {
     const [row] = within(merge).getAllByRole("listitem");
     expect(row).toHaveTextContent("Approve merge #3204");
     expect(row).toHaveTextContent("CTG-1718 · blocks 3 cards");
-    // Action-required cue; existing entries show their comment preview.
-    expect(within(row!).getByRole("img", { name: "smart.needs_you" })).toBeInTheDocument();
+    // Existing entries show their comment preview.
     expect(screen.getByRole("region", { name: /sections\.mentions/ })).toHaveTextContent("@you can you look?");
-    expect(within(screen.getByRole("region", { name: /sections\.fyi/ })).queryByRole("img", { name: "smart.needs_you" })).toBeNull();
   });
 
   it("shows the compact dashboard above the sections", () => {
@@ -216,16 +214,17 @@ describe("SmartInboxPage", () => {
     expect(archive.mutateAsync.mock.calls.map((c) => c[0]).sort()).toEqual(["dec", "dec2"]);
   });
 
-  it("shows a signal in its section and the mention on the same issue under Mentions", () => {
+  it("shows one row per card: the mention folds into the card's signal and opening it reads both", () => {
     items = [
       base({ id: "m", type: "mentioned", title: "Tagged", body: "@you approve?", issue_id: "issue-9", actor_type: "agent", actor_id: "brooks", created_at: hoursAgo(2) }),
-      sig("s", "merge", { priority: "high", since: hoursAgo(2) }, { issue_id: "issue-9", created_at: hoursAgo(0.1) }),
+      sig("s", "merge", { priority: "high", since: hoursAgo(2) }, { issue_id: "issue-9", created_at: hoursAgo(0.1), read: true }),
     ];
     renderPage();
     const merge = screen.getByRole("region", { name: /sections\.merge/ });
     expect(within(merge).getByRole("listitem")).toHaveTextContent("Signal s");
-    const mentions = screen.getByRole("region", { name: /sections\.mentions/ });
-    expect(within(mentions).getByRole("listitem")).toHaveTextContent("@you approve?");
+    expect(screen.queryByRole("region", { name: /sections\.mentions/ })).toBeNull();
+    fireEvent.click(within(merge).getByRole("button", { name: /Signal s/ }));
+    expect(markRead.mutate.mock.calls.map((c) => c[0])).toEqual(["m"]);
   });
 
   it("archives a single row", () => {

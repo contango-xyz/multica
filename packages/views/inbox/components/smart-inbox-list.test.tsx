@@ -16,17 +16,15 @@ vi.mock("./inbox-list-item", () => ({
   InboxListItem: ({
     item,
     isSelected,
-    needsYou,
     onClick,
     onAction,
   }: {
     item: InboxItem;
     isSelected: boolean;
-    needsYou?: boolean;
     onClick: () => void;
     onAction: () => void;
   }) => (
-    <div data-testid="row" data-selected={String(isSelected)} data-needs-you={String(!!needsYou)}>
+    <div data-testid="row" data-selected={String(isSelected)}>
       <button type="button" onClick={onClick}>{item.id}</button>
       <button type="button" onClick={onAction}>archive {item.id}</button>
     </div>
@@ -66,8 +64,7 @@ describe("SmartInboxList", () => {
     renderList();
     const merge = screen.getByRole("region", { name: /smart\.sections\.merge/ });
     expect(within(merge).getByRole("heading")).toHaveTextContent("smart.sections.merge · 2 · reason a");
-    const rows = within(merge).getAllByTestId("row");
-    expect(rows.map((r) => r.getAttribute("data-needs-you"))).toEqual(["true", "false"]);
+    expect(within(merge).getAllByTestId("row")).toHaveLength(2);
   });
 
   it("marks the selected row by its row key (signals by id, others by issue)", () => {
