@@ -2593,6 +2593,14 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Post("/{id}/unread", h.MarkInboxUnread)
 				r.Post("/{id}/archive", h.ArchiveInboxItem)
 				r.Post("/{id}/unarchive", h.UnarchiveInboxItem)
+				// Smart inbox signals (contango): fed by the ops job as a
+				// workspace admin; agents' machine credentials are refused.
+				r.Group(func(r chi.Router) {
+					r.Use(handler.RequireHumanActor)
+					r.Use(middleware.RequireWorkspaceRole(queries, "owner", "admin"))
+					r.Post("/signals", h.UpsertInboxSignal)
+					r.Post("/signals/resolve", h.ResolveInboxSignal)
+				})
 			})
 
 			// Notification preferences

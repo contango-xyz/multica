@@ -116,6 +116,7 @@ func (d *Dispatcher) onInboxNew(e events.Event) {
 		Details       struct {
 			CommentID string `json:"comment_id"`
 			To        string `json:"to"`
+			Summary   string `json:"summary"`
 		} `json:"details"`
 	}
 	if !decode(payload["item"], &item) || item.RecipientType != "member" || item.RecipientID == "" {
@@ -139,7 +140,7 @@ func (d *Dispatcher) onInboxNew(e events.Event) {
 		body = *item.Body
 	}
 	j := job{kind: "inbox", userID: item.RecipientID, workspaceID: wsID, threadID: thread, data: data,
-		inbox: inboxInfo{typ: item.Type, title: item.Title, body: body, to: item.Details.To}}
+		inbox: inboxInfo{typ: item.Type, title: item.Title, body: body, to: item.Details.To, summary: item.Details.Summary}}
 	if item.IssueID != nil {
 		j.issueID = *item.IssueID
 	}

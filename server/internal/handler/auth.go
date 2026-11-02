@@ -79,6 +79,8 @@ type UserResponse struct {
 	WhatsNewSeenVersion *string `json:"whats_new_seen_version"`
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
+	// SmartInbox: this user is on MULTICA_SMART_INBOX_EMAILS (contango).
+	SmartInbox bool `json:"smart_inbox,omitempty"`
 }
 
 // MaxProfileDescriptionLen caps the user-supplied profile_description body.
@@ -108,6 +110,7 @@ func (h *Handler) userToResponse(u db.User) UserResponse {
 		WhatsNewSeenVersion:     textToPtr(u.WhatsNewSeenVersion),
 		CreatedAt:               timestampToString(u.CreatedAt),
 		UpdatedAt:               timestampToString(u.UpdatedAt),
+		SmartInbox:              h.SmartInboxEnabledFor(u.Email),
 	}
 }
 

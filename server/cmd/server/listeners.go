@@ -107,6 +107,7 @@ func registerListeners(bus *events.Bus, b realtime.Broadcaster) {
 		protocol.EventInboxUnarchived:    true,
 		protocol.EventInboxBatchRead:     true,
 		protocol.EventInboxBatchArchived: true,
+		protocol.EventInboxUpdated:       true,
 		protocol.EventInvitationCreated:  true,
 		protocol.EventInvitationRevoked:  true,
 		protocol.EventIssueUnreadChanged: true,
@@ -146,6 +147,7 @@ func registerListeners(bus *events.Bus, b realtime.Broadcaster) {
 		protocol.EventInboxRead, protocol.EventInboxArchived, protocol.EventInboxUnarchived,
 		protocol.EventInboxBatchRead, protocol.EventInboxBatchArchived,
 		protocol.EventIssueUnreadChanged,
+		protocol.EventInboxUpdated,
 	} {
 		bus.Subscribe(eventType, func(e events.Event) {
 			payload, ok := e.Payload.(map[string]any)
