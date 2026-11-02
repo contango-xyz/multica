@@ -9,6 +9,7 @@ import { ActorAvatar } from "../../common/actor-avatar";
 import { DeferredTooltip } from "../../common/deferred-tooltip";
 import { Archive, ArchiveRestore } from "lucide-react";
 import type { InboxItem } from "@multica/core/types";
+import { signalDetails } from "@multica/core/inbox/smart";
 import type { InboxView } from "./inbox-view";
 import { InboxDetailLabel, useTypeLabels } from "./inbox-detail-label";
 import {
@@ -86,6 +87,7 @@ export function InboxListItem({
     ? t(($) => $.list.unarchive_tooltip)
     : t(($) => $.list.archive_tooltip);
   const actorType = item.actor_type ?? item.recipient_type;
+  const signal = signalDetails(item);
   // The glyph is per CATEGORY, so it alone cannot tell "In Review" from a
   // custom "Human Review" — moving between two statuses of the same category
   // left this row pixel-identical and read as "the inbox never updated"
@@ -132,12 +134,26 @@ export function InboxListItem({
           : "hover:bg-accent/50 data-[popup-open]:bg-accent/50"
       }`}
     >
-      <ActorAvatar
-        actorType={actorType}
-        actorId={item.actor_id ?? item.recipient_id}
-        size="lg"
-        enableHoverCard
-      />
+      {signal ? (
+        // contango smart-inbox signal: raised by the ops feeder, not by a
+        // person. Older rows carry no actor, which used to fall back to the
+        // recipient's own avatar; always show the system mark and group.
+        <ActorAvatar
+          actorType="system"
+          actorId=""
+          name={t(($) => $.smart.sections[signal.group])}
+          size="lg"
+          enableHoverCard={false}
+          profileLink={false}
+        />
+      ) : (
+        <ActorAvatar
+          actorType={actorType}
+          actorId={item.actor_id ?? item.recipient_id}
+          size="lg"
+          enableHoverCard
+        />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">

@@ -129,6 +129,9 @@ func TestInboxSignalUpsertUpdateResolve(t *testing.T) {
 	if !created.Created || !created.Pushed || created.Item.Type != "signal" || created.Item.RecipientID != f.recipientID {
 		t.Fatalf("create response = %+v", created)
 	}
+	if created.Item.ActorType == nil || *created.Item.ActorType != "system" || created.Item.ActorID != nil {
+		t.Fatalf("signal actor = %v/%v, want system with no id", created.Item.ActorType, created.Item.ActorID)
+	}
 	var details signalDetails
 	if err := json.Unmarshal(created.Item.Details, &details); err != nil {
 		t.Fatal(err)
@@ -195,6 +198,23 @@ func TestInboxSignalUpsertUpdateResolve(t *testing.T) {
 		Want(http.StatusCreated).JSON(&again)
 	if again.Item.ID == created.Item.ID {
 		t.Fatal("raise after resolve must create a new item")
+	}
+}
+
+// Rows raised before signals carried a system actor heal on their next update.
+func TestInboxSignalUpdateSetsSystemActor(t *testing.T) {
+	f := newSignalFixture(t)
+	dbfx.Insert(t, "inbox_item", testutil.Cols{
+		"workspace_id": f.workspaceID, "recipient_type": "member", "recipient_id": f.recipientID,
+		"type": "signal", "severity": "attention", "title": "Old",
+		"details": `{"key":"needs-human:CTG-1:c1","group":"merge","summary":"s","actions":[],"rank":{"priority":"none","blocks":0,"since":"2026-11-01T10:00:00Z"}}`,
+	})
+	var out signalUpsertResponse
+	testutil.Call(t, signalHandler(testHandler.UpsertInboxSignal),
+		signalRequest("/api/inbox/signals", f.botUserID, f.workspaceID, f.body(map[string]any{"push": false}))).
+		Want(http.StatusOK).JSON(&out)
+	if out.Item.ActorType == nil || *out.Item.ActorType != "system" {
+		t.Fatalf("actor_type = %v, want system", out.Item.ActorType)
 	}
 }
 

@@ -421,3 +421,33 @@ describe("InboxListItem status glyph", () => {
     expect(icon.getAttribute("data-color")).toBe("");
   });
 });
+
+describe("InboxListItem smart-inbox signal sender", () => {
+  const signalDetails = {
+    key: "k",
+    group: "merge",
+    summary: "why",
+    actions: [],
+    rank: { priority: "none", blocks: 0, since: null },
+  } as unknown as InboxItem["details"];
+
+  // Regression: signals stored without an actor fell back to the recipient's
+  // own avatar, so every signal looked like it came from the reader.
+  it("shows the system sender for a signal without an actor", () => {
+    renderRow({
+      item: item({ type: "signal", actor_type: null, actor_id: null, details: signalDetails }),
+      view: "inbox",
+    });
+    const avatar = screen.getByTestId("actor-avatar");
+    expect(avatar).toHaveAttribute("data-actor-type", "system");
+    expect(avatar).not.toHaveAttribute("data-actor-id", "member-1");
+  });
+
+  it("shows the system sender even if a signal row carries a member actor", () => {
+    renderRow({
+      item: item({ type: "signal", actor_type: "member", actor_id: "member-1", details: signalDetails }),
+      view: "inbox",
+    });
+    expect(screen.getByTestId("actor-avatar")).toHaveAttribute("data-actor-type", "system");
+  });
+});
