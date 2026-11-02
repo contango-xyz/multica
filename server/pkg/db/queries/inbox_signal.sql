@@ -16,10 +16,12 @@ FOR UPDATE;
 -- name: InsertInboxSignal :one
 -- A concurrent insert for the same key returns no row; the caller retries as
 -- an update.
+-- Signals come from the system (the ops feeder), never from a person.
 INSERT INTO inbox_item (
-    id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, details
+    id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, details,
+    actor_type
 ) VALUES (
-    $1, $2, 'member', $3, 'signal', $4, $5, $6, $7, $8
+    $1, $2, 'member', $3, 'signal', $4, $5, $6, $7, $8, 'system'
 )
 ON CONFLICT (workspace_id, recipient_id, (details->>'key'))
     WHERE type = 'signal' AND (details->>'resolved_at') IS NULL
@@ -35,6 +37,8 @@ UPDATE inbox_item SET
     title = $4,
     body = $5,
     details = $6,
+    actor_type = 'system',
+    actor_id = NULL,
     read = CASE WHEN sqlc.arg(reraise)::bool THEN false ELSE read END,
     archived = CASE WHEN sqlc.arg(reraise)::bool THEN false ELSE archived END,
     created_at = CASE WHEN sqlc.arg(reraise)::bool THEN now() ELSE created_at END

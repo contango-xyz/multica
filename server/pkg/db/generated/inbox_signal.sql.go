@@ -58,9 +58,10 @@ func (q *Queries) GetLiveInboxSignalForUpdate(ctx context.Context, arg GetLiveIn
 
 const insertInboxSignal = `-- name: InsertInboxSignal :one
 INSERT INTO inbox_item (
-    id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, details
+    id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, details,
+    actor_type
 ) VALUES (
-    $1, $2, 'member', $3, 'signal', $4, $5, $6, $7, $8
+    $1, $2, 'member', $3, 'signal', $4, $5, $6, $7, $8, 'system'
 )
 ON CONFLICT (workspace_id, recipient_id, (details->>'key'))
     WHERE type = 'signal' AND (details->>'resolved_at') IS NULL
@@ -81,6 +82,7 @@ type InsertInboxSignalParams struct {
 
 // A concurrent insert for the same key returns no row; the caller retries as
 // an update.
+// Signals come from the system (the ops feeder), never from a person.
 func (q *Queries) InsertInboxSignal(ctx context.Context, arg InsertInboxSignalParams) (InboxItem, error) {
 	row := q.db.QueryRow(ctx, insertInboxSignal,
 		arg.ID,
@@ -162,6 +164,8 @@ UPDATE inbox_item SET
     title = $4,
     body = $5,
     details = $6,
+    actor_type = 'system',
+    actor_id = NULL,
     read = CASE WHEN $7::bool THEN false ELSE read END,
     archived = CASE WHEN $7::bool THEN false ELSE archived END,
     created_at = CASE WHEN $7::bool THEN now() ELSE created_at END
