@@ -23,8 +23,11 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
   const key = `e2e-desktop:${run}`;
   try {
     const workspace = (await api.getWorkspaces())[0]!;
+    // Two cards: A has a merge ask AND the mention that tagged the reader
+    // (one row, folded); B only has a mention (Mentions & reviews).
     const issue = await api.createIssue(`Ship the login fix ${run}`, { status: "todo" });
-    // An agent that tagged the reader on the issue and is still working on it.
+    const other = await api.createIssue(`Review the docs ${run}`, { status: "todo" });
+    // An agent that tagged the reader and is still working on card B.
     const runtime = await db.query<{ id: string }>(
       `INSERT INTO agent_runtime (workspace_id, name, runtime_mode, provider, status, device_info, metadata, owner_id, last_seen_at)
        VALUES ($1, $2, 'cloud', 'codex', 'online', 'E2E fixture', '{}'::jsonb, $3, now()) RETURNING id`,
@@ -40,13 +43,38 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
     await db.query(
       `INSERT INTO agent_task_queue (agent_id, runtime_id, issue_id, status, dispatched_at, started_at)
        VALUES ($1, $2, $3, 'running', now(), now())`,
-      [agentId, runtimeId, issue.id],
+      [agentId, runtimeId, other.id],
     );
-    await db.query(
-      `INSERT INTO inbox_item (workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, actor_type, actor_id, created_at)
-       VALUES ($1, 'member', $2, 'mentioned', 'action_required', $3, $4, 'Can you approve the merge?', 'agent', $5, now() - interval '2 hours')`,
-      [workspace.id, me.id, issue.id, issue.title, agentId],
-    );
+    // A long thread, so the comment that tagged the reader starts off screen.
+    const tagThread = async (issueId: string, ask: string) => {
+      await db.query(
+        `INSERT INTO comment (workspace_id, issue_id, author_type, author_id, content, created_at)
+         SELECT $1, $2, 'member', $3, 'Progress note ' || g || E'\n\nNothing for you here yet.', now() - interval '3 hours' + g * interval '1 minute'
+         FROM generate_series(1, 30) AS g`,
+        [workspace.id, issueId, me.id],
+      );
+      const tag = await db.query<{ id: string }>(
+        `INSERT INTO comment (workspace_id, issue_id, author_type, author_id, content, created_at)
+         VALUES ($1, $2, 'agent', $3, $4, now() - interval '1 hour') RETURNING id`,
+        [workspace.id, issueId, agentId, ask],
+      );
+      const commentId = tag.rows[0]!.id;
+      await db.query(
+        `INSERT INTO comment (workspace_id, issue_id, author_type, author_id, content, created_at)
+         SELECT $1, $2, 'member', $3, 'Later note ' || g, now() - interval '50 minutes' + g * interval '1 minute'
+         FROM generate_series(1, 10) AS g`,
+        [workspace.id, issueId, me.id],
+      );
+      await db.query(
+        `INSERT INTO inbox_item (workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, actor_type, actor_id, details, created_at)
+         VALUES ($1, 'member', $2, 'mentioned', 'action_required', $3, (SELECT title FROM issue WHERE id = $3), $4, 'agent', $5,
+                 jsonb_build_object('comment_id', $6::text), now() - interval '1 hour')`,
+        [workspace.id, me.id, issueId, ask, agentId, commentId],
+      );
+      return commentId;
+    };
+    const askA = await tagThread(issue.id, "Can you approve the merge of the login fix?");
+    const askB = await tagThread(other.id, "Can you review the docs change?");
     const status = await api.upsertInboxSignal({
       recipient_member_id: me.id,
       key,
@@ -76,6 +104,8 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
     await expect(first).toContainText(/[123]\. Approve merge/);
     await expect(first).toContainText(/urgent · blocks 3 cards · waiting 6h/);
     await expect(first.getByRole("button", { name: /Open PR/ })).toBeVisible();
+    // Card A counts once although it has a signal and a mention.
+    await expect(doFirst.getByRole("listitem").filter({ hasText: issue.title })).toHaveCount(0);
     const counters = page.getByRole("group", { name: "Overview" });
     await expect(counters.getByRole("button", { name: /\d+ waiting on you/ })).toBeVisible();
     await expect(counters.getByRole("button", { name: /\d+ urgent/ })).toBeVisible();
@@ -90,20 +120,23 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
     await expect(page.getByRole("button", { name: "More actions" })).toBeInViewport();
     await expect(page.getByRole("button", { name: "Switch to Classic" })).toBeVisible();
 
-    // The mention row is a Classic row: the agent's avatar, the card's status
-    // icon, the agent-working indicator, the preview.
-    const mentionRow = mentions.getByRole("button", { name: /Ship the login fix/ });
+    // One row per card: card A's mention folded into its merge row, which shows
+    // the agent who tagged the reader; it is not under Mentions & reviews.
+    const signalRow = merge.getByRole("button", { name: new RegExp(`Approve merge #${run}`) });
+    await expect(signalRow).toContainText("CTG-1718 · blocks 3 cards");
+    await expect(signalRow.locator('[data-slot="avatar"]').first()).toBeVisible();
+    await expect(mentions.getByRole("button", { name: new RegExp(issue.title) })).toHaveCount(0);
+
+    // Card B's row is a Classic row: the agent's avatar, the card's status icon,
+    // the agent-working indicator.
+    const mentionRow = mentions.getByRole("button", { name: new RegExp(other.title) });
     await expect(mentionRow).toBeVisible();
     await expect(mentionRow.locator('[data-slot="avatar"]').first()).toBeVisible();
     await expect(mentionRow.locator('span[title="Todo"]')).toBeVisible();
     await expect(mentionRow).toContainText("Working");
-    await expect(mentionRow).toContainText("Mentioned");
-    // The signal row carries its summary and the needs-you cue.
-    const signalRow = merge.getByRole("button", { name: new RegExp(`Approve merge #${run}`) });
-    await expect(signalRow).toContainText("CTG-1718 · blocks 3 cards");
-    await expect(signalRow.getByRole("img", { name: "Needs you" })).toBeVisible();
 
-    // Two panes: selecting a row fills the right pane and stays on /inbox.
+    // Two panes: selecting the folded row fills the right pane, stays on
+    // /inbox, and scrolls the thread to the comment that tagged the reader.
     const inboxPath = new URL(page.url()).pathname;
     await signalRow.click();
     const brief = page.getByTestId("signal-brief");
@@ -112,8 +145,8 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
     await expect(brief.getByRole("button", { name: /Open PR/ })).toBeVisible();
     await expect(merge).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(inboxPath);
-    // The issue thread is still there below the brief.
-    await expect(page.getByText(issue.title).nth(1)).toBeVisible();
+    await expect(page.locator(`#comment-${askA}`)).toBeInViewport({ timeout: 15_000 });
+    await expect(page.locator("#comment-" + askA)).toContainText("approve the merge");
     await page.screenshot({ path: "test-results/smart-inbox-1280.png" });
 
     // A counter filters the list: "Merge approvals" alone.
@@ -122,10 +155,18 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
     await counters.getByRole("button", { name: /Merge approvals · \d+/ }).click();
     await expect(page.getByRole("region", { name: /Mentions & reviews/ })).toBeVisible();
 
-    // A mention's detail is Classic's: no brief.
+    // A mention's detail is Classic's (no brief), landing on its comment.
     await mentionRow.click();
     await expect(page.getByTestId("signal-brief")).toHaveCount(0);
     expect(new URL(page.url()).pathname).toBe(inboxPath);
+    await expect(page.locator(`#comment-${askB}`)).toBeInViewport({ timeout: 15_000 });
+    await page.screenshot({ path: "test-results/smart-inbox-1280-mention.png" });
+
+    // Classic lands on the tagging comment too.
+    await page.getByRole("button", { name: "Switch to Classic" }).click();
+    await page.getByRole("button", { name: new RegExp(other.title) }).first().click();
+    await expect(page.locator(`#comment-${askB}`)).toBeInViewport({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Switch to Smart" }).click();
 
     expect(await api.resolveInboxSignal({ recipient_member_id: me.id, key })).toBe(200);
   } finally {
