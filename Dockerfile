@@ -7,7 +7,8 @@ WORKDIR /src
 
 # Cache dependencies
 COPY server/go.mod server/go.sum ./server/
-RUN cd server && go mod download
+# contango: retry, since proxy.golang.org dropped a module zip mid-stream and failed the image build (2026-11-02)
+RUN cd server && for i in 1 2 3; do go mod download && exit 0; echo "go mod download failed (attempt $i), retrying" >&2; sleep 10; done; exit 1
 
 # Copy server source
 COPY server/ ./server/
