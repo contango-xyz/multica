@@ -292,6 +292,8 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `packages/core/{types/inbox,types/workspace,types/events,api/schemas}.ts`, `packages/core/package.json`
   (exports), `packages/views/inbox/components/{index.ts,inbox-page.tsx,inbox-detail-label.tsx,inbox-list-item.tsx}`
   (the last: signals render with the system sender),
+  `packages/core/inbox/queries.ts` (a group shows its newest non-signal row),
+  `server/pkg/db/queries/{inbox,inbox_archive}.sql` (archived group representative skips signals),
   `packages/views/locales/*/inbox.json`, `apps/mobile/components/inbox/detail-label.tsx` +
   `apps/mobile/locales/*/inbox.json` (compile-only: the new type's label), `e2e/fixtures.ts`.
 - **Migrations:** `607_inbox_signal_key_index` (unique partial expression index on

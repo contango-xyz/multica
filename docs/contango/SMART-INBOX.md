@@ -104,6 +104,18 @@ avatar, so every signal looked like it came from the reader. The server now writ
 `actor_type = 'system'` on insert and on every update (old rows heal on the feeder's next pass), and
 the classic row ignores the actor for type `signal`, so old rows render correctly either way.
 
+**Issue groups in Classic (fix 2026-11-02, second round):** Classic shows one row per issue. That row
+used to be the issue's newest entry, and the feeder refreshes a signal on exactly the issues where an
+agent tagged you, so those rows showed the system sender instead of the agent. Now a group SHOWS its
+newest non-signal entry (sender, title, preview, time) whenever it has one; a signal-only group shows
+the signal, with the system mark and its group label as line 2 ("Stalled · no update for 6 h"). In the
+active list the group keeps the newest row's id and read/archived state, so opening, read/unread and
+archive act on the group exactly as before (client grouping in `packages/core/inbox/queries.ts`). The
+Archived list, grouped server-side, uses the newest non-signal row as the group's representative
+(`ListArchivedInboxPage`, `ArchivedInboxFacets`, `ListArchivedInboxItems`), so the From filter matches
+the shown sender. Smart is unaffected: it takes signals one by one from the raw list and groups only
+the other entries.
+
 Desktop and mobile apps are unchanged (classic only; the desktop shares the web view code but never
 sees the opt-in param). Classic rows show a signal's summary as their second line.
 
