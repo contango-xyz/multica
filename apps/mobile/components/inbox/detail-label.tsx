@@ -57,6 +57,8 @@ const TYPE_KEY: Record<InboxItemType, string> = {
   autopilot_paused: "type.autopilot_paused",
   autopilot_quota_exceeded: "type.autopilot_quota_exceeded",
   children_done: "type.children_done",
+  // contango smart-inbox signal; only allowlisted users receive these.
+  signal: "type.signal",
 };
 
 // due_date is a calendar day — format timezone-safely (no offset day shift).

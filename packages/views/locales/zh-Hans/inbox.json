@@ -80,7 +80,8 @@
     "quick_create_unconfirmed": "通过智能体创建结果未确认",
     "autopilot_paused": "自动化已暂停",
     "children_done": "子任务已全部结束",
-    "autopilot_quota_exceeded": "自动化执行次数已用完"
+    "autopilot_quota_exceeded": "自动化执行次数已用完",
+    "signal": "信号"
   },
   "labels": {
     "set_status_to": "状态设为",
@@ -117,5 +118,32 @@
     "unarchive_failed": "取消归档失败",
     "archived_load_failed": "无法加载已归档通知",
     "filters_load_failed": "无法加载筛选项"
+  },
+  "smart": {
+    "toggle_aria": "收件箱布局",
+    "smart": "智能",
+    "classic": "经典",
+    "sections": {
+      "waiting": "等待你处理",
+      "merge": "合并审批",
+      "decision": "决策",
+      "access": "权限与资金",
+      "stalled": "停滞",
+      "blocking": "阻塞他人",
+      "alert": "告警",
+      "fyi": "知悉"
+    },
+    "priority": {
+      "urgent": "紧急",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "none": "无优先级"
+    },
+    "blocks_other": "阻塞 {{count}} 项",
+    "open": "打开",
+    "open_issue": "打开事项",
+    "back": "收件箱",
+    "empty": "目前没有需要你处理的事项"
   }
 }

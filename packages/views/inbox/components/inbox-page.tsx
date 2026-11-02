@@ -7,6 +7,7 @@ import {
   useDeferredValue,
   useMemo,
   useRef,
+  type ReactNode,
 } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceId } from "@multica/core/hooks";
@@ -113,7 +114,12 @@ import { useT } from "../../i18n";
 import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade-prompt";
 
 
-export function InboxPage() {
+export function InboxPage({
+  headerAccessory,
+}: {
+  /** Extra header control; the contango smart-inbox toggle when enabled. */
+  headerAccessory?: ReactNode;
+} = {}) {
   const queryClient = useQueryClient();
   const { t } = useT("inbox");
   const { t: tCommon } = useT("common");
@@ -672,6 +678,7 @@ export function InboxPage() {
         )
       }
     >
+      {headerAccessory}
       <InboxFilterMenu
         wsId={wsId}
         items={viewItems}

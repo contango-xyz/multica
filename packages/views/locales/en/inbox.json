@@ -82,7 +82,8 @@
     "quick_create_unconfirmed": "Create with agent unconfirmed",
     "autopilot_paused": "Autopilot paused",
     "children_done": "Sub-issues finished",
-    "autopilot_quota_exceeded": "Autopilot run limit reached"
+    "autopilot_quota_exceeded": "Autopilot run limit reached",
+    "signal": "Signal"
   },
   "labels": {
     "set_status_to": "Set status to",
@@ -119,5 +120,33 @@
     "unarchive_failed": "Failed to unarchive",
     "archived_load_failed": "Failed to load archived notifications",
     "filters_load_failed": "Could not load filters"
+  },
+  "smart": {
+    "toggle_aria": "Inbox layout",
+    "smart": "Smart",
+    "classic": "Classic",
+    "sections": {
+      "waiting": "Waiting on you",
+      "merge": "Merge approvals",
+      "decision": "Decisions",
+      "access": "Access & funding",
+      "stalled": "Stalled",
+      "blocking": "Blocking others",
+      "alert": "Alerts",
+      "fyi": "FYI"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "none": "No priority"
+    },
+    "blocks_one": "blocks {{count}}",
+    "blocks_other": "blocks {{count}}",
+    "open": "Open",
+    "open_issue": "Open issue",
+    "back": "Inbox",
+    "empty": "Nothing needs you right now"
   }
 }

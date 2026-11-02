@@ -80,7 +80,8 @@
     "quick_create_unconfirmed": "エージェントでの作成結果は未確認",
     "autopilot_paused": "自動化を一時停止しました",
     "children_done": "サブタスクがすべて終わりました",
-    "autopilot_quota_exceeded": "自動化の実行上限に達しました"
+    "autopilot_quota_exceeded": "自動化の実行上限に達しました",
+    "signal": "シグナル"
   },
   "labels": {
     "set_status_to": "ステータスを変更:",
@@ -117,5 +118,32 @@
     "unarchive_failed": "アーカイブ解除に失敗しました",
     "archived_load_failed": "アーカイブ済み通知を読み込めませんでした",
     "filters_load_failed": "フィルターを読み込めませんでした"
+  },
+  "smart": {
+    "toggle_aria": "受信トレイの表示",
+    "smart": "スマート",
+    "classic": "クラシック",
+    "sections": {
+      "waiting": "あなたの対応待ち",
+      "merge": "マージ承認",
+      "decision": "意思決定",
+      "access": "アクセスと資金",
+      "stalled": "停滞中",
+      "blocking": "他をブロック中",
+      "alert": "アラート",
+      "fyi": "お知らせ"
+    },
+    "priority": {
+      "urgent": "緊急",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "none": "優先度なし"
+    },
+    "blocks_other": "{{count}} 件をブロック",
+    "open": "開く",
+    "open_issue": "課題を開く",
+    "back": "受信トレイ",
+    "empty": "今対応が必要なものはありません"
   }
 }

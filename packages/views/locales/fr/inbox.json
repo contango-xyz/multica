@@ -82,7 +82,8 @@
     "quick_create_unconfirmed": "Création avec un agent non confirmée",
     "autopilot_paused": "Automatisation en pause",
     "children_done": "Sous-tâches terminées",
-    "autopilot_quota_exceeded": "Limite d'exécutions d'automatisation atteinte"
+    "autopilot_quota_exceeded": "Limite d'exécutions d'automatisation atteinte",
+    "signal": "Signal"
   },
   "labels": {
     "set_status_to": "Statut défini sur",
@@ -119,5 +120,33 @@
     "unarchive_failed": "Échec du désarchivage",
     "archived_load_failed": "Échec du chargement des notifications archivées",
     "filters_load_failed": "Impossible de charger les filtres"
+  },
+  "smart": {
+    "toggle_aria": "Disposition de la boîte de réception",
+    "smart": "Intelligente",
+    "classic": "Classique",
+    "sections": {
+      "waiting": "En attente de vous",
+      "merge": "Approbations de fusion",
+      "decision": "Décisions",
+      "access": "Accès et financement",
+      "stalled": "Bloqué",
+      "blocking": "Bloque d'autres tâches",
+      "alert": "Alertes",
+      "fyi": "Pour info"
+    },
+    "priority": {
+      "urgent": "Urgente",
+      "high": "Haute",
+      "medium": "Moyenne",
+      "low": "Basse",
+      "none": "Sans priorité"
+    },
+    "blocks_one": "bloque {{count}}",
+    "blocks_other": "bloque {{count}}",
+    "open": "Ouvrir",
+    "open_issue": "Ouvrir le ticket",
+    "back": "Boîte de réception",
+    "empty": "Rien ne vous attend pour le moment"
   }
 }
