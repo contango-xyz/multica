@@ -73,6 +73,7 @@ import { useTimeAgo } from "./inbox-list-item";
 import { useTypeLabels } from "./inbox-detail-label";
 import { getInboxDisplayTitle } from "./inbox-display";
 import { InboxFilterMenu } from "./inbox-filter-menu";
+import { SmartDashboard } from "./smart-dashboard";
 
 // 44px: the minimum comfortable tap target on a phone.
 const TAP = "min-h-11";
@@ -242,6 +243,10 @@ export function SmartInboxPage({ headerAccessory }: { headerAccessory?: ReactNod
       </PageHeader>
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <div className="mx-auto w-full max-w-2xl pb-6">
+          {!isLoading && <SmartDashboard wsId={wsId} sections={allSections} onSelect={(item) => {
+            const entry = allSections.flatMap((x) => x.entries).find((e) => e.item.id === item.id);
+            if (entry) openEntry(entry);
+          }} compact />}
           {isLoading ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -278,6 +283,7 @@ export function SmartFilterMenu({ wsId }: { wsId: string }) {
   const filters = useSmartInboxFilters(wsId);
   const toggleGroup = useSmartInboxFilterStore((s) => s.toggleGroup);
   const toggleNeedsYouOnly = useSmartInboxFilterStore((s) => s.toggleNeedsYouOnly);
+  const toggleUrgentOnly = useSmartInboxFilterStore((s) => s.toggleUrgentOnly);
   const clear = useSmartInboxFilterStore((s) => s.clearSmartFilters);
   const count = smartInboxFilterCount(filters);
   return (
@@ -305,6 +311,12 @@ export function SmartFilterMenu({ wsId }: { wsId: string }) {
           onCheckedChange={() => toggleNeedsYouOnly(wsId)}
         >
           {t(($) => $.smart.filters.needs_you)}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={filters.urgentOnly}
+          onCheckedChange={() => toggleUrgentOnly(wsId)}
+        >
+          {t(($) => $.smart.filters.urgent_only)}
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {SECTION_IDS.map((id) => (

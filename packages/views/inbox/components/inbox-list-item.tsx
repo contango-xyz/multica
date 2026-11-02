@@ -9,7 +9,7 @@ import { ActorAvatar } from "../../common/actor-avatar";
 import { DeferredTooltip } from "../../common/deferred-tooltip";
 import { Archive, ArchiveRestore } from "@multica/ui/icons";
 import type { InboxItem } from "@multica/core/types";
-import { signalDetails } from "@multica/core/inbox/smart";
+import { signalDetails, type AgeTint } from "@multica/core/inbox/smart";
 import type { InboxView } from "./inbox-view";
 import { InboxDetailLabel, useTypeLabels } from "./inbox-detail-label";
 import {
@@ -49,6 +49,9 @@ export function InboxListItem({
   onAction,
   needsYou = false,
   inSmartSection = false,
+  priority,
+  ageTint = "none",
+  waitingSince,
 }: {
   item: InboxItem;
   view: InboxView;
@@ -58,6 +61,12 @@ export function InboxListItem({
   needsYou?: boolean;
   /** Listed under a smart-inbox section header, which already names the group. */
   inSmartSection?: boolean;
+  /** Smart inbox: a coloured badge for urgent / high entries. */
+  priority?: "urgent" | "high";
+  /** Smart inbox: the time turns amber, then red, the longer the entry waits. */
+  ageTint?: AgeTint;
+  /** Smart inbox: show the age of the wait (a signal's rank.since) instead of the row's time. */
+  waitingSince?: string;
   // Archive in the main list, unarchive in the archived one — the row action is
   // always the reversal of the current view, so the two lists share this row.
   onAction: () => void;
@@ -178,6 +187,17 @@ export function InboxListItem({
             >
               {displayTitle}
             </span>
+            {priority && (
+              <span
+                className={`shrink-0 rounded-sm px-1 text-micro font-medium ${
+                  priority === "urgent"
+                    ? "bg-destructive/15 text-destructive"
+                    : "bg-priority-high/15 text-priority-high"
+                }`}
+              >
+                {t(($) => $.smart.priority[priority])}
+              </span>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {/* Pointer-only affordance: revealed on hover, and on keyboard
@@ -238,8 +258,17 @@ export function InboxListItem({
                 />
               </span>
             )}
-            <span className={`text-caption ${showUnread ? "text-muted-foreground" : "text-muted-foreground"}`}>
-              {timeAgo(item.created_at)}
+            <span
+              data-age-tint={ageTint}
+              className={`text-caption ${
+                ageTint === "red"
+                  ? "font-medium text-destructive"
+                  : ageTint === "amber"
+                    ? "font-medium text-warning"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {timeAgo(waitingSince ?? item.created_at)}
             </span>
           </div>
         </div>

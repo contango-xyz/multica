@@ -152,10 +152,25 @@
     "archive_section": "모두 보관",
     "filters": {
       "tooltip": "그룹으로 필터",
-      "needs_you": "내 조치가 필요한 항목만"
+      "needs_you": "내 조치가 필요한 항목만",
+      "urgent_only": "긴급만"
     },
     "show_more_other": "{{count}}개 더 보기",
     "switch_to_classic": "클래식으로 전환",
-    "switch_to_smart": "스마트로 전환"
+    "switch_to_smart": "스마트로 전환",
+    "dashboard": {
+      "do_first": "이것부터",
+      "nothing_waiting": "대기 중인 항목이 없습니다",
+      "waiting_other": "내 응답 대기 {{count}}개",
+      "oldest": "가장 오래된 {{age}}",
+      "urgent_other": "긴급 {{count}}개",
+      "blocks_cards_other": "{{count}}개 카드 차단",
+      "waiting_for": "{{age}} 대기 중",
+      "stalled_other": "정체 {{count}}개",
+      "blocking_other": "차단 중 {{count}}개",
+      "open": "열기",
+      "dashboard": "개요",
+      "health": "팀 상태"
+    }
   }
 }

@@ -2,7 +2,11 @@
 import { describe, expect, it } from "vitest";
 import type { InboxItem } from "../types";
 import {
+  ageTint,
   buildSmartSections,
+  doThisFirst,
+  smartCounters,
+  squadHealth,
   rankInput,
   rankReason,
   rankScore,
@@ -145,6 +149,70 @@ describe("buildSmartSections", () => {
     const b = signal("blocking", { priority: "medium", blocks: 5, since: hoursAgo(1) });
     const [section] = buildSmartSections([a, b], NOW);
     expect(section!.entries.map((e) => e.item.id)).toEqual([b.id, a.id]);
+  });
+});
+
+describe("dashboard", () => {
+  const ask = (id: string, group: string, rank: Record<string, unknown>, over: Partial<Omit<InboxItem, "details">> = {}) =>
+    signal(group, rank, { id, severity: "action_required", ...over });
+
+  it("picks the top 3 waiting entries by score, across sections, and promotes the next when one clears", () => {
+    const a = ask("a", "merge", { priority: "urgent", blocks: 4, since: hoursAgo(9) }); // 8*5*9 = 360
+    const b = ask("b", "decision", { priority: "high", since: hoursAgo(10) }); // 4*1*10 = 40
+    const c = ask("c", "access", { priority: "medium", blocks: 1, since: hoursAgo(5) }); // 2*2*5 = 20
+    const d = item({ id: "d", type: "mentioned", issue_priority: "low", created_at: hoursAgo(3) }); // 1*1*3 = 3
+    const fyi = signal("fyi", { priority: "urgent", blocks: 9, since: hoursAgo(99) }, { id: "fyi" }); // not waiting
+    const top = (items: InboxItem[]) => doThisFirst(buildSmartSections(items, NOW)).map((e) => e.item.id);
+    expect(top([d, c, fyi, b, a])).toEqual(["a", "b", "c"]);
+    expect(top([d, c, fyi, b])).toEqual(["b", "c", "d"]);
+    expect(top([fyi])).toEqual([]);
+  });
+
+  it("counts what waits on you, per group, the oldest wait and the urgent ones", () => {
+    const sections = buildSmartSections(
+      [
+        ask("a", "merge", { priority: "urgent", since: hoursAgo(9) }),
+        ask("b", "merge", { priority: "high", since: hoursAgo(2) }),
+        ask("c", "decision", { priority: "urgent", since: hoursAgo(30) }),
+        item({ id: "m", type: "mentioned", created_at: hoursAgo(1) }),
+        signal("stalled", { priority: "urgent", since: hoursAgo(50) }, { id: "s" }), // attention: not waiting
+      ],
+      NOW,
+    );
+    const counters = smartCounters(sections);
+    expect(counters.waiting).toBe(4);
+    expect(counters.byGroup).toEqual([
+      { id: "merge", count: 2 },
+      { id: "decision", count: 1 },
+      { id: "mentions", count: 1 },
+    ]);
+    expect(counters.oldestWaitHours).toBeCloseTo(30);
+    expect(counters.urgent).toBe(2);
+    expect(smartCounters([]).oldestWaitHours).toBeNull();
+  });
+
+  it("reads squad health from the reader's own stalled, blocking and alert signals", () => {
+    const health = squadHealth(
+      buildSmartSections(
+        [
+          signal("stalled", {}, { id: "s1" }),
+          signal("stalled", {}, { id: "s2" }),
+          signal("alert", {}, { id: "main", title: "main red" }),
+          item({ id: "x", type: "status_changed" }),
+        ],
+        NOW,
+      ),
+    );
+    expect(health.stalled).toBe(2);
+    expect(health.blocking).toBe(0);
+    expect(health.alerts.map((e) => e.item.title)).toEqual(["main red"]);
+  });
+
+  it("tints age amber after 4 h and red after 24 h; urgent after 1 h and 4 h", () => {
+    const tint = (priority: "urgent" | "high", waitedHours: number) =>
+      ageTint({ waitedHours, reason: { priority, blocks: 0, hours: Math.floor(waitedHours) } });
+    expect([3.9, 4.1, 23.9, 24.1].map((h) => tint("high", h))).toEqual(["none", "amber", "amber", "red"]);
+    expect([0.9, 1.1, 3.9, 4.1].map((h) => tint("urgent", h))).toEqual(["none", "amber", "amber", "red"]);
   });
 });
 

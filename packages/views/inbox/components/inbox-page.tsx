@@ -119,6 +119,7 @@ import {
 } from "@multica/core/inbox/smart-filter-store";
 import { SignalBrief, SmartFilterMenu } from "./smart-inbox";
 import { SmartInboxList } from "./smart-inbox-list";
+import { SmartDashboard } from "./smart-dashboard";
 import { smartInboxItems } from "./smart-items";
 import { useT } from "../../i18n";
 import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade-prompt";
@@ -233,6 +234,11 @@ export function InboxPage({
     const id = setInterval(() => setRankNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, [smart]);
+  // The dashboard counts the whole active inbox, whatever the list filters hide.
+  const smartDashboardSections = useMemo(
+    () => (smart && !isArchivedView ? buildSmartSections(items, rankNow) : null),
+    [smart, isArchivedView, items, rankNow],
+  );
   const smartSections = useMemo(
     () =>
       smart && !isArchivedView
@@ -1178,7 +1184,7 @@ export function InboxPage({
     );
   }
 
-  return (
+  const panes = (
     <div className="flex min-h-0 flex-1">
       <ListColumn collapsed={listCollapsed} width="list">{listPanel}</ListColumn>
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
@@ -1212,4 +1218,14 @@ export function InboxPage({
       </div>
     </div>
   );
+  // Smart: the dashboard sits above both panes.
+  if (smartDashboardSections) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <SmartDashboard wsId={wsId} sections={smartDashboardSections} onSelect={handleSelect} />
+        {panes}
+      </div>
+    );
+  }
+  return panes;
 }

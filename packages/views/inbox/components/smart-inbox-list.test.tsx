@@ -41,6 +41,7 @@ const entry = (id: string, over: Partial<InboxItem> = {}, needsYou = false): Sma
   score: 1,
   reason: { priority: "none", blocks: 0, hours: 0 },
   needsYou,
+  waitedHours: 0,
 });
 
 const sections: SmartSection[] = [

@@ -152,10 +152,25 @@
     "archive_section": "すべてアーカイブ",
     "filters": {
       "tooltip": "グループで絞り込み",
-      "needs_you": "自分の対応が必要なもののみ"
+      "needs_you": "自分の対応が必要なもののみ",
+      "urgent_only": "緊急のみ"
     },
     "show_more_other": "さらに {{count}} 件表示",
     "switch_to_classic": "クラシックに切り替え",
-    "switch_to_smart": "スマートに切り替え"
+    "switch_to_smart": "スマートに切り替え",
+    "dashboard": {
+      "do_first": "最初にこれを",
+      "nothing_waiting": "対応待ちはありません",
+      "waiting_other": "対応待ち {{count}} 件",
+      "oldest": "最長 {{age}}",
+      "urgent_other": "緊急 {{count}} 件",
+      "blocks_cards_other": "{{count}} 件をブロック",
+      "waiting_for": "{{age}} 待機中",
+      "stalled_other": "停滞 {{count}} 件",
+      "blocking_other": "ブロック中 {{count}} 件",
+      "open": "開く",
+      "dashboard": "概要",
+      "health": "チームの状態"
+    }
   }
 }

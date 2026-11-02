@@ -491,3 +491,33 @@ describe("InboxListItem smart needs-you cue", () => {
     expect(container.querySelector(".bg-warning")).toBeNull();
   });
 });
+
+describe("InboxListItem smart priority badge and age tint", () => {
+  const renderWith = (props: Partial<Parameters<typeof InboxListItem>[0]>) =>
+    render(
+      <WorkspaceSlugProvider slug="acme">
+        <NavigationProvider value={makeAdapter()}>
+          <InboxListItem item={item()} view="inbox" isSelected={false} onClick={vi.fn()} onAction={vi.fn()} {...props} />
+        </NavigationProvider>
+      </WorkspaceSlugProvider>,
+    );
+
+  it("colours urgent red and high orange, and shows no badge otherwise", () => {
+    const { container, unmount } = renderWith({ priority: "urgent" });
+    expect(container.querySelector(".bg-destructive\\/15")).not.toBeNull();
+    unmount();
+    const high = renderWith({ priority: "high" });
+    expect(high.container.querySelector(".bg-priority-high\\/15")).not.toBeNull();
+    high.unmount();
+    const none = renderWith({});
+    expect(none.container.querySelector(".bg-destructive\\/15, .bg-priority-high\\/15")).toBeNull();
+  });
+
+  it("tints the age amber or red", () => {
+    const amber = renderWith({ ageTint: "amber" });
+    expect(amber.container.querySelector('[data-age-tint="amber"]')!.className).toContain("text-warning");
+    amber.unmount();
+    const red = renderWith({ ageTint: "red" });
+    expect(red.container.querySelector('[data-age-tint="red"]')!.className).toContain("text-destructive");
+  });
+});
