@@ -68,6 +68,18 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
     }, api.getToken());
     await page.goto(`/${workspace.slug}/inbox?smart-inbox=1`, { waitUntil: "domcontentloaded" });
 
+    // The dashboard above the panes: the urgent signal is among the things to
+    // do first, numbered, with its action (the order itself is unit-tested).
+    const doFirst = page.getByRole("region", { name: "Do this first" });
+    await expect(doFirst).toBeVisible({ timeout: 45_000 });
+    const first = doFirst.getByRole("listitem").filter({ hasText: `Approve merge #${run}` });
+    await expect(first).toContainText(/[123]\. Approve merge/);
+    await expect(first).toContainText(/urgent · blocks 3 cards · waiting 6h/);
+    await expect(first.getByRole("button", { name: /Open PR/ })).toBeVisible();
+    const counters = page.getByRole("group", { name: "Overview" });
+    await expect(counters.getByRole("button", { name: /\d+ waiting on you/ })).toBeVisible();
+    await expect(counters.getByRole("button", { name: /\d+ urgent/ })).toBeVisible();
+
     // Sections over Classic rows, with Classic's header tools and the smart filter.
     const merge = page.getByRole("region", { name: /Merge approvals/ });
     await expect(merge).toBeVisible({ timeout: 45_000 });
@@ -103,6 +115,12 @@ test("smart inbox is Classic++ at desktop width", async ({ page }) => {
     // The issue thread is still there below the brief.
     await expect(page.getByText(issue.title).nth(1)).toBeVisible();
     await page.screenshot({ path: "test-results/smart-inbox-1280.png" });
+
+    // A counter filters the list: "Merge approvals" alone.
+    await counters.getByRole("button", { name: /Merge approvals · \d+/ }).click();
+    await expect(page.getByRole("region", { name: /Mentions & reviews/ })).toHaveCount(0);
+    await counters.getByRole("button", { name: /Merge approvals · \d+/ }).click();
+    await expect(page.getByRole("region", { name: /Mentions & reviews/ })).toBeVisible();
 
     // A mention's detail is Classic's: no brief.
     await mentionRow.click();
