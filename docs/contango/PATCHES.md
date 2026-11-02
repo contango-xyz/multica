@@ -269,6 +269,37 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream can restrict who registers runtimes in a workspace.
 
+### 14. Smart inbox: signals API and the flagged smart view
+
+- **What:** generic "signal" inbox entries raised by an external feeder (the ops job in
+  claude-sandbox), and a Smart/Classic inbox view on web. Spec and contract:
+  [SMART-INBOX.md](SMART-INBOX.md). Inbox type `signal`, `details` = `{key, group, summary,
+  actions, rank}`. `POST /api/inbox/signals` (upsert by workspace + recipient + key, push on
+  create and on re-raise) and `POST /api/inbox/signals/resolve` (archive, no push); workspace
+  owner/admin, human credentials only (PAT/JWT; agent task tokens refused). Flag:
+  `MULTICA_SMART_INBOX_EMAILS` (backend env, comma-separated); recipients not on it get 204 and
+  nothing is stored. `/api/me` gains `smart_inbox` for the current user; the web shows the
+  smart view only with that and a `?smart-inbox=1` opt-in (remembered in localStorage,
+  `?smart-inbox=0` clears it). New realtime event `inbox:updated` for silent changes.
+  Per-group push preferences `signal_<group>` (default on, `fyi` off).
+- **Touches:** ours: `server/internal/handler/inbox_signal{,_test}.go`,
+  `server/pkg/db/queries/inbox_signal.sql` (+ generated), `packages/core/inbox/smart{,.test}.ts`,
+  `packages/views/inbox/components/{smart-inbox,inbox-entry}{,.test}.tsx`,
+  `e2e/smart-inbox.spec.ts`. Upstream files: `server/cmd/server/{router,listeners}.go`,
+  `server/cmd/migrate/main.go` (concurrent-index cleanup entry), `server/internal/handler/{handler,auth,notification_preference}.go`,
+  `server/internal/push/{dispatcher,text}.go` (+ tests), `server/pkg/protocol/events.go`,
+  `packages/core/{types/inbox,types/workspace,types/events,api/schemas}.ts`, `packages/core/package.json`
+  (export), `packages/views/inbox/components/{index.ts,inbox-page.tsx,inbox-detail-label.tsx}`,
+  `packages/views/locales/*/inbox.json`, `apps/mobile/components/inbox/detail-label.tsx` +
+  `apps/mobile/locales/*/inbox.json` (compile-only: the new type's label), `e2e/fixtures.ts`.
+- **Migrations:** `607_inbox_signal_key_index` (unique partial expression index on
+  `inbox_item (workspace_id, recipient_id, details->>'key') WHERE type = 'signal' AND
+  details->>'resolved_at' IS NULL`). Upstream `main` reached 606 at the time; when upstream
+  claims 607, add the stem to `contangoMigrationStems`.
+- **Upstream status:** none.
+- **Drop when:** upstream ships an external-notification API with per-entry actions; until then
+  permanent (the index may have run in production).
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
