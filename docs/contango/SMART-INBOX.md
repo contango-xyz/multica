@@ -90,6 +90,22 @@ toggle as one icon button. A signal and a mention on the same issue are separate
 on their own id (`inboxRowKey`), other rows on their issue as before. The archived view stays Classic.
 Below 1024 px the single-column flow described next is unchanged (list → focused detail → back).
 
+**Dashboard (fourth revision, 2026-11-02, owner: "a mixture of an inbox with a dashboard/control
+panel"):** above the two panes (phones: above the sections) the Smart view shows:
+- **Do this first:** the top 3 entries waiting on you (action_required signals, mentions, review
+  requests) by rank score, numbered 1-3, each with its one action (the signal's first action, else
+  Open) and the reason in plain words ("urgent · blocks 4 cards · waiting 9h"). Computed from the live
+  list, so clearing one promotes the next; "Nothing waiting on you" when empty.
+- **Counters:** waiting on you, per group, the oldest wait (amber over 4 h, red over 24 h; click
+  opens it) and the urgent count. Each filters the list (waiting → "Needs my action only", a group →
+  that group alone, again to clear; urgent → "Urgent only", also in the group filter menu).
+- **Squad health:** only from the reader's own signals: each `alert` signal as a red chip by its title
+  (e.g. "main red"), and the stalled / blocking counts. Nothing is shown without such signals; no other
+  source is read.
+- Phones get Do this first plus one counters line ("3 waiting on you · oldest 9h · 1 urgent").
+- **Rows** in Smart get a priority badge (urgent red, high orange) and an age tint on the time (amber
+  after 4 h, red after 24 h; urgent after 1 h and 4 h); for signals the time is the wait (rank.since).
+
 **Layout (revised 2026-11-02 after the owner's first look):** one section per kind — Merge approvals,
 Decisions, Access & funding, Stalled, Blocking others, Alerts (the signal groups), Mentions & reviews
 (`mentioned` / `review_requested` entries) and FYI (fyi signals and every other entry). There is no
