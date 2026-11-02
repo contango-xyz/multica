@@ -43,9 +43,13 @@ test("smart inbox works at phone width", async ({ page }) => {
   await expect(merge).toBeVisible({ timeout: 30000 });
   await expect(merge.getByRole("heading", { level: 2 })).toContainText(/Merge approvals · \d+ · Urgent · blocks 3/);
   await expect(page.getByRole("heading", { name: /Waiting on you/ })).toHaveCount(0);
-  const row = page.getByRole("button", { name: new RegExp(title) });
+  const row = merge.getByRole("button", { name: new RegExp(title) });
   await expect(row).toBeVisible();
   await expect(merge.getByRole("img", { name: "Needs you" }).first()).toBeVisible();
+
+  // Phone: "Do this first" and one counters line above the sections.
+  await expect(page.getByRole("region", { name: "Do this first" }).getByText(title)).toBeVisible();
+  await expect(page.getByRole("button", { name: /waiting on you · oldest/ })).toBeVisible();
 
   // Classic's header tools are still there, plus the group filter.
   await expect(page.getByRole("button", { name: "Filter inbox" })).toBeVisible();
