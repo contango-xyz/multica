@@ -126,6 +126,11 @@ import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade
 const INBOX_LIST_DEFAULT_SIZE = 260;
 const INBOX_LIST_MIN_SIZE = 240;
 const INBOX_LIST_MAX_SIZE = 400;
+// Smart rows carry more (summary, badges, two-line titles), so its list pane
+// starts wider; it is still resizable and remembers its own width.
+const SMART_LIST_DEFAULT_SIZE = 400;
+const SMART_LIST_MIN_SIZE = 360;
+const SMART_LIST_MAX_SIZE = 640;
 
 export function InboxPage({
   headerAccessory,
@@ -389,7 +394,7 @@ export function InboxPage({
   ]);
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: "multica_inbox_layout",
+    id: smart ? "multica_smart_inbox_layout" : "multica_inbox_layout",
   });
 
   const isCompact = useIsCompact();
@@ -1101,9 +1106,9 @@ export function InboxPage({
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
         <ResizablePanel
           id="list"
-          defaultSize={INBOX_LIST_DEFAULT_SIZE}
-          minSize={INBOX_LIST_MIN_SIZE}
-          maxSize={INBOX_LIST_MAX_SIZE}
+          defaultSize={smart ? SMART_LIST_DEFAULT_SIZE : INBOX_LIST_DEFAULT_SIZE}
+          minSize={smart ? SMART_LIST_MIN_SIZE : INBOX_LIST_MIN_SIZE}
+          maxSize={smart ? SMART_LIST_MAX_SIZE : INBOX_LIST_MAX_SIZE}
           groupResizeBehavior="preserve-pixel-size"
         >
           <div className="flex flex-col border-r h-full">
@@ -1138,9 +1143,9 @@ export function InboxPage({
     <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
       <ResizablePanel
         id="list"
-        defaultSize={INBOX_LIST_DEFAULT_SIZE}
-        minSize={INBOX_LIST_MIN_SIZE}
-        maxSize={INBOX_LIST_MAX_SIZE}
+        defaultSize={smart ? SMART_LIST_DEFAULT_SIZE : INBOX_LIST_DEFAULT_SIZE}
+        minSize={smart ? SMART_LIST_MIN_SIZE : INBOX_LIST_MIN_SIZE}
+        maxSize={smart ? SMART_LIST_MAX_SIZE : INBOX_LIST_MAX_SIZE}
         groupResizeBehavior="preserve-pixel-size"
       >
       <div className="flex flex-col border-r h-full">

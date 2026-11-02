@@ -170,8 +170,8 @@ export function InboxListItem({
         />
       )}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
+        <div className={`flex justify-between gap-2 ${inSmartSection ? "items-start" : "items-center"}`}>
+          <div className={`flex min-w-0 gap-1.5 ${inSmartSection ? "items-start" : "items-center"}`}>
             {showUnread && (
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
             )}
@@ -183,10 +183,12 @@ export function InboxListItem({
               />
             )}
             <span
-              className={`truncate text-body ${showUnread ? "font-medium" : "text-muted-foreground"} ${needsYou ? "font-semibold text-foreground" : ""}`}
+              className={`${inSmartSection ? "line-clamp-2 break-words" : "truncate"} text-body ${showUnread ? "font-medium" : "text-muted-foreground"} ${needsYou ? "font-semibold text-foreground" : ""}`}
             >
               {displayTitle}
             </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
             {priority && (
               <span
                 className={`shrink-0 rounded-sm px-1 text-micro font-medium ${
@@ -198,8 +200,6 @@ export function InboxListItem({
                 {t(($) => $.smart.priority[priority])}
               </span>
             )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
             {/* Pointer-only affordance: revealed on hover, and on keyboard
                 focus anywhere in the row so it is reachable by Tab. Touch has
                 neither, so it stays hidden on a pointer that cannot hover and

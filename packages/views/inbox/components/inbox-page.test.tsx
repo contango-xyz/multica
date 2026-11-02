@@ -1195,6 +1195,20 @@ describe("InboxPage smart two-pane (contango)", () => {
     expect(screen.getByTestId("smart-dashboard")).toBeInTheDocument();
   });
 
+  it("gives the smart list pane more room than Classic's, still resizable", () => {
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [signal("sig", "merge", { issue_id: "issue-1" })];
+    const { unmount } = render(<InboxPage smart />);
+    const smartPane = screen.getByTestId("panel-list");
+    expect(smartPane).toHaveAttribute("data-default-size", "400");
+    expect(smartPane).toHaveAttribute("data-min-size", "360");
+    expect(smartPane).toHaveAttribute("data-max-size", "640");
+    unmount();
+    render(<InboxPage />);
+    expect(screen.getByTestId("panel-list")).toHaveAttribute("data-default-size", "260");
+  });
+
   it("classic mode has no dashboard", () => {
     reset();
     layout.width = DESKTOP;
