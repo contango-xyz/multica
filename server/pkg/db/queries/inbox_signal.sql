@@ -56,3 +56,16 @@ WHERE workspace_id = $1
   AND details->>'key' = sqlc.arg(signal_key)::text
   AND (details->>'resolved_at') IS NULL
 RETURNING *;
+
+-- name: ArchiveInboxRelatedToSignal :execrows
+-- With resolve's archive_related: the recipient's other entries on the
+-- signal's issue (the mentions that carried the ask), up to now. Later
+-- entries are a new conversation and stay.
+UPDATE inbox_item SET archived = true
+WHERE workspace_id = $1
+  AND recipient_type = 'member'
+  AND recipient_id = $2
+  AND issue_id = sqlc.arg(issue_id)::uuid
+  AND type <> 'signal'
+  AND archived = false
+  AND created_at <= now();

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/multica-ai/multica/server/internal/auth"
@@ -370,4 +371,66 @@ func TestSignalPushPreferenceKeysAreAccepted(t *testing.T) {
 			t.Fatalf("group %s missing from preference keys", g)
 		}
 	}
+}
+
+func TestResolveInboxSignalArchivesRelatedEntries(t *testing.T) {
+	f := newSignalFixture(t)
+	issue := dbfx.Issue(t, "Merge me", testutil.Cols{"workspace_id": f.workspaceID})
+	otherIssue := dbfx.Issue(t, "Elsewhere", testutil.Cols{"workspace_id": f.workspaceID})
+	other := dbfx.User(t, "Other", "other-"+uuid.NewString()[:8]+"@example.com")
+	dbfx.Member(t, f.workspaceID, other, "member")
+	mention := func(recipient, issueID, when string) string {
+		return dbfx.Insert(t, "inbox_item", testutil.Cols{
+			"workspace_id": f.workspaceID, "recipient_type": "member", "recipient_id": recipient,
+			"type": "mentioned", "severity": "action_required", "issue_id": issueID, "title": "Merge me",
+			"created_at": time.Now().Add(mustDuration(when)),
+		})
+	}
+	ask := mention(f.recipientID, issue, "-2h")
+	reply := mention(f.recipientID, issue, "-1h")
+	later := mention(f.recipientID, issue, "1h") // arrives after the resolve
+	elsewhere := mention(f.recipientID, otherIssue, "-1h")
+	someoneElse := mention(other, issue, "-1h")
+
+	raise := func(key string) {
+		testutil.Call(t, signalHandler(testHandler.UpsertInboxSignal),
+			signalRequest("/api/inbox/signals", f.botUserID, f.workspaceID, f.body(map[string]any{"key": key, "issue_id": issue}))).
+			Want(http.StatusCreated)
+	}
+	archived := func(id string) bool {
+		return dbfx.Count(t, `SELECT count(*) FROM inbox_item WHERE id = $1 AND archived`, id) == 1
+	}
+
+	// Default: only the signal is archived.
+	raise("plain")
+	testutil.Call(t, signalHandler(testHandler.ResolveInboxSignal),
+		signalRequest("/api/inbox/signals/resolve", f.botUserID, f.workspaceID,
+			map[string]any{"recipient_member_id": f.recipientID, "key": "plain"})).Want(http.StatusOK)
+	if archived(ask) || archived(reply) {
+		t.Fatal("resolve without archive_related archived related entries")
+	}
+
+	// archive_related: the recipient's earlier entries on the issue go too.
+	raise("merge")
+	var out struct {
+		ArchivedRelated int64 `json:"archived_related"`
+	}
+	testutil.Call(t, signalHandler(testHandler.ResolveInboxSignal),
+		signalRequest("/api/inbox/signals/resolve", f.botUserID, f.workspaceID,
+			map[string]any{"recipient_member_id": f.recipientID, "key": "merge", "archive_related": true})).
+		Want(http.StatusOK).JSON(&out)
+	if out.ArchivedRelated != 2 || !archived(ask) || !archived(reply) {
+		t.Fatalf("archived_related=%d ask=%v reply=%v", out.ArchivedRelated, archived(ask), archived(reply))
+	}
+	if archived(later) || archived(elsewhere) || archived(someoneElse) {
+		t.Fatal("archived an entry that is later, on another issue, or someone else's")
+	}
+}
+
+func mustDuration(s string) time.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		panic(err)
+	}
+	return d
 }

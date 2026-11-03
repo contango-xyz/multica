@@ -11,6 +11,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveInboxRelatedToSignal = `-- name: ArchiveInboxRelatedToSignal :execrows
+UPDATE inbox_item SET archived = true
+WHERE workspace_id = $1
+  AND recipient_type = 'member'
+  AND recipient_id = $2
+  AND issue_id = $3::uuid
+  AND type <> 'signal'
+  AND archived = false
+  AND created_at <= now()
+`
+
+type ArchiveInboxRelatedToSignalParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	RecipientID pgtype.UUID `json:"recipient_id"`
+	IssueID     pgtype.UUID `json:"issue_id"`
+}
+
+// With resolve's archive_related: the recipient's other entries on the
+// signal's issue (the mentions that carried the ask), up to now. Later
+// entries are a new conversation and stay.
+func (q *Queries) ArchiveInboxRelatedToSignal(ctx context.Context, arg ArchiveInboxRelatedToSignalParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveInboxRelatedToSignal, arg.WorkspaceID, arg.RecipientID, arg.IssueID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getLiveInboxSignalForUpdate = `-- name: GetLiveInboxSignalForUpdate :one
 
 SELECT id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details FROM inbox_item

@@ -208,4 +208,3 @@ func TestArchivedInboxGroupsPreferNonSignalRows(t *testing.T) {
 		t.Fatalf("legacy rows = %v", types)
 	}
 }
-
