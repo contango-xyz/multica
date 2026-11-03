@@ -126,6 +126,9 @@ type upsertSignalRequest struct {
 type resolveSignalRequest struct {
 	RecipientMemberID string `json:"recipient_member_id"`
 	Key               string `json:"key"`
+	// ArchiveRelated also archives the recipient's other entries on the
+	// signal's issue created up to now (the mentions that carried the ask).
+	ArchiveRelated bool `json:"archive_related"`
 }
 
 func runeLen(s string) int { return utf8.RuneCountInString(s) }
@@ -429,7 +432,22 @@ func (h *Handler) ResolveInboxSignal(w http.ResponseWriter, r *http.Request) {
 		"issue_id":     uuidToPtr(item.IssueID),
 		"recipient_id": uuidToString(item.RecipientID),
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"item": inboxToResponse(item)})
+	var related int64
+	if req.ArchiveRelated && item.IssueID.Valid {
+		related, err = h.Queries.ArchiveInboxRelatedToSignal(r.Context(), db.ArchiveInboxRelatedToSignalParams{
+			WorkspaceID: wsUUID, RecipientID: recipient.ID, IssueID: item.IssueID,
+		})
+		if err != nil {
+			// The signal itself is resolved; report the partial result.
+			slog.Warn("archive entries related to signal failed", append(logger.RequestAttrs(r), "error", err)...)
+		} else if related > 0 {
+			h.publish(protocol.EventInboxBatchArchived, workspaceID, "member", requestUserID(r), map[string]any{
+				"recipient_id": uuidToString(item.RecipientID),
+				"count":        related,
+			})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"item": inboxToResponse(item), "archived_related": related})
 }
 
 // inboxResponseMap converts a response to the map shape the inbox:new
