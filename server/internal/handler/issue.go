@@ -3092,6 +3092,12 @@ type CreateIssueRequest struct {
 	OriginID   *string `json:"origin_id,omitempty"`
 
 	AllowDuplicate bool `json:"allow_duplicate,omitempty"`
+
+	// SourceCommentID records the comment this issue came from (contango,
+	// `multica issue create --from-comment`): the comment's issue and thread
+	// are snapshotted as the issue's source context. It does not set the
+	// parent; the comment may be on any issue in the workspace.
+	SourceCommentID *string `json:"source_comment_id,omitempty"`
 }
 
 // UnmarshalJSON rejects duplicate object members before Go's ordinary map
@@ -3490,6 +3496,30 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		return out
 	}
 
+	// Contango: --from-comment. Captured last, after every cheap validation,
+	// because it may clone the thread's attachments.
+	var source *sourceCommentCapture
+	if req.SourceCommentID != nil && strings.TrimSpace(*req.SourceCommentID) != "" {
+		if originType.Valid && originType.String == "quick_create" {
+			// A quick-create task carries its own source context.
+			writeError(w, http.StatusBadRequest, "source_comment_id cannot be combined with a quick-create origin")
+			return
+		}
+		capturedBy, ok := parseUUIDOrBadRequest(w, creatorID, "user_id")
+		if !ok {
+			return
+		}
+		if source, ok = h.captureSourceFromComment(w, r, wsUUID, capturedBy, *req.SourceCommentID, "source_comment_id"); !ok {
+			return
+		}
+	}
+	var sourceContext *service.SourceContextCapture
+	var sourceOriginTask pgtype.UUID
+	if source != nil {
+		sourceContext = &source.capture
+		sourceOriginTask = h.agentTaskForRequest(r, creatorType, actualCreatorID)
+	}
+
 	res, err := h.IssueService.Create(r.Context(), service.IssueCreateParams{
 		WorkspaceID:    wsUUID,
 		Title:          req.Title,
@@ -3511,6 +3541,9 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		LabelIDs:       labelIDs,
 		Properties:     properties,
 		AllowDuplicate: req.AllowDuplicate,
+
+		SourceContext:             sourceContext,
+		SourceContextOriginTaskID: sourceOriginTask,
 	}, service.IssueCreateOpts{
 		ActorID:          actualCreatorID,
 		AnalyticsAgentID: analyticsAgentID,
@@ -3534,6 +3567,13 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	if err != nil && source != nil {
+		source.cleanup()
+		if isSourceContextError(err) {
+			h.writeSourceContextError(w, err, source.limits)
+			return
+		}
+	}
 	if errors.Is(err, service.ErrActiveDuplicate) {
 		dup := *res.DuplicateIssue
 		existing := issueToResponse(dup, h.getIssuePrefix(r.Context(), dup.WorkspaceID))
@@ -3585,6 +3625,11 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	// understood label_ids and skip its legacy post-create attach fallback.
 	labelResponses := labelsToResponse(res.Labels)
 	resp.Labels = &labelResponses
+	if source != nil {
+		if detail, err := h.issueSourceContextDetail(r.Context(), issue); err == nil {
+			resp.SourceContext = detail
+		}
+	}
 	writeJSON(w, http.StatusCreated, resp)
 }
 
