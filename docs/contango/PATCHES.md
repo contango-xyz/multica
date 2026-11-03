@@ -369,6 +369,12 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   (`Truncated` field, `FitToLimits` on the capture, rows returned with a too-large build),
   `server/internal/handler/source_context.go` (change detection for a fitted capture). The 256-comment
   limit still refuses.
+- **System comments (2026-11-03, `contango/issue-origin-3`):** a source thread containing a
+  `system` (or `plugin`) comment failed with 500, because the snapshot's author-name lookup only knew
+  members and agents. It now never fails: `system` reads "Multica", other types "System", a missing
+  member or agent "Unknown" / "Unknown Agent" (upstream file `server/internal/service/source_context.go`).
+  The detail view shows a system author as unchanged rather than unavailable, and the source-link
+  endpoints log the error detail on failure.
 
 ## Last rebase
 

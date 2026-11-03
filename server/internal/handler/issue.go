@@ -3538,7 +3538,7 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	if err != nil && source != nil {
 		source.cleanup()
 		if isSourceContextError(err) {
-			h.writeSourceContextError(w, err, source.limits)
+			h.writeSourceLinkError(w, r, err, source.limits, source.capture.AnchorCommentID)
 			return
 		}
 	}
