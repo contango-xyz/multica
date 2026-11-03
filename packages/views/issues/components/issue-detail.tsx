@@ -2226,6 +2226,12 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     enabled: !!parentIssueId,
     initialData: () => allIssues.find((i) => i.id === parentIssueId),
   });
+  // A source context captured from the parent's comment (the UI flow) is the
+  // parent relation itself; one captured elsewhere (contango CLI) is not.
+  const sourceIsParent =
+    !!issue?.source_context &&
+    !!parentIssueId &&
+    issue.source_context.snapshot.source_issue.id === parentIssueId;
 
   // Project segment in the breadcrumb. The issue's project_id is the source of
   // truth — same URL renders the same breadcrumb regardless of entry path.
@@ -3554,7 +3560,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
             />
           ) : null}
 
-          {parentIssue && !issue.source_context && (
+          {parentIssue && !sourceIsParent && (
             <AppLink
               href={paths.issueDetail(parentIssue.id)}
               className="mt-2 inline-flex max-w-full items-center gap-1.5 text-label text-muted-foreground hover:text-foreground transition-colors group/parent"
@@ -3599,8 +3605,12 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
           {issue.source_context && (
             <SourceContextBadge
               context={issue.source_context}
-              parentIssue={parentIssue}
-              parentProgress={parentChildIssues.length > 0
+              // The badge stands in for the parent line only when the source
+              // IS the parent (the UI's comment-to-sub-issue flow). A source on
+              // another issue (contango: CLI --from-comment) shows as
+              // "Created from" next to the ordinary parent line.
+              parentIssue={sourceIsParent ? parentIssue : null}
+              parentProgress={sourceIsParent && parentChildIssues.length > 0
                 ? {
                     done: parentChildIssues.filter((child) => issueBehavesAs(child, "done")).length,
                     total: parentChildIssues.length,

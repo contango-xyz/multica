@@ -1017,6 +1017,67 @@ describe("IssueDetail (shared)", () => {
     expect(mockApiObj.getIssue).toHaveBeenCalledWith("issue-1");
   });
 
+  it("shows a source on another issue as 'Created from' and keeps the real parent row (contango)", async () => {
+    const sourceContext: NonNullable<Issue["source_context"]> = {
+      id: "context-2",
+      version: 1,
+      usage: "read_only_historical_background",
+      captured_at: "2026-11-03T12:00:00Z",
+      display_state: "unchanged",
+      source_issue_state: "unchanged",
+      comment_thread_state: "unchanged",
+      anchor_comment_state: "available",
+      can_open_current_source: true,
+      current_source: { issue_id: "source-issue", anchor_comment_id: "source-comment", identifier: "TES-7" },
+      source_author_state: [],
+      snapshot: {
+        version: 1,
+        captured_by_user_id: "user-1",
+        captured_at: "2026-11-03T12:00:00Z",
+        source_issue: {
+          id: "source-issue", identifier: "TES-7", number: 7, title: "Source issue", description: "",
+          created_at: "2026-11-02T00:00:00Z", updated_at: "2026-11-03T00:00:00Z", revision: 1, attachments: [],
+        },
+        anchor_comment_id: "source-comment",
+        comment_thread: [{
+          id: "source-comment", parent_id: null, type: "comment", content: "File a card for this",
+          author: { type: "agent", id: "agent-1", name: "Brooks" },
+          created_at: "2026-11-03T01:00:00Z", updated_at: "2026-11-03T01:00:00Z", revision: 1, attachments: [],
+        }],
+      },
+    };
+    const detail: Issue = { ...mockIssue, parent_issue_id: "real-parent", source_context: sourceContext };
+    const realParent: Issue = {
+      ...mockIssue, id: "real-parent", identifier: "TES-9", number: 9, title: "Real parent", parent_issue_id: null,
+    };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: Infinity }, mutations: { retry: false } },
+    });
+    mockApiObj.getIssue.mockImplementation((issueId: string) =>
+      Promise.resolve(issueId === "real-parent" ? realParent : detail),
+    );
+
+    render(
+      <I18nProvider locale="en" resources={TEST_RESOURCES}>
+        <QueryClientProvider client={queryClient}>
+          <IssueDetail issueId="issue-1" />
+        </QueryClientProvider>
+      </I18nProvider>,
+    );
+
+    const snapshotAction = await screen.findByRole("button", { name: "Context snapshot" });
+    const summary = snapshotAction.closest<HTMLElement>('[data-slot="source-context-summary"]');
+    // The badge names the source issue, not the parent...
+    expect(summary).toHaveTextContent("Created from");
+    expect(summary).toHaveTextContent("TES-7");
+    expect(summary).toHaveTextContent("Source issue");
+    expect(summary).not.toHaveTextContent("Sub-issue of");
+    expect(summary).not.toHaveTextContent("Real parent");
+    // ...and the ordinary parent row still shows the real parent.
+    expect((await screen.findAllByText("Real parent")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sub-issue of")).toHaveLength(1);
+  });
+
   it("opts the description editor into the unmount flush", async () => {
     // Closing the issue modal must save the description the user last saw —
     // ContentEditor drops pending debounced updates on unmount by default
