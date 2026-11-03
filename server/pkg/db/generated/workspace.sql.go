@@ -168,6 +168,11 @@ cleared_github_pr_check_runs AS (
     DELETE FROM github_pull_request_check_run
     WHERE pr_id IN (SELECT id FROM ws_github_prs)
 ),
+cleared_github_pr_reviews AS (
+    -- Same for github_pull_request_review (contango, migration 608).
+    DELETE FROM github_pull_request_review
+    WHERE pull_request_id IN (SELECT id FROM ws_github_prs)
+),
 ws_vcs_prs AS (
     SELECT id FROM vcs_pull_request WHERE workspace_id = $1
 ),

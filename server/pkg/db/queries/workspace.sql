@@ -211,6 +211,11 @@ cleared_github_pr_check_runs AS (
     DELETE FROM github_pull_request_check_run
     WHERE pr_id IN (SELECT id FROM ws_github_prs)
 ),
+cleared_github_pr_reviews AS (
+    -- Same for github_pull_request_review (contango, migration 608).
+    DELETE FROM github_pull_request_review
+    WHERE pull_request_id IN (SELECT id FROM ws_github_prs)
+),
 -- VCS tables (migration 213) carry no FK to workspace, so they are not cascaded
 -- away by the DELETE below. Sweep the workspace's connections, mirrored PRs,
 -- their issue links, and CI statuses here. issue_vcs_pull_request has no

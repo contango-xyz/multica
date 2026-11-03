@@ -452,6 +452,11 @@ func (m *Manager) applySnapshot(ctx context.Context, prID pgtype.UUID, snap *PRS
 			return false, err
 		}
 	}
+	if snap.ReviewsFetched {
+		if err := UpsertReviews(ctx, q, prID, snap.Reviews); err != nil {
+			return false, err
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}
