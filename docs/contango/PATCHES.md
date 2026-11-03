@@ -307,6 +307,33 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Drop when:** upstream ships an external-notification API with per-entry actions; until then
   permanent (the index may have run in production).
 
+### 15. GitHub pull request reviews are stored
+
+- **What:** the `pull_request_review` webhook (submitted / edited / dismissed) upserts the review
+  into `github_pull_request_review` on every mirrored row of its PR (one per workspace bound to the
+  installation): reviewer login and type (User/Bot), state (APPROVED / CHANGES_REQUESTED /
+  COMMENTED / DISMISSED), commit, submitted time. Pending reviews are not stored. A dismissal is
+  final: a late or replayed delivery never revives it. The PR snapshot refresh (which every
+  `pull_request` opened/synchronize/reopened event, CI event and review event already enqueues)
+  also lists the PR's reviews (`GET /repos/{o}/{r}/pulls/{n}/reviews`, one extra Pull-requests read
+  per refresh) and upserts them in the same head-guarded write, so PRs that had reviews before this
+  patch are backfilled on their next refresh; a failed reviews call skips only the reviews. Nothing
+  new in the UI or API yet.
+- **Touches:** ours: `server/internal/integrations/ghsnapshot/reviews{,_db_test}.go`,
+  `server/pkg/db/queries/github_review.sql` (+ generated), `server/internal/handler/github_review_test.go`.
+  Upstream files: `server/internal/handler/github.go` (event switch + handler),
+  `server/internal/integrations/ghsnapshot/{snapshot,refresh}.go` (+ `rest_snapshot_test.go`),
+  `server/pkg/db/queries/{workspace,workspace_delete}.sql` (cleanup; the table has no FK),
+  `server/internal/handler/workspace_delete_manifest_test.go`, `server/cmd/migrate/main.go`.
+- **Migrations:** `608_github_pull_request_review` (table, no PK/FK like
+  `github_pull_request_check_run`) and `609_github_pull_request_review_unique_index` (unique
+  `(pull_request_id, github_review_id)`, CONCURRENTLY; also serves per-PR lookups). The review id is
+  unique per mirrored PR row, not globally, because one installation can feed several workspaces.
+- **GitHub App:** needs the **Pull request review** event (already required by patch 6) and
+  **Pull requests: Read** (already granted). No new permission.
+- **Upstream status:** none.
+- **Drop when:** upstream mirrors reviews.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
