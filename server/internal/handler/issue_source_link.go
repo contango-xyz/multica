@@ -63,7 +63,7 @@ func (h *Handler) captureSourceFromComment(w http.ResponseWriter, r *http.Reques
 	// instead of refusing it.
 	build, err := service.BuildSourceContextToFit(r.Context(), h.Queries, workspaceID, commentID)
 	if err != nil {
-		h.writeSourceContextError(w, err, build.Limits)
+		h.writeSourceLinkError(w, r, err, build.Limits, commentID)
 		return nil, false
 	}
 	contextID := dbid.NewV7()
@@ -157,7 +157,7 @@ func (h *Handler) SetIssueSourceContext(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusNotFound, "issue not found")
 			return
 		}
-		h.writeSourceContextError(w, err, src.limits)
+		h.writeSourceLinkError(w, r, err, src.limits, src.capture.AnchorCommentID)
 		return
 	}
 	if len(result.ReplacedObjectURLs) > 0 {
@@ -187,4 +187,14 @@ func isSourceContextError(err error) bool {
 		}
 	}
 	return false
+}
+
+// writeSourceLinkError logs the failure with its detail (writeSourceContextError
+// answers 500 with a generic message), then writes the response.
+func (h *Handler) writeSourceLinkError(w http.ResponseWriter, r *http.Request, err error, limits service.SourceContextLimitUsage, commentID pgtype.UUID) {
+	slog.Warn("issue source from comment failed", append(logger.RequestAttrs(r),
+		"comment_id", uuidToString(commentID), "error", err,
+		"comment_count", limits.CommentCount, "text_bytes", limits.TextBytes,
+		"attachment_count", limits.AttachmentCount, "attachment_bytes", limits.AttachmentBytes)...)
+	h.writeSourceContextError(w, err, limits)
 }

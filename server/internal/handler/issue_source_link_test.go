@@ -306,3 +306,53 @@ func TestIssueSourceFromLongThreadIsFittedNotRefused(t *testing.T) {
 		t.Fatalf("oversized anchor: %d %s", w.Code, w.Body.String())
 	}
 }
+
+// A thread with a system comment (and a plugin one) must not fail the capture
+// over author names (contango issue-origin-3: live 500 on CTG-892, CTG-501).
+func TestIssueSourceFromThreadWithSystemComment(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	const zeroUUID = "00000000-0000-0000-0000-000000000000"
+	source := fixtureIssue(t, "Thread with a system note "+uuid.NewString()[:6])
+	root := dbfx.Comment(t, source, "QA verdict: Android fails on login")
+	system := dbfx.Comment(t, source, "Runtime went offline; the run was requeued.",
+		testutil.Cols{"parent_id": root, "author_type": "system", "author_id": zeroUUID})
+	plugin := dbfx.Comment(t, source, "Plugin note", testutil.Cols{"parent_id": root, "author_type": "plugin", "author_id": uuid.NewString()})
+	anchor := dbfx.Comment(t, source, "Please file the fix", testutil.Cols{"parent_id": root})
+	dbfx.Exec(t, `UPDATE comment SET created_at = now() - interval '1 hour' WHERE id = $1`, root)
+	dbfx.Exec(t, `UPDATE comment SET created_at = now() - interval '30 minutes' WHERE id = $1`, system)
+	dbfx.Exec(t, `UPDATE comment SET created_at = now() - interval '20 minutes' WHERE id = $1`, plugin)
+
+	target := fixtureIssue(t, "Fix from a thread with a system note")
+	cleanupIssueWithSource(t, target)
+	w := httptest.NewRecorder()
+	testHandler.SetIssueSourceContext(w, withURLParam(newRequest("POST", "/api/issues/"+target+"/source-context",
+		map[string]any{"comment_id": anchor}), "id", target))
+	if w.Code != http.StatusOK {
+		t.Fatalf("set-source: %d %s", w.Code, w.Body.String())
+	}
+	var resp IssueResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.SourceContext == nil {
+		t.Fatalf("no source_context: %s", w.Body.String())
+	}
+	names := map[string]string{}
+	for _, c := range resp.SourceContext.Snapshot.CommentThread {
+		names[c.ID] = c.Author.Name
+	}
+	if names[system] != "Multica" || names[plugin] != "System" || names[anchor] == "" {
+		t.Fatalf("author names = %v", names)
+	}
+	for _, state := range resp.SourceContext.SourceAuthorState {
+		if state.Type == "system" && state.State != "unchanged" {
+			t.Fatalf("system author state = %+v", state)
+		}
+	}
+
+	// Create --from-comment takes the same path.
+	wc, created := createIssueWithBody(t, map[string]any{"title": "Also from that thread", "source_comment_id": anchor}, nil)
+	if wc.Code != http.StatusCreated || created.SourceContext == nil {
+		t.Fatalf("create: %d %s", wc.Code, wc.Body.String())
+	}
+}

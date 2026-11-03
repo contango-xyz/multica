@@ -371,6 +371,12 @@ func (h *Handler) resolveSourceContextAuthors(ctx context.Context, workspaceID p
 		}
 		seen[key] = struct{}{}
 		state := sourceContextAuthorState{Type: comment.Author.Type, ID: comment.Author.ID, CapturedName: comment.Author.Name, State: "unavailable"}
+		if comment.Author.Type == "system" {
+			// Contango: a system comment's author never changes.
+			state.State = "unchanged"
+			states = append(states, state)
+			continue
+		}
 		authorID, parseErr := util.ParseUUID(comment.Author.ID)
 		if parseErr != nil {
 			states = append(states, state)

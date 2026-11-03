@@ -208,22 +208,40 @@ func sourceContextText(v pgtype.Text) *string {
 	return &s
 }
 
-func sourceContextAuthorName(ctx context.Context, q *db.Queries, workspaceID pgtype.UUID, authorType string, authorID pgtype.UUID) (string, error) {
+// Neutral author names for comments whose author has no name to resolve
+// (contango): a system comment, an unknown author type, or an author that no
+// longer exists. A capture must never fail over an author's display name.
+const (
+	sourceContextSystemAuthorName  = "Multica"
+	sourceContextUnknownAuthorName = "System"
+	sourceContextFormerMemberName  = "Unknown"
+	sourceContextFormerAgentName   = "Unknown Agent"
+)
+
+func sourceContextAuthorName(ctx context.Context, q *db.Queries, workspaceID pgtype.UUID, authorType string, authorID pgtype.UUID) string {
 	switch authorType {
 	case "member":
 		user, err := q.GetUser(ctx, authorID)
 		if err != nil {
-			return "", fmt.Errorf("resolve source-context member author: %w", err)
+			if !errors.Is(err, pgx.ErrNoRows) {
+				slog.Warn("source context: member author lookup failed", "error", err)
+			}
+			return sourceContextFormerMemberName
 		}
-		return user.Name, nil
+		return user.Name
 	case "agent":
 		agent, err := q.GetAgentInWorkspace(ctx, db.GetAgentInWorkspaceParams{ID: authorID, WorkspaceID: workspaceID})
 		if err != nil {
-			return "", fmt.Errorf("resolve source-context agent author: %w", err)
+			if !errors.Is(err, pgx.ErrNoRows) {
+				slog.Warn("source context: agent author lookup failed", "error", err)
+			}
+			return sourceContextFormerAgentName
 		}
-		return agent.Name, nil
+		return agent.Name
+	case "system":
+		return sourceContextSystemAuthorName
 	}
-	return "", fmt.Errorf("unsupported source-context author type %q", authorType)
+	return sourceContextUnknownAuthorName
 }
 
 func attachmentSnapshot(row db.Attachment, ownerType, ownerID string) SourceContextAttachment {
@@ -333,10 +351,7 @@ func buildSourceContextCommentSnapshots(
 	commentThread := make([]SourceContextCommentSnapshot, 0, len(historyRows))
 	for _, row := range historyRows {
 		commentID := util.UUIDToString(row.ID)
-		authorName, err := sourceContextAuthorName(ctx, q, workspaceID, row.AuthorType, row.AuthorID)
-		if err != nil {
-			return nil, nil, err
-		}
+		authorName := sourceContextAuthorName(ctx, q, workspaceID, row.AuthorType, row.AuthorID)
 		var parentID *string
 		if row.ParentID.Valid {
 			value := util.UUIDToString(row.ParentID)
