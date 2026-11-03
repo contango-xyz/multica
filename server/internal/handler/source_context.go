@@ -282,6 +282,10 @@ func (h *Handler) issueSourceContextDetail(ctx context.Context, issue db.Issue) 
 	} else {
 		currentIssue, _, currentIssueErr = service.BuildSourceIssueSnapshot(ctx, h.Queries, issue.WorkspaceID, row.SourceIssueID)
 	}
+	if captured.Truncated != nil && captured.Truncated.IssueDescriptionOmitted {
+		// Contango: a fitted capture left the description out on purpose.
+		currentIssue.Description, currentIssue.Attachments = nil, []service.SourceContextAttachment{}
+	}
 	switch {
 	case currentIssueErr == nil:
 		issueChanges := sourceContextIssueChangeDetails(captured.SourceIssue, currentIssue)
@@ -301,6 +305,13 @@ func (h *Handler) issueSourceContextDetail(ctx context.Context, issue db.Issue) 
 	}
 
 	current, buildErr := service.BuildSourceContext(ctx, h.Queries, issue.WorkspaceID, row.AnchorCommentID)
+	if captured.Truncated != nil && (buildErr == nil || (errors.Is(buildErr, service.ErrSourceContextTooLarge) && current.Snapshot.AnchorCommentID != "")) {
+		// Contango: compare a fitted capture with the current thread fitted the
+		// same way, so what was left out does not read as a change.
+		if reduced, err := service.ReduceSourceContextToFit(current.Snapshot); err == nil {
+			current.Snapshot, buildErr = reduced, nil
+		}
+	}
 	switch {
 	case buildErr == nil || (errors.Is(buildErr, service.ErrSourceContextTooLarge) && current.Snapshot.AnchorCommentID != ""):
 		threadChanges := sourceContextThreadChangeDetails(captured, current.Snapshot)

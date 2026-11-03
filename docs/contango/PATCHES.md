@@ -354,6 +354,21 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Migrations:** none.
 - **Upstream status:** none (upstream only captures from the UI comment-to-sub-issue flow).
 - **Drop when:** upstream lets the API/CLI record a source without parenting.
+- **Long threads (2026-11-03, `contango/issue-origin-2`):** the first live `set-source` on a long
+  Android QA thread was refused "source context too large". The CLI paths already used upstream's
+  general limits (1 MiB of snapshot text, 100 / 500 MiB of attachments, 256 comments), not the 64 KiB
+  agent-prompt limit, so one of those tripped. They now fit instead of refusing
+  (`service.BuildSourceContextToFit` / `ReduceSourceContextToFit` in
+  `server/internal/service/source_context_fit{,_test}.go`): keep the root-to-anchor path and the
+  anchor; drop off-path comments oldest first (with their replies), then empty older path comments,
+  then leave out the source issue's description and attachments, then the anchor's attachments; refuse
+  only when the anchor's own text is over 1 MiB. What was left out is recorded in the snapshot's new
+  `truncated` field (omitted when nothing was, so existing digests are unchanged). The write-time
+  check and the detail view's change detection reduce the current thread the same way, so a fitted
+  capture does not read as changed. Upstream files touched further: `server/internal/service/source_context.go`
+  (`Truncated` field, `FitToLimits` on the capture, rows returned with a too-large build),
+  `server/internal/handler/source_context.go` (change detection for a fitted capture). The 256-comment
+  limit still refuses.
 
 ## Last rebase
 

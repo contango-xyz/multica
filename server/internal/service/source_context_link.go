@@ -41,7 +41,11 @@ func lockAndVerifySourceContext(ctx context.Context, qtx *db.Queries, workspaceI
 	if len(locked) == 0 {
 		return ErrAnchorCommentDeleted
 	}
-	current, err := BuildSourceContext(ctx, qtx, workspaceID, capture.AnchorCommentID)
+	build := BuildSourceContext
+	if capture.FitToLimits {
+		build = BuildSourceContextToFit
+	}
+	current, err := build(ctx, qtx, workspaceID, capture.AnchorCommentID)
 	if err != nil {
 		return err
 	}
