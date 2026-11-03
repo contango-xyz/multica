@@ -58,7 +58,10 @@ func (h *Handler) captureSourceFromComment(w http.ResponseWriter, r *http.Reques
 	if _, ok := h.loadIssueForUser(w, r, uuidToString(comment.IssueID)); !ok {
 		return nil, false
 	}
-	build, err := service.BuildSourceContext(r.Context(), h.Queries, workspaceID, commentID)
+	// The CLI paths never quote the snapshot into an agent prompt, so they use
+	// the general limits, and fit an oversized thread around the anchor
+	// instead of refusing it.
+	build, err := service.BuildSourceContextToFit(r.Context(), h.Queries, workspaceID, commentID)
 	if err != nil {
 		h.writeSourceContextError(w, err, build.Limits)
 		return nil, false
@@ -83,6 +86,7 @@ func (h *Handler) captureSourceFromComment(w http.ResponseWriter, r *http.Reques
 			h.Storage.Delete(context.Background(), key)
 		}
 	}
+	capture.FitToLimits = true
 	return &sourceCommentCapture{capture: capture, limits: build.Limits, cleanup: cleanup}, true
 }
 

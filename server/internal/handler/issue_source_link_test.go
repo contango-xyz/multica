@@ -3,8 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -230,5 +232,77 @@ func TestSetIssueSourceContext(t *testing.T) {
 	}
 	if got := loadStoredSource(t, fresh); got.count != 0 {
 		t.Fatalf("foreign comment stored a source: %+v", got)
+	}
+}
+
+// A long QA thread (contango issue-origin-2): over the general limit, the CLI
+// paths keep the anchor and fit the rest instead of refusing.
+func TestIssueSourceFromLongThreadIsFittedNotRefused(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	ctx := context.Background()
+	source := fixtureIssue(t, "Android QA "+uuid.NewString()[:6])
+	long := func(n int, tag string) string { return tag + " " + strings.Repeat("verdict line. ", n/14) }
+	root := dbfx.Comment(t, source, long(300<<10, "root"))
+	var oldest string
+	for i := 0; i < 4; i++ {
+		id := dbfx.Comment(t, source, long(300<<10, fmt.Sprintf("reply-%d", i)), testutil.Cols{"parent_id": root})
+		if i == 0 {
+			oldest = id
+		}
+	}
+	anchor := dbfx.Comment(t, source, long(40<<10, "anchor verdict"), testutil.Cols{"parent_id": root})
+	// Order the thread by time: root, replies, then the anchor.
+	dbfx.Exec(t, `UPDATE comment SET created_at = now() - interval '1 hour' WHERE id = $1`, root)
+	dbfx.Exec(t, `UPDATE comment SET created_at = now() + interval '1 minute' WHERE id = $1`, anchor)
+
+	target := fixtureIssue(t, "Fix from QA")
+	cleanupIssueWithSource(t, target)
+	w := httptest.NewRecorder()
+	testHandler.SetIssueSourceContext(w, withURLParam(newRequest("POST", "/api/issues/"+target+"/source-context",
+		map[string]any{"comment_id": anchor}), "id", target))
+	if w.Code != http.StatusOK {
+		t.Fatalf("set-source on a long thread: %d %s", w.Code, w.Body.String())
+	}
+	var resp IssueResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	sc := resp.SourceContext
+	if sc == nil || sc.Snapshot.Truncated == nil || len(sc.Snapshot.Truncated.OmittedCommentIDs) == 0 || sc.Snapshot.Truncated.OmittedCommentIDs[0] != oldest {
+		t.Fatalf("expected a fitted snapshot dropping the oldest reply first: %+v", sc)
+	}
+	threadIDs := map[string]bool{}
+	for _, c := range sc.Snapshot.CommentThread {
+		threadIDs[c.ID] = true
+	}
+	if !threadIDs[anchor] || !threadIDs[root] || sc.Snapshot.CommentThread[len(sc.Snapshot.CommentThread)-1].ID != anchor {
+		t.Fatalf("anchor and root must be kept: %v", threadIDs)
+	}
+	// What was left out on purpose does not read as a change.
+	if sc.DisplayState != "unchanged" || sc.CommentThreadState != "unchanged" || len(sc.ChangeReasons) != 0 {
+		t.Fatalf("display=%s thread=%s reasons=%v", sc.DisplayState, sc.CommentThreadState, sc.ChangeReasons)
+	}
+	var stored []byte
+	if err := testPool.QueryRow(ctx, `SELECT snapshot FROM issue_source_context WHERE issue_id = $1`, target).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) > 1<<20 || !strings.Contains(string(stored), `"truncated"`) {
+		t.Fatalf("stored snapshot is %d bytes, truncated marker present: %v", len(stored), strings.Contains(string(stored), `"truncated"`))
+	}
+
+	// Create --from-comment takes the same path.
+	wc, created := createIssueWithBody(t, map[string]any{"title": "Also from QA", "source_comment_id": anchor}, nil)
+	if wc.Code != http.StatusCreated || created.SourceContext == nil || created.SourceContext.Snapshot.Truncated == nil {
+		t.Fatalf("create from a long thread: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// Refused only when the anchor alone is over the limit.
+	huge := dbfx.Comment(t, source, long((1<<20)+(64<<10), "too long"), testutil.Cols{"parent_id": root})
+	other := fixtureIssue(t, "Too big")
+	w = httptest.NewRecorder()
+	testHandler.SetIssueSourceContext(w, withURLParam(newRequest("POST", "/api/issues/"+other+"/source-context",
+		map[string]any{"comment_id": huge}), "id", other))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "source_context_too_large") {
+		t.Fatalf("oversized anchor: %d %s", w.Code, w.Body.String())
 	}
 }

@@ -159,6 +159,10 @@ type SourceContextSnapshot struct {
 	SourceIssue      SourceContextIssueSnapshot     `json:"source_issue"`
 	CommentThread    []SourceContextCommentSnapshot `json:"comment_thread"`
 	AnchorCommentID  string                         `json:"anchor_comment_id"`
+	// Truncated (contango) records what a CLI capture left out to fit the
+	// general limits. Omitted when nothing was, so existing snapshots and
+	// their digests are unchanged.
+	Truncated *SourceContextTruncation `json:"truncated,omitempty"`
 }
 
 type SourceContextBuild struct {
@@ -187,6 +191,9 @@ type SourceContextCapture struct {
 	Snapshot         SourceContextSnapshot
 	Digest           string
 	Clones           []SourceContextClone
+	// FitToLimits (contango): captured by BuildSourceContextToFit, so the
+	// write-time check rebuilds the same way.
+	FitToLimits bool
 }
 
 func sourceContextTime(v pgtype.Timestamptz) string {
@@ -495,7 +502,9 @@ func BuildSourceContext(ctx context.Context, q *db.Queries, workspaceID, anchorC
 		limits.AttachmentBytes += row.SizeBytes
 	}
 	if limits.TextBytes > SourceContextMaxTextBytes || limits.AttachmentCount > SourceContextMaxAttachments || limits.AttachmentBytes > SourceContextMaxAttachmentBytes {
-		return SourceContextBuild{Snapshot: snapshot, Limits: limits}, ErrSourceContextTooLarge
+		// Rows ride along so BuildSourceContextToFit (contango) can reduce the
+		// snapshot and clone only what it keeps.
+		return SourceContextBuild{Snapshot: snapshot, Limits: limits, Rows: allRows}, ErrSourceContextTooLarge
 	}
 	// Revisions and update timestamps are useful capture metadata, but they are
 	// not part of the canonical content comparison. A source that was edited

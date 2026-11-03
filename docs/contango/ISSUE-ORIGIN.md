@@ -35,4 +35,13 @@ multica issue set-source CTG-123 --from-comment <comment-uuid> [--force]
 - Errors reuse upstream's source-context codes (`anchor_comment_deleted`, `source_context_changed`,
   `source_context_too_large`, …); an unknown or foreign comment is 404.
 
+## Long threads
+
+The snapshot uses the general limits (1 MiB of text, 100 attachments / 500 MiB, 256 comments). A
+longer thread is not refused: the anchor comment and as much of the thread around it as fits are kept
+(off-path comments go first, oldest first; then older comments on the path to the anchor are emptied;
+then the source issue's description; then the anchor's attachments), and the snapshot's `truncated`
+field lists what was left out. Only an anchor whose own text exceeds 1 MiB, or a thread over 256
+comments, is refused (`source_context_too_large`, 422).
+
 No migration: it reuses upstream's `issue_source_context` table and attachment cloning.
