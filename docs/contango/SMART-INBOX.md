@@ -28,6 +28,10 @@
 ```
 - Same (workspace, recipient, key) while not archived: update in place; push again only when the request says `"push": true` and the title or summary changed (re-raise).
 - `POST /api/inbox/signals/resolve` `{ "recipient_member_id", "key" }`: archive it (no push). Unknown key: 204.
+  Optional `"archive_related": true` (2026-11-03) also archives the recipient's other non-archived,
+  non-signal entries on the signal's issue created up to now (the mentions that carried the ask), so
+  a resolved ask leaves nothing behind; entries arriving later stay. Clients get one
+  `inbox:batch-archived`; the response adds `archived_related` (count). Default false: unchanged.
 - New inbox item type `signal` with `details` = {group, summary, actions, rank, key}. Pushes for it respect the recipient's inbox notification settings (a new per-group toggle; default on for action_required groups, off for fyi).
 
 ### As built (fork patch 14; differences from and additions to the contract above)
