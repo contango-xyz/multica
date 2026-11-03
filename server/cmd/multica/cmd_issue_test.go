@@ -840,6 +840,7 @@ func newIssueCreateTestCmd() *cobra.Command {
 	cmd.Flags().String("assignee", "", "")
 	cmd.Flags().String("assignee-id", "", "")
 	cmd.Flags().String("parent", "", "")
+	cmd.Flags().String("from-comment", "", "")
 	cmd.Flags().String("project", "", "")
 	cmd.Flags().String("due-date", "", "")
 	cmd.Flags().Bool("allow-duplicate", false, "")

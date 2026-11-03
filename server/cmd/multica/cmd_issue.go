@@ -277,6 +277,19 @@ commas or the value starts with "["; simple entries can use comma-separated valu
 	RunE: runIssueCreate,
 }
 
+var issueSetSourceCmd = &cobra.Command{
+	Use:   "set-source <issue>",
+	Short: "Record the comment an existing issue came from",
+	Long: `Record the comment an existing issue came from. The comment's issue and
+thread are snapshotted and the issue shows "Created from <issue>" with a link
+to the comment. The comment may be on any issue in the workspace; the parent is
+not changed. An issue keeps one source: an issue that already has one is
+refused unless --force replaces it.
+  multica issue set-source CTG-123 --from-comment 0198f3c2-...`,
+	Args: exactArgs(1),
+	RunE: runIssueSetSource,
+}
+
 var issueUpdateCmd = &cobra.Command{
 	Use:   "update <id>",
 	Short: "Update an issue",
@@ -581,6 +594,7 @@ func init() {
 	issueCmd.AddCommand(issuePullRequestsCmd)
 	issueCmd.AddCommand(issueChildrenCmd)
 	issueCmd.AddCommand(issueCreateCmd)
+	issueCmd.AddCommand(issueSetSourceCmd)
 	issueCmd.AddCommand(issueUpdateCmd)
 	issueCmd.AddCommand(issueAssignCmd)
 	issueCmd.AddCommand(issueStatusCmd)
@@ -643,6 +657,7 @@ func init() {
 	issueCreateCmd.Flags().String("assignee", "", "Assignee name (member, agent, or squad; fuzzy match)")
 	issueCreateCmd.Flags().String("assignee-id", "", "Assignee UUID — member, agent, or squad (mutually exclusive with --assignee)")
 	issueCreateCmd.Flags().String("parent", "", "Parent issue ID")
+	issueCreateCmd.Flags().String("from-comment", "", "Comment UUID this issue came from (any issue in the workspace). Snapshots the comment's issue and thread as the new issue's source (\"Created from ...\"); does not set the parent.")
 	issueCreateCmd.Flags().Int("stage", 0, "Stage ordinal (>=1) grouping this sub-issue into an ordered barrier group under its parent; omit for unstaged. The parent assignee is woken only when every sub-issue in a stage finishes.")
 	issueCreateCmd.Flags().String("project", "", "Project ID")
 	issueCreateCmd.Flags().String("start-date", "", "Start date (calendar day, YYYY-MM-DD)")
@@ -1506,6 +1521,9 @@ func runIssueCreate(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("resolve parent issue: %w", err)
 		}
 		body["parent_issue_id"] = parent.ID
+	}
+	if v, _ := cmd.Flags().GetString("from-comment"); strings.TrimSpace(v) != "" {
+		body["source_comment_id"] = strings.TrimSpace(v)
 	}
 	if v, _ := cmd.Flags().GetString("project"); v != "" {
 		project, err := resolveProjectID(ctx, client, v)
@@ -3596,4 +3614,69 @@ func compactComments(comments []map[string]any) {
 			}
 		}
 	}
+}
+
+func init() {
+	issueSetSourceCmd.Flags().String("from-comment", "", "Comment UUID the issue came from (required)")
+	issueSetSourceCmd.Flags().Bool("force", false, "Replace the issue's existing source")
+	issueSetSourceCmd.Flags().String("output", "table", "Output format: table or json")
+}
+
+func runIssueSetSource(cmd *cobra.Command, args []string) error {
+	commentID, _ := cmd.Flags().GetString("from-comment")
+	commentID = strings.TrimSpace(commentID)
+	if commentID == "" {
+		return fmt.Errorf("--from-comment is required")
+	}
+	force, _ := cmd.Flags().GetBool("force")
+	client, err := newAPIClient(cmd)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := cli.APIContext(context.Background())
+	defer cancel()
+	issueRef, err := resolveIssueRef(ctx, client, args[0])
+	if err != nil {
+		return fmt.Errorf("resolve issue: %w", err)
+	}
+	var result map[string]any
+	if err := client.PostJSON(ctx, "/api/issues/"+issueRef.ID+"/source-context",
+		map[string]any{"comment_id": commentID, "force": force}, &result); err != nil {
+		if httpErrorCode(err, http.StatusConflict) == "source_context_already_attached" {
+			return fmt.Errorf("issue %s already has a source; pass --force to replace it", args[0])
+		}
+		return fmt.Errorf("set issue source: %w", err)
+	}
+	output, _ := cmd.Flags().GetString("output")
+	if output == "json" {
+		return cli.PrintJSON(os.Stdout, result)
+	}
+	from := ""
+	if sc, ok := result["source_context"].(map[string]any); ok {
+		if snap, ok := sc["snapshot"].(map[string]any); ok {
+			if src, ok := snap["source_issue"].(map[string]any); ok {
+				from = strVal(src, "identifier")
+			}
+		}
+	}
+	if from == "" {
+		from = "comment " + commentID
+	}
+	fmt.Fprintf(os.Stdout, "%s now shows it was created from %s\n", issueDisplayKey(result), from)
+	return nil
+}
+
+// httpErrorCode is the JSON "code" of an API error with the given status, or "".
+func httpErrorCode(err error, status int) string {
+	var httpErr *cli.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.StatusCode != status {
+		return ""
+	}
+	var payload struct {
+		Code string `json:"code"`
+	}
+	if json.Unmarshal([]byte(httpErr.Body), &payload) != nil {
+		return ""
+	}
+	return payload.Code
 }

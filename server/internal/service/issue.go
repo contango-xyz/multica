@@ -96,6 +96,9 @@ type IssueCreateParams struct {
 	// Its immutable snapshot and cloned attachment rows commit in the same
 	// transaction as the new issue.
 	SourceContext *SourceContextCapture
+	// SourceContextOriginTaskID is the agent task that recorded SourceContext
+	// (contango: `multica issue create --from-comment` run by an agent).
+	SourceContextOriginTaskID pgtype.UUID
 }
 
 // IssueCreateOpts groups optional knobs for IssueService.Create. Most
@@ -247,30 +250,8 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 	}
 
 	if p.SourceContext != nil {
-		if _, err := qtx.LockIssueForDescriptionUpdate(ctx, db.LockIssueForDescriptionUpdateParams{
-			ID: p.SourceContext.SourceIssueID, WorkspaceID: p.WorkspaceID,
-		}); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return IssueCreateResult{}, ErrSourceIssueDeleted
-			}
-			return IssueCreateResult{}, fmt.Errorf("lock source issue: %w", err)
-		}
-		locked, err := qtx.LockCommentAncestorPath(ctx, db.LockCommentAncestorPathParams{
-			CommentID: p.SourceContext.AnchorCommentID, WorkspaceID: p.WorkspaceID,
-			IssueID: p.SourceContext.SourceIssueID,
-		})
-		if err != nil {
-			return IssueCreateResult{}, fmt.Errorf("lock anchor comment thread: %w", err)
-		}
-		if len(locked) == 0 {
-			return IssueCreateResult{}, ErrAnchorCommentDeleted
-		}
-		current, err := BuildSourceContext(ctx, qtx, p.WorkspaceID, p.SourceContext.AnchorCommentID)
-		if err != nil {
+		if err := lockAndVerifySourceContext(ctx, qtx, p.WorkspaceID, *p.SourceContext); err != nil {
 			return IssueCreateResult{}, err
-		}
-		if current.Digest != p.SourceContext.Digest {
-			return IssueCreateResult{}, ErrSourceContextChanged
 		}
 	}
 
@@ -428,7 +409,7 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 	}
 
 	if p.SourceContext != nil {
-		if _, err := PersistSourceContext(ctx, qtx, *p.SourceContext, issue.ID, pgtype.UUID{}); err != nil {
+		if _, err := PersistSourceContext(ctx, qtx, *p.SourceContext, issue.ID, p.SourceContextOriginTaskID); err != nil {
 			return IssueCreateResult{}, fmt.Errorf("persist source context: %w", err)
 		}
 	} else if p.OriginType.Valid && p.OriginType.String == "quick_create" && p.OriginID.Valid {
