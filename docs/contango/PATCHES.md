@@ -334,6 +334,27 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** upstream mirrors reviews.
 
+### 16. Issue origin from a comment via the CLI (`--from-comment`, `set-source`)
+
+- **What:** agents can record where a card came from. `multica issue create --from-comment <uuid>`
+  (`POST /api/issues` with `source_comment_id`) and `multica issue set-source <issue> --from-comment
+  <uuid> [--force]` (`POST /api/issues/{id}/source-context`) capture upstream's source-context
+  snapshot from any comment in the workspace without making the card a sub-issue. Agent callers stamp
+  `origin_task_id`. See [ISSUE-ORIGIN.md](ISSUE-ORIGIN.md).
+- **Touches:** ours: `server/internal/handler/issue_source_link{,_test}.go`,
+  `server/internal/service/source_context_link.go`, `server/cmd/multica/cmd_issue_source_test.go`,
+  `docs/contango/ISSUE-ORIGIN.md`. Upstream files: `server/internal/handler/issue.go`
+  (`CreateIssueRequest.source_comment_id`, wiring in `CreateIssue`), `server/internal/service/issue.go`
+  (the source lock/verify block moved verbatim into `lockAndVerifySourceContext`; new
+  `IssueCreateParams.SourceContextOriginTaskID`), `server/cmd/server/router.go` (one route),
+  `server/cmd/multica/cmd_issue.go` (flag + command), `cmd_issue_test.go` (test flag),
+  `packages/views/issues/components/issue-detail{,.test}.tsx`: upstream assumed the source issue is
+  the parent; now the badge takes the parent role only when `source_issue.id == parent_issue_id`, and
+  the ordinary parent line stays otherwise.
+- **Migrations:** none.
+- **Upstream status:** none (upstream only captures from the UI comment-to-sub-issue flow).
+- **Drop when:** upstream lets the API/CLI record a source without parenting.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
