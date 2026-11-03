@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 )
@@ -38,6 +39,11 @@ type PRSnapshot struct {
 	// as passed (acceptance criterion 5).
 	HasChecks bool
 	Contexts  []CheckContext
+	// Reviews are the PR's submitted reviews (contango), backfilled on every
+	// refresh. ReviewsFetched is false when the reviews call failed: the
+	// snapshot is still applied, and stored reviews are left as they are.
+	Reviews        []Review
+	ReviewsFetched bool
 }
 
 // Decided reports whether the snapshot has settled: no check is still running
@@ -195,6 +201,18 @@ func FetchPRSnapshot(ctx context.Context, c *Client, installationID int64, owner
 	snap.HasChecks = len(snap.Contexts) > 0
 	if snap.HasChecks {
 		snap.RollupState = rollupContexts(snap.Contexts)
+	}
+	// Reviews (contango): one more Pull-requests read. A rate limit aborts the
+	// whole refresh like any other call; other failures only skip the reviews.
+	reviews, err := FetchPRReviews(ctx, c, installationID, owner, repo, number)
+	var rl *RateLimitError
+	switch {
+	case err == nil:
+		snap.Reviews, snap.ReviewsFetched = reviews, true
+	case errors.As(err, &rl):
+		return nil, err
+	default:
+		slog.Warn("ghsnapshot: reviews fetch failed", "owner", owner, "repo", repo, "number", number, "err", err.Error())
 	}
 	return snap, nil
 }

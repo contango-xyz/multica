@@ -598,6 +598,7 @@ func TestRESTSnapshotRefreshStoresResultsAndPreservesThemOnPermissionFailure(t *
 	pr := seedPRAt(t, pool, q, 1, "r", 5, "sha1")
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM github_pull_request_check_run WHERE pr_id=$1`, pr.ID)
+		_, _ = pool.Exec(ctx, `DELETE FROM github_pull_request_review WHERE pull_request_id=$1`, pr.ID)
 		_, _ = pool.Exec(ctx, `DELETE FROM github_pull_request WHERE id=$1`, pr.ID)
 	})
 	var phase atomic.Int32
@@ -617,6 +618,9 @@ func TestRESTSnapshotRefreshStoresResultsAndPreservesThemOnPermissionFailure(t *
 			_, _ = fmt.Fprintf(w, `{"total_count":1,"check_runs":[{"id":1,"head_sha":"sha1","name":"ci","status":"completed","conclusion":%q}]}`, conclusion)
 		case "/repos/o/r/commits/sha1/status":
 			_, _ = w.Write([]byte(`{"total_count":0,"statuses":[]}`))
+		case "/repos/o/r/pulls/5/reviews":
+			// Contango: the refresh backfills reviews.
+			_, _ = w.Write([]byte(`[{"id":77,"user":{"login":"owner","type":"User"},"state":"APPROVED","commit_id":"sha1","submitted_at":"2026-11-03T10:00:00Z"}]`))
 		default:
 			t.Errorf("unexpected request: %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -640,5 +644,9 @@ func TestRESTSnapshotRefreshStoresResultsAndPreservesThemOnPermissionFailure(t *
 	}
 	if applied != 2 || len(m.rateUntil) != 0 {
 		t.Fatalf("permission failure must preserve snapshot without notification or installation pause: applied=%d limits=%v", applied, m.rateUntil)
+	}
+	reviews, err := q.ListGitHubPRReviews(ctx, pr.ID)
+	if err != nil || len(reviews) != 1 || reviews[0].GithubReviewID != 77 || reviews[0].State != "APPROVED" {
+		t.Fatalf("backfilled reviews = %+v, err %v", reviews, err)
 	}
 }

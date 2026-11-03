@@ -47,7 +47,7 @@ func writeTestPR(w http.ResponseWriter, sha string, mergeable any, state string)
 }
 
 func TestFetchPRSnapshotRESTPagination(t *testing.T) {
-	prCalls, runPages, statusPages := 0, 0, 0
+	prCalls, runPages, statusPages, reviewPages := 0, 0, 0, 0
 	srv := snapshotServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/o/r/pulls/5":
@@ -81,6 +81,14 @@ func TestFetchPRSnapshotRESTPagination(t *testing.T) {
 				statuses = []map[string]any{{"context": "deploy", "state": "pending"}}
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"total_count": 101, "statuses": statuses})
+		case "/repos/o/r/pulls/5/reviews":
+			reviewPages++
+			_, _ = w.Write([]byte(`[
+				{"id": 11, "user": {"login": "owner", "type": "User"}, "state": "APPROVED", "commit_id": "sha1", "submitted_at": "2026-11-03T10:00:00Z"},
+				{"id": 12, "user": {"login": "greptile", "type": "Bot"}, "state": "COMMENTED", "commit_id": "sha0", "submitted_at": "2026-11-02T10:00:00Z"},
+				{"id": 13, "user": {"login": "draft", "type": "User"}, "state": "PENDING"},
+				{"id": 14, "user": {"login": "old", "type": "User"}, "state": "DISMISSED", "commit_id": "sha0", "submitted_at": "2026-11-01T10:00:00Z"}
+			]`))
 		default:
 			t.Errorf("request outside base repository REST endpoints: %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -102,6 +110,16 @@ func TestFetchPRSnapshotRESTPagination(t *testing.T) {
 	}
 	if last := snap.Contexts[202]; last.Status != "in_progress" || !last.IsStatusContext {
 		t.Fatalf("legacy pending status = %+v", last)
+	}
+	// Reviews (contango): backfilled with the snapshot; the pending one is not stored.
+	if !snap.ReviewsFetched || reviewPages != 1 || len(snap.Reviews) != 3 {
+		t.Fatalf("reviews fetched=%v pages=%d reviews=%+v", snap.ReviewsFetched, reviewPages, snap.Reviews)
+	}
+	if r := snap.Reviews[0]; r.ID != 11 || r.Login != "owner" || r.UserType != "User" || r.State != "APPROVED" || r.CommitID != "sha1" || r.SubmittedAt.IsZero() {
+		t.Fatalf("approved review = %+v", r)
+	}
+	if snap.Reviews[1].UserType != "Bot" || snap.Reviews[2].State != "DISMISSED" {
+		t.Fatalf("reviews = %+v", snap.Reviews)
 	}
 }
 
@@ -423,6 +441,8 @@ func TestFetchPRSnapshotRESTSupersededSuites(t *testing.T) {
 						return
 					}
 					_ = json.NewEncoder(w).Encode(map[string]any{"total_count": len(tc.workflowRuns), "workflow_runs": tc.workflowRuns})
+				case "/repos/o/r/pulls/5/reviews": // contango: reviews backfill
+					_, _ = w.Write([]byte(`[]`))
 				default:
 					t.Errorf("unexpected request: %s", r.URL.Path)
 					w.WriteHeader(http.StatusNotFound)
@@ -453,5 +473,29 @@ func TestFetchPRSnapshotRESTSupersededSuites(t *testing.T) {
 				t.Fatalf("workflow runs calls = %d, want fetch %v", workflowCalls, tc.wantFetch)
 			}
 		})
+	}
+}
+
+// A failed reviews call skips the backfill but never fails the snapshot.
+func TestFetchPRSnapshotReviewsFailureKeepsSnapshot(t *testing.T) {
+	srv := snapshotServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/o/r/pulls/5":
+			writeTestPR(w, "sha1", true, "clean")
+		case "/repos/o/r/commits/sha1/check-runs":
+			_, _ = w.Write([]byte(`{"total_count":0,"check_runs":[]}`))
+		case "/repos/o/r/commits/sha1/status":
+			_, _ = w.Write([]byte(`{"total_count":0,"statuses":[]}`))
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+	defer srv.Close()
+	snap, err := FetchPRSnapshot(context.Background(), newTestClient(t, srv.URL), 1, "o", "r", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.ReviewsFetched || snap.Reviews != nil || snap.Mergeable != "MERGEABLE" {
+		t.Fatalf("snapshot = %+v", snap)
 	}
 }

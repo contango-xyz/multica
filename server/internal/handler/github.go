@@ -25,6 +25,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/multica-ai/multica/server/internal/integrations/ghsnapshot"
 	"github.com/multica-ai/multica/server/internal/issuestatus"
 	"github.com/multica-ai/multica/server/internal/middleware"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
@@ -1107,7 +1108,11 @@ func (h *Handler) HandleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		// never read for display. Each just asks the API pipeline to re-fetch
 		// the authoritative snapshot for the PR(s) it concerns.
 		h.triggerPRRefreshFromCIEvent(ctx, body)
-	case "pull_request_review", "pull_request_review_comment", "pull_request_review_thread", "issue_comment":
+	case "pull_request_review":
+		// Contango fork: store the review, then refresh the PR as below.
+		h.handlePullRequestReviewEvent(ctx, body)
+		h.triggerPRRefreshFromReviewEvent(body)
+	case "pull_request_review_comment", "pull_request_review_thread", "issue_comment":
 		// Contango fork: reviews and comments are triggers too. The refresh bumps
 		// the PR row's updated_at, which is how our PR watcher learns that a PR
 		// changed within a minute instead of polling GitHub for every PR.
@@ -2012,5 +2017,79 @@ func (h *Handler) triggerPRRefreshFromReviewEvent(body []byte) {
 	}
 	if inst, owner, repo, number, ok := prAddressFromReviewEvent(body); ok {
 		h.PRRefresh.Enqueue(inst, owner, repo, number)
+	}
+}
+
+// ghPullRequestReviewPayload is the part of a pull_request_review webhook the
+// review mirror reads (contango).
+type ghPullRequestReviewPayload struct {
+	Action string `json:"action"`
+	Review struct {
+		ID   int64 `json:"id"`
+		User *struct {
+			Login string `json:"login"`
+			Type  string `json:"type"`
+		} `json:"user"`
+		State       string     `json:"state"`
+		CommitID    string     `json:"commit_id"`
+		SubmittedAt *time.Time `json:"submitted_at"`
+	} `json:"review"`
+	PullRequest struct {
+		Number int32 `json:"number"`
+	} `json:"pull_request"`
+	Repository struct {
+		Name  string `json:"name"`
+		Owner struct {
+			Login string `json:"login"`
+		} `json:"owner"`
+	} `json:"repository"`
+	Installation struct {
+		ID int64 `json:"id"`
+	} `json:"installation"`
+}
+
+// handlePullRequestReviewEvent stores a submitted, edited or dismissed review
+// on every mirrored row of its PR (one per workspace bound to the
+// installation). A PR not mirrored yet is skipped: its first snapshot refresh
+// backfills the reviews.
+func (h *Handler) handlePullRequestReviewEvent(ctx context.Context, body []byte) {
+	var p ghPullRequestReviewPayload
+	if err := json.Unmarshal(body, &p); err != nil {
+		return
+	}
+	switch p.Action {
+	case "submitted", "edited", "dismissed":
+	default:
+		return
+	}
+	if p.Installation.ID == 0 || p.Repository.Name == "" || p.PullRequest.Number == 0 {
+		return
+	}
+	login, userType := "", ""
+	if p.Review.User != nil {
+		login, userType = p.Review.User.Login, p.Review.User.Type
+	}
+	state := p.Review.State
+	if p.Action == "dismissed" {
+		state = "DISMISSED"
+	}
+	review, ok := ghsnapshot.ReviewFromWebhook(p.Review.ID, login, userType, state, p.Review.CommitID, p.Review.SubmittedAt)
+	if !ok {
+		return
+	}
+	rows, err := h.Queries.ListGitHubPRRowsByAddress(ctx, db.ListGitHubPRRowsByAddressParams{
+		InstallationID: p.Installation.ID,
+		RepoOwner:      p.Repository.Owner.Login,
+		RepoName:       p.Repository.Name,
+		PrNumber:       p.PullRequest.Number,
+	})
+	if err != nil {
+		slog.Warn("github webhook: list PR rows for review failed", "error", err)
+		return
+	}
+	for _, row := range rows {
+		if err := ghsnapshot.UpsertReviews(ctx, h.Queries, row.ID, []ghsnapshot.Review{review}); err != nil {
+			slog.Warn("github webhook: store review failed", "error", err)
+		}
 	}
 }

@@ -807,6 +807,18 @@ type GithubPullRequestCheckSuite struct {
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
+type GithubPullRequestReview struct {
+	PullRequestID  pgtype.UUID        `json:"pull_request_id"`
+	GithubReviewID int64              `json:"github_review_id"`
+	ReviewerLogin  string             `json:"reviewer_login"`
+	ReviewerType   string             `json:"reviewer_type"`
+	State          string             `json:"state"`
+	CommitID       pgtype.Text        `json:"commit_id"`
+	SubmittedAt    pgtype.Timestamptz `json:"submitted_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type InboxItem struct {
 	ID            pgtype.UUID        `json:"id"`
 	WorkspaceID   pgtype.UUID        `json:"workspace_id"`

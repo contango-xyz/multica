@@ -147,6 +147,7 @@ var concurrentIndexCleanups = map[string]string{
 	"602_wecom_install_session_request_idx":                     "idx_wecom_install_session_request",
 	"601_wecom_install_session_due_idx":                         "idx_wecom_install_session_due",
 	"594_agent_task_process_cleanup_index":                      "idx_agent_task_queue_process_cleanup",
+	"609_github_pull_request_review_unique_index":               "github_pull_request_review_pr_review_idx",
 	"607_inbox_signal_key_index":                                "idx_inbox_item_signal_key",
 	"593_issue_dependency_edge_unique":                          "idx_issue_dependency_edge",
 	"566_push_device_user_index":                                "idx_push_device_user",

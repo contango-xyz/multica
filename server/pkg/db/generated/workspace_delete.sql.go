@@ -435,6 +435,11 @@ deleted_github_check_suites AS (
     DELETE FROM github_pull_request_check_suite
     WHERE pr_id IN (SELECT id FROM ws_github_prs)
 ),
+deleted_github_reviews AS (
+    -- github_pull_request_review has no FK (contango, migration 608).
+    DELETE FROM github_pull_request_review
+    WHERE pull_request_id IN (SELECT id FROM ws_github_prs)
+),
 deleted_pending_github_suites AS (
     DELETE FROM github_pending_check_suite WHERE workspace_id = $1
 ),
