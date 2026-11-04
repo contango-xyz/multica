@@ -34,6 +34,9 @@ var validNotifGroups = map[string]bool{
 	"signal_blocking": true,
 	"signal_alert":    true,
 	"signal_fyi":      true,
+	// When the person works (contango; see work_hours.go): its value is
+	// validated by validateWorkHours, not validNotifValues.
+	workHoursKey: true,
 }
 
 // validNotifValues is the set of allowed preference values per group.
@@ -97,6 +100,15 @@ func decodeNotificationPreferenceRequest(w http.ResponseWriter, r *http.Request)
 		if !validNotifGroups[k] {
 			writeError(w, http.StatusBadRequest, "invalid preference group: "+k)
 			return nil, false
+		}
+		if k == workHoursKey {
+			if v != "" {
+				if err := validateWorkHours(v); err != nil {
+					writeError(w, http.StatusBadRequest, "invalid work_hours: "+err.Error())
+					return nil, false
+				}
+			}
+			continue
 		}
 		if !validNotifValues[v] {
 			writeError(w, http.StatusBadRequest, "invalid preference value: "+v)

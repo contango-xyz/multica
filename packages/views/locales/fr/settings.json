@@ -693,6 +693,18 @@
       "granted": "Ce navigateur peut afficher des bannières de notification.",
       "denied": "Bloqué par votre navigateur. Activez les notifications pour ce site dans ses réglages.",
       "enabled_badge": "Activé"
+    },
+    "work_hours": {
+      "label": "Heures de travail",
+      "description": "Les rappels sur les demandes qui vous attendent n'arrivent que pendant ces heures. Les nouvelles demandes vous notifient toujours immédiatement.",
+      "not_set": "Non défini : les rappels suivent l'horaire de l'équipe (07:00–22:00 UTC, tous les jours). Les nouvelles demandes vous notifient toujours immédiatement.",
+      "zone": "Fuseau horaire",
+      "days": "Jours travaillés",
+      "from": "De",
+      "to": "À",
+      "save": "Enregistrer",
+      "clear": "Effacer",
+      "saved": "Heures de travail enregistrées"
     }
   },
   "tokens": {

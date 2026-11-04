@@ -693,6 +693,18 @@
       "granted": "This browser can show notification banners.",
       "denied": "Blocked by your browser. Enable notifications for this site in your browser settings.",
       "enabled_badge": "Enabled"
+    },
+    "work_hours": {
+      "label": "Working hours",
+      "description": "Reminders about asks still waiting on you only arrive inside these hours. New asks still notify you at once.",
+      "not_set": "Not set: reminders use the team default (07:00–22:00 UTC, every day). New asks still notify you at once.",
+      "zone": "Time zone",
+      "days": "Working days",
+      "from": "From",
+      "to": "To",
+      "save": "Save",
+      "clear": "Clear",
+      "saved": "Working hours saved"
     }
   },
   "tokens": {
