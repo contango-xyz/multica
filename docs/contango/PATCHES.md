@@ -376,6 +376,24 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   The detail view shows a system author as unchanged rather than unavailable, and the source-link
   endpoints log the error detail on failure.
 
+### 17. Working hours notification preference
+
+- **What:** a per-user `work_hours` preference, `"<IANA zone>|<days>|<HH:MM-HH:MM>"` (days a range or comma
+  list of Mon..Sun, hours may cross midnight, `""` clears), validated by the server and set from
+  Settings > Notifications > Working hours. The ops inbox feeder (claude-sandbox `team/inbox-signals.py`)
+  sends its periodic "asks waiting on you" reminders only inside it; new asks still notify at once.
+  Owner 2026-11-04.
+- **Touches:** ours: `server/internal/handler/work_hours{,_test}.go`,
+  `packages/core/notification-preferences/work-hours{,.test}.ts`,
+  `packages/views/settings/components/work-hours-setting.tsx`. Upstream files:
+  `server/internal/handler/notification_preference.go` (one key in `validNotifGroups`, its own value
+  check), `packages/core/types/notification-preference.ts` (`work_hours?: string`),
+  `packages/core/package.json` (one export), `packages/views/settings/components/notifications-tab.tsx`
+  (one section), `packages/views/locales/*/settings.json` (`notifications.work_hours`).
+- **Migrations:** none (a key in the existing preferences JSON).
+- **Upstream status:** none.
+- **Drop when:** upstream has per-user quiet hours the feeder can read.
+
 ## Last rebase
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
