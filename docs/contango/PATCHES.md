@@ -4,10 +4,10 @@ Every change our fork carries on top of upstream `multica-ai/multica`, one entry
 Read this before each rebase onto a new upstream tag: for every entry, check the upstream release
 notes for the same fix and drop the patch when its "Drop when" holds.
 
-**Base:** upstream `v0.7.0` (rebased 2026-10-23 from `v0.6.1` via `v0.6.5`). Branch `contango/main`.
+**Base:** upstream `v0.8.1` (rebased 2026-11-06 from `v0.7.0`). Branch `contango/main`.
 
 Commits are named by subject, not hash: hashes change on every rebase. Find one with
-`git log --oneline v0.7.0..contango/main --grep '<subject words>'`.
+`git log --oneline v0.8.1..contango/main --grep '<subject words>'`.
 
 ## Rules
 
@@ -53,7 +53,7 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `server/internal/migrations/migrations_lint_test.go` exempts these three stems from
   `TestMigrationNumericPrefixesAreUnique` (commit `test(migrations): exempt the fork's push_device
   migrations from the unique-prefix lint (contango)`). Number new fork migrations after upstream's
-  highest to avoid adding to that list.
+  highest (616 at v0.8.1) to avoid adding to that list.
 - **Also carries:** `.github/workflows/contango-backend-image.yml` (builds
   `ghcr.io/contango-xyz/multica-backend:<sha7>` on every `contango/**` push) and
   `docs/contango/push-rollout.md`.
@@ -142,9 +142,12 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Commit:** `fix(agent): a Codex preamble before tool calls is not the run's output (contango)`.
 - **Touches:** `server/pkg/agent/codex.go` (`codexClient` fields, item/started and agent message
   handlers). Daemon code, so it ships in the fork CLI, not the backend image.
-- **Upstream status:** not fixed. v0.6.2's #9020 (`excludeTurns` on resume) and #8934 (Guardian 429
-  circuit) are separate fixes in the same file.
-- **Drop when:** upstream's Result.Output fallback ignores commentary / pre-tool messages.
+- **Upstream status:** half fixed in v0.7.2 by MUL-8240 (#9521, `codexOutputSelection`): a message
+  labelled with any phase other than `final_answer` (e.g. `commentary`) no longer becomes the output.
+  Since the v0.8.1 rebase our patch is only the other half: `onToolActivity` →
+  `codexOutputSelection.observeToolActivity()` forgets an unlabelled preamble once a tool item starts
+  after it.
+- **Drop when:** upstream's fallback also ignores an unlabelled message followed by tool activity.
 
 ### 9. Issue dependencies ("blocked by")
 
@@ -177,7 +180,7 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   The issue sidebar shows "Blocked by" and "Blocks" sections (status icon, identifier, title,
   link), each hidden while empty. Board cards and list rows show "Blocked by N" / "Blocks N" pills
   counting open issues only, with the identifiers in a native tooltip. A workspace page
-  `/{slug}/dependencies` (sidebar, under Projects) draws every open issue on a blocked-by edge as a
+  `/{slug}/dependencies` (a row at the bottom of the Work panel) draws every open issue on a blocked-by edge as a
   layered left-to-right graph, blockers on the left, coloured by status, with the "Critical path"
   number property as a badge and nodes at 3 or more outlined; filters hide done/cancelled (on by
   default) and show only the critical path. Read-only: edges are still edited with the CLI/API.
@@ -196,8 +199,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `packages/core/diagnostics/diagnostic-context.ts`, the workspace-paths mocks in
   `packages/views/{search,layout}/*.test.tsx`,
   `packages/views/issues/components/{issue-detail,board-card,list-row}.tsx`,
-  `packages/views/layout/{app-sidebar,route-icon-components}.tsx`,
-  `packages/views/search/search-command.tsx`, `packages/views/editor/utils/link-handler.ts`,
+  `packages/views/layout/route-icon-components.tsx`, `packages/views/layout/panels/work-panel.tsx`
+  (the Dependencies row; upstream's rail replaced `app-sidebar.tsx` in v0.8.0),
+  `packages/core/paths/spaces.ts` (`dependencies` belongs to the Work space),
+  `packages/views/search/use-root-model.ts` (palette keywords),
+  `packages/views/editor/utils/link-handler.ts`,
   `packages/views/package.json`, `packages/views/locales/*/{issues,layout}.json`,
   `apps/web/proxy.ts`, `server/internal/handler/reserved_slugs.json`, plus the server files of
   patch 9 (`issue_dependency.sql`, `contango_issue_dependency{,_test}.go`, `router.go`).
@@ -231,13 +237,10 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Migrations:** `594_push_device_platform_macos` (adds `macos` to the platform check).
   **Lockfile:** `node-gyp` for `apps/desktop` (`apps/desktop/package.json` also gains the
   `contango:build` script).
-- **Migration numbering:** upstream `main` (after v0.7.0) has `593_runtime_profile_add_devin`,
-  which shares 593 with patch 9's `593_issue_dependency_edge_unique`. The runner keys
-  `schema_migrations` by the whole filename stem, so both apply, but
-  `TestMigrationNumericPrefixesAreUnique` will fail on the next rebase. Resolution then: keep our
-  filename (it may have run in production) and add `593_issue_dependency_edge_unique` to
-  `contangoMigrationStems` in `server/internal/migrations/migrations_lint_test.go`; do the same for
-  `594_push_device_platform_macos` once upstream claims 594.
+- **Migration numbering:** upstream v0.8.1 also has `593_runtime_profile_add_devin` and
+  `594_agent_task_process_cleanup_index`. The runner keys `schema_migrations` by the whole filename
+  stem, so both apply; `593_issue_dependency_edge_unique` and `594_push_device_platform_macos` are in
+  `contangoMigrationStems` (`migrations_lint_test.go`).
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream ships desktop push and a first-party macOS distribution.
 
@@ -254,7 +257,8 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `apps/web/features/landing/utils/github-release{,.test}.ts`,
   `apps/web/app/(landing)/download/download-client{,.test}.tsx`, `apps/web/app/layout.tsx`,
   `apps/web/components/web-providers.tsx`, `packages/core/config/index.ts` (`desktopDownloadUrl`),
-  `packages/views/layout/help-launcher{,.test}.tsx`.
+  `packages/views/layout/help-launcher{,.test}.tsx`, `packages/views/layout/account-menu.tsx` (the
+  account menu's download item, new upstream in v0.8.0).
 - **Upstream status:** none as of v0.7.0.
 - **Drop when:** upstream offers a configurable download source.
 
@@ -294,15 +298,16 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   (the last: signals render with the system sender),
   `packages/core/inbox/queries.ts` (a group shows its newest non-signal row),
   `packages/core/inbox/filter-store.ts` (`inboxRowKey`: signals key on their own id),
-  `packages/core/inbox/smart-fold{,.test}.ts` (ours: one Smart row per card),
+  `packages/core/inbox/smart-fold{,.test}.ts` (ours: one Smart row per card; since v0.8.1 the
+  smart list uses upstream's shared list-column width, no wider pane of its own),
   `packages/views/inbox/components/{inbox-page,inbox-list,inbox-display}` (smart two-pane mode, row key),
   `server/pkg/db/queries/{inbox,inbox_archive}.sql` (archived group representative skips signals),
   `packages/views/locales/*/inbox.json`, `apps/mobile/components/inbox/detail-label.tsx` +
   `apps/mobile/locales/*/inbox.json` (compile-only: the new type's label), `e2e/fixtures.ts`.
 - **Migrations:** `607_inbox_signal_key_index` (unique partial expression index on
   `inbox_item (workspace_id, recipient_id, details->>'key') WHERE type = 'signal' AND
-  details->>'resolved_at' IS NULL`). Upstream `main` reached 606 at the time; when upstream
-  claims 607, add the stem to `contangoMigrationStems`.
+  details->>'resolved_at' IS NULL`). Upstream v0.8.1 also has `607_inbox_item_section`;
+  ours is in `contangoMigrationStems`.
 - **Upstream status:** none.
 - **Drop when:** upstream ships an external-notification API with per-entry actions; until then
   permanent (the index may have run in production).
@@ -327,7 +332,8 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   `server/internal/handler/workspace_delete_manifest_test.go`, `server/cmd/migrate/main.go`.
 - **Migrations:** `608_github_pull_request_review` (table, no PK/FK like
   `github_pull_request_check_run`) and `609_github_pull_request_review_unique_index` (unique
-  `(pull_request_id, github_review_id)`, CONCURRENTLY; also serves per-PR lookups). The review id is
+  `(pull_request_id, github_review_id)`, CONCURRENTLY; also serves per-PR lookups). Upstream v0.8.1 also has `608_task_usage_credits`; ours is in
+  `contangoMigrationStems` (upstream skipped 609). The review id is
   unique per mirrored PR row, not globally, because one installation can feed several workspaces.
 - **GitHub App:** needs the **Pull request review** event (already required by patch 6) and
   **Pull requests: Read** (already granted). No new permission.
@@ -395,6 +401,40 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Drop when:** upstream has per-user quiet hours the feeder can read.
 
 ## Last rebase
+
+**2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
+MUL-8346 (#9652, v0.7.2) classifies Claude Code "hit your session/weekly limit" runs. No patch dropped;
+patch 8 shrank (see its entry). Conflicts:
+
+- `preferences.ts` / `packages/core/package.json` (patch 2): upstream added preference scopes and
+  exports; kept them, view-bar helpers stay in our `view-bar-prefs.ts`.
+- `server/cmd/migrate/main.go` (patches 1, 9, 14, 15): both sides' `concurrentIndexCleanups`.
+- `codex.go` / `codex_test.go` (patch 8): ported onto upstream's `codexOutputSelection`.
+- `app-sidebar.tsx` deleted upstream (v0.8.0 rail, MUL-8317), `search-command.tsx` rewritten (patch 10):
+  Dependencies row moved to the Work panel, palette keywords to `use-root-model.ts`.
+- `apps/desktop/src/main/index.ts` (patch 11): upstream's multi-window main process (MUL-8432); the
+  cold-launch push route opens after the window session is restored; `focusMainWindow` → `focusWindow`.
+- `help-launcher.tsx`, `apps/web/app/layout.tsx` (patch 12): took upstream's rail menu, kept our URL.
+- `listeners.go`, `auth.go`, `inbox-page.tsx`, `inbox-list-item.tsx` (patch 14): kept upstream's
+  `EventIssueUnreadChanged`, `whats_new_seen_version`, inbox-zero state and `ListColumn` layout; ours
+  added back on top. Upstream removed the resizable inbox panes, so the smart list's 400px default pane
+  (and its test) went; `openArchived` re-added for the smart list.
+- `rest_snapshot_test.go` (patch 15): upstream's new superseded-suites test serves `/pulls/5/reviews`.
+- Icons: upstream dropped `lucide-react` for `@multica/ui/icons`; our patch files import from
+  `@multica/ui/icons` (`LayoutList` → `List` in the smart inbox filter button).
+- Fallout fixed after the rebase: `CollectionPageHeader` lost `count`, so the dependency graph shows
+  its node count in the title; upstream added `es` and `zh-Hant` locales, so our keys (patches 2, 10,
+  11, 14, 17) were translated into both (views) and `zh-Hant` (mobile).
+- Migration lint: `593_issue_dependency_edge_unique`, `594_push_device_platform_macos`,
+  `607_inbox_signal_key_index`, `608_github_pull_request_review` exempted (upstream claimed the numbers).
+
+Lockfile: upstream's plus our mobile push packages, regenerated under `minimumReleaseAge: 5760`. One
+exclusion: the next 16.4.5 family (`next`, `@next/env`, `@next/swc-*`), published 2026-11-03
+17:49–18:02Z and required by v0.8.1 for GHSA-673q-mjm6-r5xr (#9914). We ship `apps/web`, so this is
+not the usual "upstream-only" exclusion: the owner waived the age for it on 2026-11-06 ("do the update
+anyway"). Everything else was at least 4 days old. Migration path tested: a scratch DB at the old
+`contango/main` schema migrated up through 616, and the 23 new upstream migrations went down and up
+again.
 
 **2026-10-23, v0.6.5 → v0.7.0** (branch `contango/rebase-v0.7.0`). Only `pnpm-lock.yaml`
 conflicted. Upstream pins `electron 44.9.3` (desktop, which we don't ship), under 4 days old at the
