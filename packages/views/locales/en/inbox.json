@@ -179,6 +179,15 @@
       "open": "Open",
       "dashboard": "Overview",
       "health": "Squad health"
+    },
+    "reply": {
+      "confirm_title": "Post “{{content}}”?",
+      "confirm_title_on": "Post “{{content}}” on {{card}}?",
+      "confirm_description": "It is posted as your reply to the ask, as if you typed it.",
+      "confirm": "Post",
+      "cancel": "Cancel",
+      "posted": "Posted “{{content}}”",
+      "failed": "Could not post the reply"
     }
   }
 }

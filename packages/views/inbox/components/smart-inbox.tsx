@@ -74,6 +74,7 @@ import { useTypeLabels } from "./inbox-detail-label";
 import { getInboxDisplayTitle } from "./inbox-display";
 import { InboxFilterMenu } from "./inbox-filter-menu";
 import { SmartDashboard } from "./smart-dashboard";
+import { SignalReplyButton } from "./signal-reply-button";
 
 // 44px: the minimum comfortable tap target on a phone.
 const TAP = "min-h-11";
@@ -463,12 +464,27 @@ export function useReasonText() {
   };
 }
 
-/** The one primary action: the signal's first action, else open the issue. */
+/**
+ * The one primary action: the signal's first one-tap reply, else its first
+ * action, else open the issue.
+ */
 function PrimaryAction({ entry, className }: { entry: SmartEntry; className?: string }) {
   const { t } = useT("inbox");
   const { push } = useNavigation();
   const wsPaths = useWorkspacePaths();
+  const reply = entry.item.issue_id ? entry.signal?.replies[0] : undefined;
   const action = entry.signal?.actions[0];
+  if (reply) {
+    return (
+      <SignalReplyButton
+        item={entry.item}
+        reply={reply}
+        variant="outline"
+        size="sm"
+        className={cn(TAP, "max-w-[40%] shrink-0", className)}
+      />
+    );
+  }
   if (action) {
     return (
       <Button
@@ -587,6 +603,7 @@ export function SignalBrief({
   const reasonText = useReasonText();
   const { item, signal } = entry;
   const body = signal && showTitleAndBody ? item.body : null;
+  const replies = item.issue_id ? (signal?.replies ?? []) : [];
   return (
     <div data-testid="signal-brief" className={cn(compact ? "space-y-2" : "space-y-4")}>
       <header className="space-y-1">
@@ -600,12 +617,23 @@ export function SignalBrief({
         <p className="text-caption text-muted-foreground">{reasonText(entry)}</p>
       </header>
       {body && <p className="whitespace-pre-wrap break-words text-body">{body}</p>}
-      {signal && signal.actions.length > 0 && (
+      {signal && (signal.actions.length > 0 || replies.length > 0) && (
         <div className={cn("flex gap-2", compact ? "flex-row flex-wrap" : "flex-col sm:flex-row sm:flex-wrap")}>
+          {/* One-tap answers first: the recommended reply is the primary button. */}
+          {replies.map((reply, i) => (
+            <SignalReplyButton
+              key={`reply-${reply.index}`}
+              item={item}
+              reply={reply}
+              variant={i === 0 ? "default" : "outline"}
+              size={compact ? "sm" : "default"}
+              className={compact ? undefined : TAP}
+            />
+          ))}
           {signal.actions.map((action, i) => (
             <Button
               key={`${action.url}-${i}`}
-              variant={i === 0 ? "default" : "outline"}
+              variant={i === 0 && replies.length === 0 ? "default" : "outline"}
               size={compact ? "sm" : "default"}
               className={compact ? undefined : TAP}
               render={<a href={action.url} target="_blank" rel="noopener noreferrer" />}

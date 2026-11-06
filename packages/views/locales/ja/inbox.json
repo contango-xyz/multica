@@ -170,6 +170,15 @@
       "open": "開く",
       "dashboard": "概要",
       "health": "チームの状態"
+    },
+    "reply": {
+      "confirm_title": "「{{content}}」を投稿しますか？",
+      "confirm_title_on": "{{card}} に「{{content}}」を投稿しますか？",
+      "confirm_description": "依頼への返信として、あなたが入力したのと同じように投稿されます。",
+      "confirm": "投稿",
+      "cancel": "キャンセル",
+      "posted": "「{{content}}」を投稿しました",
+      "failed": "返信を投稿できませんでした"
     }
   }
 }

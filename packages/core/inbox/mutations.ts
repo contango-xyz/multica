@@ -4,6 +4,7 @@ import { api } from "../api";
 import { inboxKeys, mapArchivedInboxCache, patchArchivedInboxCaches, type ArchivedInboxCache } from "./queries";
 import { onInboxInvalidate, onInboxSummaryInvalidate } from "./ws-updaters";
 import { useWorkspaceId } from "../hooks";
+import { issueKeys } from "../issues/queries";
 import type { InboxItem } from "../types";
 
 /**
@@ -166,6 +167,26 @@ export function useArchiveInbox() {
     onSettled: () => {
       // Both lists: the item just moved from the main inbox into the archive.
       refreshInboxAfterWrite(qc, wsId);
+    },
+  });
+}
+
+/**
+ * One-tap answer to a smart-inbox signal (contango patch 18). Not optimistic:
+ * the caller confirms first and waits for the server, which posts the comment
+ * as the caller and archives the signal for them.
+ */
+export function useReplyToSignal() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: ({ id, index, content }: { id: string; index: number; content: string }) =>
+      api.replyToInboxSignal(id, index, content),
+    onSettled: (data) => {
+      refreshInboxAfterWrite(qc, wsId);
+      if (data?.comment?.issue_id) {
+        void qc.invalidateQueries({ queryKey: issueKeys.timeline(data.comment.issue_id) });
+      }
     },
   });
 }

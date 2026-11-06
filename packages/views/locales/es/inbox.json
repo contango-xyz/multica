@@ -179,6 +179,15 @@
       "open": "Abrir",
       "dashboard": "Resumen",
       "health": "Estado del equipo"
+    },
+    "reply": {
+      "confirm_title": "¿Publicar «{{content}}»?",
+      "confirm_title_on": "¿Publicar «{{content}}» en {{card}}?",
+      "confirm_description": "Se publica como tu respuesta a la pregunta, como si la hubieras escrito.",
+      "confirm": "Publicar",
+      "cancel": "Cancelar",
+      "posted": "Publicado «{{content}}»",
+      "failed": "No se pudo publicar la respuesta"
     }
   }
 }

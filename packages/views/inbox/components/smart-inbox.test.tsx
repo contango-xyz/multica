@@ -65,6 +65,13 @@ vi.mock("./smart-dashboard", () => ({
     <div data-testid="dashboard" data-compact={String(!!compact)} data-sections={sections.length} />
   ),
 }));
+vi.mock("./signal-reply-button", () => ({
+  SignalReplyButton: ({ reply, variant }: { reply: { index: number; label: string }; variant?: string }) => (
+    <button type="button" data-testid={`reply-${reply.index}`} data-variant={variant}>
+      {reply.label}
+    </button>
+  ),
+}));
 let compact = false;
 vi.mock("@multica/ui/hooks/use-mobile", () => ({ useIsCompact: () => compact }));
 
@@ -258,6 +265,61 @@ describe("SmartInboxPage", () => {
     const mentions = screen.getByRole("region", { name: /sections\.mentions/ });
     fireEvent.click(within(mentions).getByRole("button", { name: "smart.open" }));
     expect(push).toHaveBeenCalledWith("/acme/issues/issue-2");
+  });
+
+  it("puts a signal's one-tap replies first: the row's primary action and the detail's first buttons", () => {
+    items = [
+      base({
+        id: "ask",
+        type: "signal",
+        severity: "action_required",
+        title: "Signal ask",
+        issue_id: "issue-9",
+        details: {
+          key: "ask",
+          group: "decision",
+          summary: "CTG-9 · waiting 2 h",
+          actions: [{ label: "Open card", url: "https://x/CTG-9" }],
+          replies: [
+            { label: "Approve: agree", content: "agree", parent_comment_id: "c1" },
+            { label: "Reply: disagree", content: "disagree", parent_comment_id: "c1" },
+          ],
+          rank: { priority: "high", since: hoursAgo(2) },
+        },
+      }),
+    ];
+    renderPage();
+    const [row] = within(screen.getByRole("region", { name: /sections\.decision/ })).getAllByRole("listitem");
+    expect(within(row!).getByTestId("reply-0")).toHaveTextContent("Approve: agree");
+    expect(within(row!).queryByRole("button", { name: "Open card" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Signal ask/ }));
+    const brief = screen.getByTestId("signal-brief");
+    const buttons = within(brief).getAllByRole("button").map((b) => b.textContent);
+    expect(buttons).toEqual(["Approve: agree", "Reply: disagree", "Open card"]);
+    expect(within(brief).getByTestId("reply-0")).toHaveAttribute("data-variant", "default");
+    expect(within(brief).getByRole("button", { name: "Open card" })).toHaveAttribute("href", "https://x/CTG-9");
+  });
+
+  it("offers no reply on a signal without an issue (a reply only lands on the signal's own card)", () => {
+    items = [
+      base({
+        id: "loose",
+        type: "signal",
+        severity: "action_required",
+        title: "Signal loose",
+        details: {
+          key: "loose",
+          group: "decision",
+          summary: "s",
+          actions: [],
+          replies: [{ label: "Approve: ok", content: "ok" }],
+          rank: { since: hoursAgo(1) },
+        },
+      }),
+    ];
+    renderPage();
+    expect(screen.queryByTestId("reply-0")).toBeNull();
   });
 
   it("opens a focused detail instead of the thread, and marks it read", () => {

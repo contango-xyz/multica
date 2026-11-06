@@ -170,6 +170,15 @@
       "open": "열기",
       "dashboard": "개요",
       "health": "팀 상태"
+    },
+    "reply": {
+      "confirm_title": "“{{content}}”을(를) 게시할까요?",
+      "confirm_title_on": "{{card}}에 “{{content}}”을(를) 게시할까요?",
+      "confirm_description": "직접 입력한 것처럼 요청에 대한 답글로 게시됩니다.",
+      "confirm": "게시",
+      "cancel": "취소",
+      "posted": "“{{content}}” 게시됨",
+      "failed": "답글을 게시하지 못했습니다"
     }
   }
 }

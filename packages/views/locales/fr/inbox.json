@@ -179,6 +179,15 @@
       "open": "Ouvrir",
       "dashboard": "Vue d'ensemble",
       "health": "Santé de l'équipe"
+    },
+    "reply": {
+      "confirm_title": "Publier « {{content}} » ?",
+      "confirm_title_on": "Publier « {{content}} » sur {{card}} ?",
+      "confirm_description": "Publié comme votre réponse à la demande, comme si vous l’aviez tapé.",
+      "confirm": "Publier",
+      "cancel": "Annuler",
+      "posted": "« {{content}} » publié",
+      "failed": "Impossible de publier la réponse"
     }
   }
 }

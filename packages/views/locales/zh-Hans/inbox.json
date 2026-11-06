@@ -170,6 +170,15 @@
       "open": "打开",
       "dashboard": "概览",
       "health": "团队状态"
+    },
+    "reply": {
+      "confirm_title": "发布“{{content}}”？",
+      "confirm_title_on": "在 {{card}} 上发布“{{content}}”？",
+      "confirm_description": "将作为你对该请求的回复发布，与手动输入相同。",
+      "confirm": "发布",
+      "cancel": "取消",
+      "posted": "已发布“{{content}}”",
+      "failed": "无法发布回复"
     }
   }
 }

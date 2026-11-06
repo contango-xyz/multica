@@ -170,6 +170,15 @@
       "open": "開啟",
       "dashboard": "概覽",
       "health": "團隊狀態"
+    },
+    "reply": {
+      "confirm_title": "發布「{{content}}」？",
+      "confirm_title_on": "在 {{card}} 上發布「{{content}}」？",
+      "confirm_description": "將作為你對該請求的回覆發布，與手動輸入相同。",
+      "confirm": "發布",
+      "cancel": "取消",
+      "posted": "已發布「{{content}}」",
+      "failed": "無法發布回覆"
     }
   }
 }

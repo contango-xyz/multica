@@ -3034,6 +3034,16 @@ export class ApiClient {
     return this.fetch(`/api/inbox/${id}/archive`, { method: "POST" });
   }
 
+  // One-tap answer on the caller's own smart-inbox signal (contango patch 18):
+  // the server posts the reply as the caller and archives the signal. `content`
+  // is what the confirm step showed; the server refuses (409) if it changed.
+  async replyToInboxSignal(id: string, index: number, content: string): Promise<{ comment: Comment; item: InboxItem }> {
+    return this.fetch(`/api/inbox/${id}/signal-reply`, {
+      method: "POST",
+      body: JSON.stringify({ index, content }),
+    });
+  }
+
   // Archived notifications, backing the inbox's "Archived" sub-view. Capped
   // server-side (no pagination in v1). Schema-guarded so a contract drift
   // renders an empty archive instead of taking the inbox down with it.

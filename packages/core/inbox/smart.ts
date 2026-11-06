@@ -24,13 +24,35 @@ export interface SignalAction {
   url: string;
 }
 
+/**
+ * A one-tap answer (contango patch 18): posts `content` on the signal's own
+ * issue as the reader, replying to `parent_comment_id` (the ask) when set.
+ * Separate from `actions` so older clients, whose actions parser drops the
+ * whole list on an entry without a url, never see it.
+ */
+export interface SignalReply {
+  /** Position in the stored list: what the reply endpoint takes. */
+  index: number;
+  label: string;
+  content: string;
+  parent_comment_id: string | null;
+}
+
 export interface SignalDetails {
   key: string;
   group: SignalGroup;
   summary: string;
   actions: SignalAction[];
+  /** One-tap answers (unusable entries dropped; each keeps its index). */
+  replies: SignalReply[];
   rank: { priority: RankPriority; blocks: number; since: string | null };
 }
+
+const SignalReplySchema = z.object({
+  label: z.string(),
+  content: z.string(),
+  parent_comment_id: z.string().nullish().transform((v) => v || null),
+});
 
 const SignalDetailsSchema = z.object({
   key: z.string().catch(""),
@@ -43,6 +65,16 @@ const SignalDetailsSchema = z.object({
       actions
         .filter((a) => /^https?:\/\//i.test(a.url) && a.label.trim() !== "")
         .map((a) => ({ label: a.label, url: a.url })),
+    ),
+  replies: z
+    .array(z.unknown())
+    .catch([])
+    .transform((raw) =>
+      raw.flatMap((value, index): SignalReply[] => {
+        const r = SignalReplySchema.safeParse(value);
+        if (!r.success || r.data.label.trim() === "" || r.data.content.trim() === "") return [];
+        return [{ index, label: r.data.label, content: r.data.content, parent_comment_id: r.data.parent_comment_id }];
+      }),
     ),
   rank: z
     .object({

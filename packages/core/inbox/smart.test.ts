@@ -76,8 +76,43 @@ describe("signalDetails", () => {
       group: "fyi",
       summary: "",
       actions: [{ label: "Open PR", url: "https://github.com/x" }],
+      replies: [],
       rank: { priority: "none", blocks: 0, since: null },
     });
+  });
+
+  it("parses one-tap replies, keeping each one's server index and dropping unusable ones", () => {
+    const parsed = signalDetails(
+      item({
+        type: "signal",
+        details: {
+          key: "k",
+          group: "decision",
+          summary: "s",
+          actions: [{ label: "Open card", url: "https://x/CTG-1" }],
+          replies: [
+            { label: "", content: "agree" },
+            { label: "Approve: agree", content: "agree", parent_comment_id: "c1" },
+            "junk",
+            { label: "Reply: no", content: "no" },
+          ],
+        },
+      }),
+    );
+    expect(parsed?.replies).toEqual([
+      { index: 1, label: "Approve: agree", content: "agree", parent_comment_id: "c1" },
+      { index: 3, label: "Reply: no", content: "no", parent_comment_id: null },
+    ]);
+    expect(parsed?.actions).toEqual([{ label: "Open card", url: "https://x/CTG-1" }]);
+  });
+
+  it("keeps the link actions when replies are malformed or missing", () => {
+    const details = { key: "k", group: "decision", summary: "s", actions: [{ label: "Open card", url: "https://x" }] };
+    expect(signalDetails(item({ type: "signal", details: { ...details, replies: "nope" } }))).toMatchObject({
+      replies: [],
+      actions: [{ label: "Open card", url: "https://x" }],
+    });
+    expect(signalDetails(item({ type: "signal", details }))?.replies).toEqual([]);
   });
 
   it("is null for other entry types", () => {
