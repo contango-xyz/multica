@@ -425,6 +425,34 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** with patch 14.
 
+### 19. MVP page
+
+- **What:** a workspace page `/{slug}/mvp` (Work panel, under Dependencies; web only) showing what MVP means
+  (the home card's description, edited and discussed on that card), progress per pillar, the critical
+  path(s) through blocked-by edges, a 30-day burndown rebuilt from `status_changed` activity with a naive
+  projected finish, open human asks on MVP cards grouped by person (with patch 18's one-tap replies for the
+  entry's recipient), Held / Blocked-without-blocker / idle cards, and the open agent questions on the home
+  card and pillar epics. Server: `GET /api/mvp` (members and agents), computed per request in Go
+  (`server/internal/mvp`, pure and unit-tested) from a few indexed queries. Config:
+  `MULTICA_MVP_HOME_ISSUE` (e.g. `CTG-2386`), `MULTICA_MVP_RELEASE_PROPERTY` / `_OPTION` (default
+  `Release` / `MVP`) and the others in [MVP-PAGE.md](MVP-PAGE.md). Owner 2026-11-06.
+- **Touches:** ours: `server/internal/mvp/*`, `server/internal/handler/contango_mvp{,_test}.go`,
+  `packages/views/mvp/**`, `apps/web/app/[workspaceSlug]/(dashboard)/mvp/page.tsx`,
+  `packages/core/api/mvp-report.test.ts`, `docs/contango/MVP-PAGE.md`. Upstream files (one line or one
+  entry each, next to patch 10's): `server/cmd/server/router.go`, `server/internal/handler/reserved_slugs.json`,
+  `packages/core/paths/{paths,route-icons,spaces,tab-subject,reserved-slugs,consistency.test}.ts`,
+  `packages/core/diagnostics/diagnostic-context.ts`, `apps/web/proxy.ts`,
+  `packages/views/editor/utils/link-handler.ts`, `packages/views/search/use-root-model.ts`,
+  `packages/views/layout/route-icon-components.tsx`, `packages/views/layout/global-shortcuts.{chat,history}.test.tsx`,
+  `packages/views/package.json`, `packages/views/locales/*/{issues,layout}.json` (all seven locales),
+  `packages/core/{types/api,api/schemas,api/client,issues/queries}.ts`. Patch 10 file:
+  `packages/views/layout/panels/work-panel.tsx` (its Dependencies row became a two-row list). Patch 18 file:
+  `packages/views/inbox/components/signal-reply-button.tsx` (takes `Pick`s of the item and reply, and an
+  `onPosted` callback).
+- **Migrations:** none (reads existing tables). **Lockfile:** unchanged (chart is hand-rolled SVG).
+- **Upstream status:** none.
+- **Drop when:** never on its own; it depends on patches 9 and 14 and our property conventions.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
