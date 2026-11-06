@@ -35,12 +35,15 @@ export function SignalReplyButton({
   variant = "default",
   size = "default",
   className,
+  onPosted,
 }: {
-  item: InboxItem;
-  reply: SignalReply;
+  item: Pick<InboxItem, "id" | "issue_id">;
+  reply: Pick<SignalReply, "index" | "label" | "content">;
   variant?: "default" | "outline";
   size?: "default" | "sm";
   className?: string;
+  /** Called after the server posted the reply (the MVP page refreshes its asks). */
+  onPosted?: () => void;
 }) {
   const { t } = useT("inbox");
   const wsId = useWorkspaceId();
@@ -60,6 +63,7 @@ export function SignalReplyButton({
       {
         onSuccess: () => {
           setOpen(false);
+          onPosted?.();
           toast.success(t(($) => $.smart.reply.posted, { content: reply.content }));
         },
         onError: (err) => {

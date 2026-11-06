@@ -15,6 +15,7 @@ import type {
   UpdateIssueRequest,
   IssueDuplicates,
   DependencyGraph,
+  MvpReport,
   GroupedIssuesResponse,
   ListIssuesResponse,
   SearchIssuesResponse,
@@ -282,6 +283,7 @@ import {
   ChildIssuesResponseSchema,
   IssueDuplicatesResponseSchema,
   DependencyGraphResponseSchema,
+  MvpReportSchema,
   ChildIssueProgressResponseSchema,
   CommentsListSchema,
   CommentTriggerPreviewSchema,
@@ -1626,6 +1628,14 @@ export class ApiClient {
     const raw = await this.fetch<unknown>("/api/issues/dependency-graph");
     return parseWithFallback(raw, DependencyGraphResponseSchema, { nodes: [], edges: [] }, {
       endpoint: "GET /api/issues/dependency-graph",
+    });
+  }
+
+  /** The MVP page (Contango fork, patch 19). */
+  async getMvpReport(): Promise<MvpReport> {
+    const raw = await this.fetch<unknown>("/api/mvp");
+    return parseWithFallback(raw, MvpReportSchema, MvpReportSchema.parse({}) as MvpReport, {
+      endpoint: "GET /api/mvp",
     });
   }
 

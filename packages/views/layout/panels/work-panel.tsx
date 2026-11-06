@@ -161,19 +161,27 @@ export function WorkPanel() {
             />
           )}
 
-          {/* contango: the issue dependency graph (patch 10). */}
-          <DependenciesLink href={p.dependencies()} pathname={pathname} label={t(($) => $.nav.dependencies)} />
+          {/* contango: the issue dependency graph (patch 10) and the MVP page (patch 19). */}
+          <ContangoLinks
+            pathname={pathname}
+            links={[
+              { href: p.dependencies(), label: t(($) => $.nav.dependencies) },
+              { href: p.mvp(), label: t(($) => $.nav.mvp) },
+            ]}
+          />
         </PanelBody>
       </IssueContextMenuProvider>
     </>
   );
 }
 
-function DependenciesLink({ href, pathname, label }: { href: string; pathname: string; label: string }) {
-  const Icon = routeIconForPath(href);
+function ContangoLinks({ pathname, links }: { pathname: string; links: { href: string; label: string }[] }) {
   return (
     <PanelList className="mt-2">
-      <PanelLink href={href} icon={<Icon />} label={label} active={isPathWithin(pathname, href)} />
+      {links.map(({ href, label }) => {
+        const Icon = routeIconForPath(href);
+        return <PanelLink key={href} href={href} icon={<Icon />} label={label} active={isPathWithin(pathname, href)} />;
+      })}
     </PanelList>
   );
 }

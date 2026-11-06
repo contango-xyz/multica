@@ -105,6 +105,8 @@ export function parseTabSubject(url: string): TabSubject {
       return { kind: "page", page: "usage" };
     case "dependencies":
       return { kind: "page", page: "dependencies" };
+    case "mvp":
+      return { kind: "page", page: "mvp" };
     case "inbox":
       return {
         kind: "inbox",

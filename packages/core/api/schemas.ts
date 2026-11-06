@@ -1839,6 +1839,138 @@ export const DependencyGraphResponseSchema = z.object({
   edges: z.array(z.object({ from: z.string(), to: z.string() }).loose()).default([]),
 }).loose();
 
+// Contango fork: GET /api/mvp (patch 19). Every list defaults to empty and every
+// count to 0, so a partial or older payload still renders the sections it has.
+const MvpIssueSchema = z
+  .object({
+    id: z.string(),
+    identifier: z.string(),
+    number: z.number().catch(0),
+    title: z.string().catch(""),
+    status: z.string(),
+    priority: z.string().catch("none"),
+    assignee_type: z.string().nullable().catch(null).default(null),
+    assignee_id: z.string().nullable().catch(null).default(null),
+    responsible_id: z.string().nullable().catch(null).default(null),
+    parent_id: z.string().nullable().catch(null).default(null),
+    blocked_by: z
+      .array(z.object({ id: z.string(), identifier: z.string(), status: z.string() }).loose())
+      .catch([])
+      .default([]),
+    blocks: z.number().catch(0).default(0),
+    on_critical_path: z.boolean().catch(false).default(false),
+    last_run_at: z.string().nullable().catch(null).default(null),
+    flags: z.array(z.string()).catch([]).default([]),
+  })
+  .loose();
+
+const MvpCountsShape = {
+  total: z.number().catch(0).default(0),
+  open: z.number().catch(0).default(0),
+  done: z.number().catch(0).default(0),
+  cancelled: z.number().catch(0).default(0),
+  by_status: z.record(z.string(), z.number()).catch({}).default({}),
+};
+
+const MvpGroupSchema = z.object({ ...MvpCountsShape, open_items: z.array(MvpIssueSchema).catch([]).default([]) }).loose();
+
+const MvpAskSchema = z
+  .object({
+    issue: MvpIssueSchema,
+    comment_id: z.string(),
+    kind: z.string().catch("human"),
+    excerpt: z.string().catch(""),
+    created_at: z.string().catch(""),
+    recipient_id: z.string().catch(""),
+    blocks: z.number().catch(0).default(0),
+    inbox_item_id: z.string().nullable().catch(null).default(null),
+    replies: z
+      .array(z.object({ index: z.number(), label: z.string(), content: z.string() }).loose())
+      .catch([])
+      .default([]),
+  })
+  .loose();
+
+const EMPTY_MVP_GROUP = { total: 0, open: 0, done: 0, cancelled: 0, by_status: {}, open_items: [] };
+const EMPTY_MVP_ETA = {
+  open: 0, done_7d: 0, done_14d: 0, rate_7d: 0, rate_14d: 0, eta_7d: null, eta_14d: null, days_7d: null, days_14d: null,
+};
+
+export const MvpReportSchema = z
+  .object({
+    configured: z.boolean().catch(false).default(false),
+    problem: z.string().nullable().catch(null).default(null),
+    config: z
+      .object({
+        home_issue: z.string().catch(""),
+        release_property: z.string().catch(""),
+        release_option: z.string().catch(""),
+        idle_hours: z.number().catch(24),
+        days: z.number().catch(30),
+      })
+      .loose()
+      .catch({ home_issue: "", release_property: "", release_option: "", idle_hours: 24, days: 30 }),
+    generated_at: z.string().nullable().catch(null).default(null),
+    home: z
+      .object({
+        id: z.string(),
+        identifier: z.string(),
+        title: z.string().catch(""),
+        status: z.string().catch(""),
+        description: z.string().catch(""),
+      })
+      .loose()
+      .nullable()
+      .catch(null)
+      .default(null),
+    totals: z.object(MvpCountsShape).loose().catch({ total: 0, open: 0, done: 0, cancelled: 0, by_status: {} }),
+    pillars: z.array(z.object({ ...MvpCountsShape, open_items: z.array(MvpIssueSchema).catch([]).default([]), issue: MvpIssueSchema }).loose()).catch([]).default([]),
+    standalone: MvpGroupSchema.catch(EMPTY_MVP_GROUP).default(EMPTY_MVP_GROUP),
+    critical_paths: z.array(z.object({ issues: z.array(MvpIssueSchema).default([]) }).loose()).catch([]).default([]),
+    burndown: z
+      .array(z.object({ date: z.string(), open: z.number(), done: z.number() }).loose())
+      .catch([])
+      .default([]),
+    eta: z
+      .object({
+        open: z.number().catch(0),
+        done_7d: z.number().catch(0),
+        done_14d: z.number().catch(0),
+        rate_7d: z.number().catch(0),
+        rate_14d: z.number().catch(0),
+        eta_7d: z.string().nullable().catch(null).default(null),
+        eta_14d: z.string().nullable().catch(null).default(null),
+        days_7d: z.number().nullable().catch(null).default(null),
+        days_14d: z.number().nullable().catch(null).default(null),
+      })
+      .loose()
+      .catch(EMPTY_MVP_ETA)
+      .default(EMPTY_MVP_ETA),
+    humans: z
+      .array(
+        z
+          .object({
+            recipient_id: z.string().catch(""),
+            cards_blocked: z.number().catch(0),
+            asks: z.array(MvpAskSchema).catch([]).default([]),
+          })
+          .loose(),
+      )
+      .catch([])
+      .default([]),
+    stuck: z
+      .object({
+        held: z.array(MvpIssueSchema).catch([]).default([]),
+        blocked_no_blocker: z.array(MvpIssueSchema).catch([]).default([]),
+        idle: z.array(MvpIssueSchema).catch([]).default([]),
+      })
+      .loose()
+      .catch({ held: [], blocked_no_blocker: [], idle: [] })
+      .default({ held: [], blocked_no_blocker: [], idle: [] }),
+    agent_questions: z.array(MvpAskSchema).catch([]).default([]),
+  })
+  .loose();
+
 export const IssueDuplicatesResponseSchema = z.object({
   duplicate_of: IssueSchema.nullable().default(null),
   duplicates: z.array(IssueSchema).default([]),

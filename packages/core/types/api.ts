@@ -114,6 +114,96 @@ export interface DependencyGraph {
   edges: { from: string; to: string }[];
 }
 
+/** An issue on the MVP page (Contango fork, GET /api/mvp). */
+export interface MvpIssue {
+  id: string;
+  identifier: string;
+  number: number;
+  title: string;
+  status: string;
+  priority: string;
+  assignee_type: string | null;
+  assignee_id: string | null;
+  /** User id of the card's "Responsible human". */
+  responsible_id: string | null;
+  parent_id: string | null;
+  /** Open blockers. */
+  blocked_by: { id: string; identifier: string; status: string }[];
+  /** Open MVP cards waiting on this one, directly or downstream. */
+  blocks: number;
+  on_critical_path: boolean;
+  last_run_at: string | null;
+  /** held | blocked_no_blocker | idle | needs_human */
+  flags: string[];
+}
+
+export interface MvpCounts {
+  total: number;
+  open: number;
+  done: number;
+  cancelled: number;
+  /** Open cards per status key. */
+  by_status: Record<string, number>;
+}
+
+export interface MvpGroup extends MvpCounts {
+  open_items: MvpIssue[];
+}
+
+export interface MvpPillar extends MvpGroup {
+  issue: MvpIssue;
+}
+
+export interface MvpAsk {
+  issue: MvpIssue;
+  comment_id: string;
+  kind: "human" | "operator" | string;
+  excerpt: string;
+  created_at: string;
+  /** Member user id the ask is for; "" when nobody could be named. */
+  recipient_id: string;
+  blocks: number;
+  /** The smart-inbox entry raised for the ask (patch 14), when there is one. */
+  inbox_item_id: string | null;
+  replies: { index: number; label: string; content: string }[];
+}
+
+export interface MvpHumanGroup {
+  recipient_id: string;
+  cards_blocked: number;
+  asks: MvpAsk[];
+}
+
+export interface MvpEta {
+  open: number;
+  done_7d: number;
+  done_14d: number;
+  rate_7d: number;
+  rate_14d: number;
+  eta_7d: string | null;
+  eta_14d: string | null;
+  days_7d: number | null;
+  days_14d: number | null;
+}
+
+/** GET /api/mvp. */
+export interface MvpReport {
+  configured: boolean;
+  problem: string | null;
+  config: { home_issue: string; release_property: string; release_option: string; idle_hours: number; days: number };
+  generated_at: string | null;
+  home: { id: string; identifier: string; title: string; status: string; description: string } | null;
+  totals: MvpCounts;
+  pillars: MvpPillar[];
+  standalone: MvpGroup;
+  critical_paths: { issues: MvpIssue[] }[];
+  burndown: { date: string; open: number; done: number }[];
+  eta: MvpEta;
+  humans: MvpHumanGroup[];
+  stuck: { held: MvpIssue[]; blocked_no_blocker: MvpIssue[]; idle: MvpIssue[] };
+  agent_questions: MvpAsk[];
+}
+
 export interface IssueDuplicates {
   /** The original this issue duplicates, when it is marked as a duplicate. */
   duplicate_of: Issue | null;

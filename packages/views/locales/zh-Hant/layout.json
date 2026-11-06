@@ -13,7 +13,8 @@
     "skills": "Skills",
     "settings": "設定",
     "views": "檢視",
-    "dependencies": "依賴關係"
+    "dependencies": "依賴關係",
+    "mvp": "MVP"
   },
   "tab": {
     "issue": "任務",

@@ -143,6 +143,7 @@ export const issueKeys = {
     [...issueKeys.all(wsId), "identifier", identifier] as const,
   /** Prefix for every per-issue duplicate-relation query in a workspace. */
   dependencyGraph: (wsId: string) => [...issueKeys.all(wsId), "dependency-graph"] as const,
+  mvp: (wsId: string) => [...issueKeys.all(wsId), "mvp"] as const,
   duplicatesAll: (wsId: string) =>
     [...issueKeys.all(wsId), "duplicates"] as const,
   duplicates: (wsId: string, id: string) =>
@@ -584,6 +585,16 @@ export function dependencyGraphOptions(wsId: string) {
     queryKey: issueKeys.dependencyGraph(wsId),
     queryFn: () => api.getDependencyGraph(),
     refetchOnMount: "always",
+  });
+}
+
+/** The MVP page (Contango fork, patch 19); refreshed every minute while open. */
+export function mvpReportOptions(wsId: string) {
+  return queryOptions({
+    queryKey: issueKeys.mvp(wsId),
+    queryFn: () => api.getMvpReport(),
+    refetchOnMount: "always",
+    refetchInterval: 60_000,
   });
 }
 

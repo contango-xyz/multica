@@ -13,7 +13,8 @@
     "skills": "Skills",
     "settings": "Ajustes",
     "views": "Vistas",
-    "dependencies": "Dependencias"
+    "dependencies": "Dependencias",
+    "mvp": "MVP"
   },
   "tab": {
     "issue": "Tarea",
