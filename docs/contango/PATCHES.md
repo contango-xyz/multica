@@ -400,6 +400,31 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** upstream has per-user quiet hours the feeder can read.
 
+### 18. Smart inbox one-tap answers
+
+- **What:** a signal may carry up to 2 `replies` (`{label, content, parent_comment_id}`, content
+  ≤ 500, label ≤ 40) next to its link `actions`. A reply has no issue of its own: it can only post on
+  the signal's issue, so upserting replies needs `issue_id`, and each `parent_comment_id` must be a
+  live comment on that issue. The recipient taps a reply, confirms ("Post “agree” on CTG-123?"), and
+  the client calls `POST /api/inbox/{id}/signal-reply` `{index, content}` (human credentials only).
+  The server checks the item is the caller's own unresolved signal and the reply at `index` still has
+  that `content` (else 404 / 409), then runs the ordinary `CreateComment` handler on the same request,
+  so the comment is the caller's own (auth, permissions, mentions, notifications, agent triggers as if
+  typed), and archives the signal issue-wide for the caller (not resolved: the feeder resolves it when
+  the ask closes, and its updates keep an archived signal quiet). Web: the reply is the row's primary
+  action and the first buttons of the signal brief. A separate field, not a new kind in `actions`:
+  older clients' parser drops the whole `actions` list on an entry without a `url`, and they now just
+  never see replies. Mobile does not render signals. Owner 2026-11-06. Spec: [SMART-INBOX.md](SMART-INBOX.md).
+- **Touches:** ours: `server/internal/handler/inbox_signal_reply{,_test}.go`,
+  `packages/views/inbox/components/signal-reply-button{,.test}.tsx`; patch 14 files:
+  `server/internal/handler/inbox_signal.go`, `packages/core/inbox/smart{,.test}.ts`,
+  `packages/views/inbox/components/smart-inbox{,.test}.tsx`. Upstream files: `server/cmd/server/router.go`
+  (one route), `packages/core/api/client.ts` (`replyToInboxSignal`), `packages/core/inbox/mutations.ts`
+  (`useReplyToSignal`), `packages/views/locales/*/inbox.json` (`smart.reply`).
+- **Migrations:** none (a key in the signal's `details`).
+- **Upstream status:** none.
+- **Drop when:** with patch 14.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

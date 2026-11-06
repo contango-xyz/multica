@@ -168,6 +168,38 @@ the other entries.
 Desktop and mobile apps are unchanged (classic only; the desktop shares the web view code but never
 sees the opt-in param). Classic rows show a signal's summary as their second line.
 
+## One-tap answers (fork patch 18, owner 2026-11-06)
+Answering an ask used to mean opening the card and typing. A signal can now carry the answers
+themselves: "Approve: agree" posts `agree` on the card, as a reply to the ask, from the reader.
+
+- **Shape:** `details.replies` = up to 2 `{ "label": "Approve: agree", "content": "agree",
+  "parent_comment_id": "<ask comment id>" }` (label 1–40, content 1–500, parent optional), sent on
+  the upsert next to `actions` (which stay link buttons, max 3). No issue field: a reply always lands
+  on the signal's own `issue_id`, which is required when replies are present; a parent must be a live
+  comment on that issue (else 400). A separate field rather than a new kind of action, because
+  clients that predate it parse `actions` strictly and would drop the whole list (Open card included)
+  on an entry without a `url`; they ignore `replies` instead.
+- **Who posts:** the reader, on their click. `POST /api/inbox/{id}/signal-reply` `{ "index": 0,
+  "content": "agree" }` with the reader's own session (agent task tokens 403). The item must be the
+  caller's (else 404), a signal not yet resolved, with that reply still at that index (else 409: the
+  feeder changed it between render and tap). The server then runs the normal comment-create handler
+  on the same request, so authorship, permissions, mentions, notifications, agent triggers and the
+  feeder's answered-ask detection behave exactly as for a typed reply. A refusal from it comes back
+  unchanged and leaves the signal as it was. Nothing is posted without that click.
+- **How it clears:** on success the signal and the reader's other entries on the card (the mention
+  that carried the ask) are archived, like the inbox's own Archive; the response is
+  `{comment, item}` (201). It is not resolved: the feeder keeps an ask while Needs human is set
+  (until the PM clears it, CTG-1971), and an archived signal stays archived through its updates, so
+  the entry does not come back; the feeder resolves it when the ask closes. A new ask is a new key
+  and a new entry.
+- **Web:** a signal's first reply is the row's primary action (instead of its first link), and its
+  replies come first in the signal brief (the first one filled), then the links. Tapping one opens a
+  confirmation ("Post “agree” on CTG-123?" · Post / Cancel); the dialog stays open on an error and
+  shows it. Desktop renders the same views; mobile shows no signals.
+- **Feeder:** sends replies only with `MULTICA_INBOX_ONE_TAP=1` (default off: turn it on after this
+  backend and web are live). Only decision asks get them (merge asks keep Open PR: merges are approved
+  on GitHub), and only when the ask's `Reply with` options parse cleanly; see `inbox-signals.py`.
+
 ## What the feeder produces (ops job, every 2 min)
 - **merge / decision / access**: each open `[NEEDS HUMAN]` ask (needs-human set) → its Responsible human; group from the ask's text (merge ask, plan/design approval, login/access/funding, other decision). Also a merge-ready PR whose approval is owned by that human (pr-watch's merge asks).
 - **stalled**: stall-watch's stalled cards → the card's Responsible human.
