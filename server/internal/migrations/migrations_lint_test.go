@@ -9,13 +9,17 @@ import (
 	"testing"
 )
 
-// contangoMigrationStems are the fork's push_device migrations. They were
-// numbered before upstream claimed 564-566 and are applied in production by
-// stem, so they keep their names (contango, docs/contango/PATCHES.md).
+// contangoMigrationStems are fork migrations numbered before upstream claimed
+// the same number. They are applied in production by stem, so they keep their
+// names (contango, docs/contango/PATCHES.md).
 var contangoMigrationStems = map[string]bool{
-	"564_push_device":             true,
-	"565_push_device_token_index": true,
-	"566_push_device_user_index":  true,
+	"564_push_device":                  true,
+	"565_push_device_token_index":      true,
+	"566_push_device_user_index":       true,
+	"593_issue_dependency_edge_unique": true,
+	"594_push_device_platform_macos":   true,
+	"607_inbox_signal_key_index":       true,
+	"608_github_pull_request_review":   true,
 }
 
 func TestMigrationNumericPrefixesAreUnique(t *testing.T) {
