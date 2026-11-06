@@ -20,6 +20,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/logger"
@@ -37,6 +38,10 @@ const (
 	signalLabelMaxLen   = 40
 	signalURLMaxLen     = 2000
 	signalMaxBlocks     = 10000
+	// One-tap answers (patch 18): at most 2 replies, each a short literal
+	// answer such as "agree" or "approve pairing".
+	signalMaxReplies  = 2
+	signalReplyMaxLen = 500
 )
 
 // SignalGroups are the smart-inbox sections a signal can belong to.
@@ -89,6 +94,18 @@ type signalAction struct {
 	URL   string `json:"url"`
 }
 
+// signalReply is a one-tap answer (contango patch 18): a button that posts
+// Content on the signal's own issue, as a reply to ParentCommentID (the ask)
+// when set, as the clicking recipient. It has no issue of its own: a reply can
+// only ever land on the signal's issue. Kept apart from actions so clients that
+// predate it (whose actions parser drops the whole list on an entry without a
+// url) keep their link buttons and simply never see the replies.
+type signalReply struct {
+	Label           string `json:"label"`
+	Content         string `json:"content"`
+	ParentCommentID string `json:"parent_comment_id,omitempty"`
+}
+
 type signalRank struct {
 	Priority string `json:"priority"`
 	Blocks   int    `json:"blocks"`
@@ -102,6 +119,7 @@ type signalDetails struct {
 	Group   string         `json:"group"`
 	Summary string         `json:"summary"`
 	Actions []signalAction `json:"actions"`
+	Replies []signalReply  `json:"replies,omitempty"`
 	Rank    signalRank     `json:"rank"`
 }
 
@@ -115,6 +133,7 @@ type upsertSignalRequest struct {
 	Summary           string         `json:"summary"`
 	Body              string         `json:"body"`
 	Actions           []signalAction `json:"actions"`
+	Replies           []signalReply  `json:"replies"`
 	Rank              struct {
 		Priority string  `json:"priority"`
 		Blocks   int     `json:"blocks"`
@@ -193,6 +212,26 @@ func (req *upsertSignalRequest) validate() string {
 	if req.Actions == nil {
 		req.Actions = []signalAction{}
 	}
+	if len(req.Replies) > signalMaxReplies {
+		return "at most 2 replies"
+	}
+	for i := range req.Replies {
+		rp := &req.Replies[i]
+		rp.Label = strings.TrimSpace(rp.Label)
+		rp.Content = strings.TrimSpace(sanitizeNullBytes(rp.Content))
+		rp.ParentCommentID = strings.TrimSpace(rp.ParentCommentID)
+		if rp.Label == "" || runeLen(rp.Label) > signalLabelMaxLen {
+			return "reply label is required (max 40 characters)"
+		}
+		if rp.Content == "" || runeLen(rp.Content) > signalReplyMaxLen {
+			return "reply content is required (max 500 characters)"
+		}
+		if rp.ParentCommentID != "" {
+			if _, err := uuid.Parse(rp.ParentCommentID); err != nil {
+				return "reply parent_comment_id must be a uuid"
+			}
+		}
+	}
 	return ""
 }
 
@@ -251,6 +290,9 @@ func (h *Handler) UpsertInboxSignal(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		issueID = id
+	}
+	if !h.validSignalReplies(w, r, issueID, req.Replies) {
+		return
 	}
 	recipient, ok := h.signalRecipient(w, r, wsUUID, req.RecipientMemberID)
 	if !ok {
@@ -329,7 +371,7 @@ func (h *Handler) upsertSignalOnce(ctx context.Context, wsID, recipientID, issue
 	}
 
 	details := signalDetails{
-		Key: req.Key, Group: req.Group, Summary: req.Summary, Actions: req.Actions,
+		Key: req.Key, Group: req.Group, Summary: req.Summary, Actions: req.Actions, Replies: req.Replies,
 		Rank: signalRank{Priority: req.Rank.Priority, Blocks: req.Rank.Blocks},
 	}
 	var prev signalDetails

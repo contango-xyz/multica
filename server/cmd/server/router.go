@@ -2603,6 +2603,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/signals", h.UpsertInboxSignal)
 					r.Post("/signals/resolve", h.ResolveInboxSignal)
 				})
+				// One-tap answer on the caller's own signal (contango patch 18):
+				// posts the reply as the caller through CreateComment.
+				r.With(handler.RequireHumanActor).Post("/{id}/signal-reply", h.ReplyToInboxSignal)
 			})
 
 			// Notification preferences
