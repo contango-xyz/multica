@@ -16,7 +16,7 @@ import {
 import { Button } from "@multica/ui/components/ui/button";
 import { useIsCompact } from "@multica/ui/hooks/use-mobile";
 import { IconButton } from "@multica/ui/components/common/icon-button";
-import { Sparkles } from "lucide-react";
+import { Sparkles } from "@multica/ui/icons";
 import { useNavigation } from "../../navigation";
 import { useT } from "../../i18n";
 import { InboxPage as ClassicInboxPage } from "./inbox-page";

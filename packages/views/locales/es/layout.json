@@ -12,7 +12,8 @@
     "runtimes": "Runtimes",
     "skills": "Skills",
     "settings": "Ajustes",
-    "views": "Vistas"
+    "views": "Vistas",
+    "dependencies": "Dependencias"
   },
   "tab": {
     "issue": "Tarea",

@@ -82,7 +82,8 @@
     "quick_create_unconfirmed": "Creación con agente sin confirmar",
     "autopilot_paused": "Automatización en pausa",
     "children_done": "Sub-tareas finalizadas",
-    "autopilot_quota_exceeded": "Límite de ejecuciones de automatizaciones alcanzado"
+    "autopilot_quota_exceeded": "Límite de ejecuciones de automatizaciones alcanzado",
+    "signal": "Señal"
   },
   "labels": {
     "set_status_to": "Establecer estado en",
@@ -119,5 +120,65 @@
     "unarchive_failed": "No se ha podido desarchivar",
     "archived_load_failed": "No se han podido cargar las notificaciones archivadas",
     "filters_load_failed": "No se han podido cargar los filtros"
+  },
+  "smart": {
+    "toggle_aria": "Diseño de la bandeja",
+    "smart": "Inteligente",
+    "classic": "Clásica",
+    "sections": {
+      "merge": "Aprobaciones de merge",
+      "decision": "Decisiones",
+      "access": "Acceso y financiación",
+      "stalled": "Estancadas",
+      "blocking": "Bloqueando a otros",
+      "alert": "Alertas",
+      "mentions": "Menciones y revisiones",
+      "fyi": "Para tu información"
+    },
+    "priority": {
+      "urgent": "Urgente",
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "none": "Sin prioridad"
+    },
+    "blocks_one": "bloquea {{count}}",
+    "blocks_other": "bloquea {{count}}",
+    "open": "Abrir",
+    "open_issue": "Abrir issue",
+    "back": "Bandeja de entrada",
+    "empty": "Nada requiere tu atención ahora",
+    "bulk_menu": "Acciones de la bandeja",
+    "section_actions": "Acciones de la sección",
+    "mark_section_read": "Marcar como leído",
+    "archive_section": "Archivar todo",
+    "filters": {
+      "tooltip": "Filtrar por grupo",
+      "needs_you": "Solo lo que requiere mi acción",
+      "urgent_only": "Solo urgentes"
+    },
+    "show_more_one": "Mostrar {{count}} más",
+    "show_more_other": "Mostrar {{count}} más",
+    "switch_to_classic": "Cambiar a Clásica",
+    "switch_to_smart": "Cambiar a Inteligente",
+    "dashboard": {
+      "do_first": "Haz esto primero",
+      "nothing_waiting": "Nada te está esperando",
+      "waiting_one": "{{count}} te espera",
+      "waiting_other": "{{count}} te esperan",
+      "oldest": "la más antigua {{age}}",
+      "urgent_one": "{{count}} urgente",
+      "urgent_other": "{{count}} urgentes",
+      "blocks_cards_one": "bloquea {{count}} tarjeta",
+      "blocks_cards_other": "bloquea {{count}} tarjetas",
+      "waiting_for": "esperando {{age}}",
+      "stalled_one": "{{count}} estancada",
+      "stalled_other": "{{count}} estancadas",
+      "blocking_one": "{{count}} bloqueando",
+      "blocking_other": "{{count}} bloqueando",
+      "open": "Abrir",
+      "dashboard": "Resumen",
+      "health": "Estado del equipo"
+    }
   }
 }

@@ -80,7 +80,8 @@
     "quick_create_unconfirmed": "透過 AI 代理建立結果未確認",
     "autopilot_paused": "自動化已暫停",
     "children_done": "子任務已全部結束",
-    "autopilot_quota_exceeded": "自動化執行次數已用完"
+    "autopilot_quota_exceeded": "自動化執行次數已用完",
+    "signal": "訊號"
   },
   "labels": {
     "set_status_to": "狀態設為",
@@ -117,5 +118,58 @@
     "unarchive_failed": "取消歸檔失敗",
     "archived_load_failed": "無法載入已歸檔通知",
     "filters_load_failed": "無法載入篩選項"
+  },
+  "smart": {
+    "toggle_aria": "收件匣版面",
+    "smart": "智慧",
+    "classic": "經典",
+    "sections": {
+      "merge": "合併審批",
+      "decision": "決策",
+      "access": "權限與資金",
+      "stalled": "停滯",
+      "blocking": "阻塞他人",
+      "alert": "警示",
+      "mentions": "提及與審查",
+      "fyi": "知悉"
+    },
+    "priority": {
+      "urgent": "緊急",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "none": "無優先級"
+    },
+    "blocks_other": "阻塞 {{count}} 項",
+    "open": "開啟",
+    "open_issue": "開啟事項",
+    "back": "收件匣",
+    "empty": "目前沒有需要你處理的事項",
+    "bulk_menu": "收件匣操作",
+    "section_actions": "分組操作",
+    "mark_section_read": "標為已讀",
+    "archive_section": "全部封存",
+    "filters": {
+      "tooltip": "按分組篩選",
+      "needs_you": "僅顯示需要我處理的",
+      "urgent_only": "僅緊急"
+    },
+    "show_more_other": "再顯示 {{count}} 項",
+    "switch_to_classic": "切換到經典檢視",
+    "switch_to_smart": "切換到智慧檢視",
+    "dashboard": {
+      "do_first": "先處理這些",
+      "nothing_waiting": "沒有等待你處理的事項",
+      "waiting_other": "{{count}} 項等待你處理",
+      "oldest": "最久 {{age}}",
+      "urgent_other": "{{count}} 項緊急",
+      "blocks_cards_other": "阻塞 {{count}} 張卡片",
+      "waiting_for": "已等待 {{age}}",
+      "stalled_other": "{{count}} 項停滯",
+      "blocking_other": "{{count}} 項阻塞他人",
+      "open": "開啟",
+      "dashboard": "概覽",
+      "health": "團隊狀態"
+    }
   }
 }

@@ -17,10 +17,10 @@ import {
   ChevronDown,
   ExternalLink,
   Inbox,
-  LayoutList,
+  List,
   ListChecks,
   MoreHorizontal,
-} from "lucide-react";
+} from "@multica/ui/icons";
 import { toast } from "sonner";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
@@ -303,7 +303,7 @@ export function SmartFilterMenu({ wsId }: { wsId: string }) {
           />
         }
       >
-        <LayoutList className="size-4" />
+        <List className="size-4" />
         {count > 0 && <span className="text-caption tabular-nums">{count}</span>}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto min-w-48">

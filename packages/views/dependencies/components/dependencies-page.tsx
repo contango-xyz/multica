@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Network } from "lucide-react";
+import { Network } from "@multica/ui/icons";
 import type { DependencyGraphNode } from "@multica/core/types";
 import { STATUS_CONFIG } from "@multica/core/issues/config";
 import { dependencyGraphOptions } from "@multica/core/issues/queries";
@@ -66,8 +66,12 @@ export function DependenciesPage() {
     <div className="flex flex-1 min-h-0 flex-col">
       <CollectionPageHeader
         icon={Network}
-        title={t(($) => $.dependencies.page_title)}
-        count={graph.nodes.length}
+        title={
+          <>
+            {t(($) => $.dependencies.page_title)}
+            <span className="ml-2 text-caption tabular-nums text-muted-foreground">{graph.nodes.length}</span>
+          </>
+        }
         actions={
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-caption text-muted-foreground">

@@ -215,7 +215,7 @@ const pushClicks = new PushClicks({
   open: (route) => openPushRoute(route),
   focus: () => {
     const window = ensureMainWindow();
-    if (window) focusMainWindow(window);
+    if (window) focusWindow(window);
   },
 });
 // Route from the push notification that cold-launched the app, if any.
@@ -393,7 +393,7 @@ function handleDeepLink(url: string): void {
         dispatchToMainRenderer("route:open", decision.path);
       } else {
         const window = ensureMainWindow();
-        if (window) focusMainWindow(window);
+        if (window) focusWindow(window);
       }
       return;
     }
@@ -421,7 +421,7 @@ function handleWebLink(url: string): void {
     dispatchToMainRenderer("route:open", decision.path);
   } else if (decision.kind === "focus") {
     const window = ensureMainWindow();
-    if (window) focusMainWindow(window);
+    if (window) focusWindow(window);
   } else {
     void openExternalSafely(url);
   }

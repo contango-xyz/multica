@@ -6,7 +6,7 @@
 // count, its top entry's reason and section actions.
 
 import { useCallback, useRef, type KeyboardEvent } from "react";
-import { Archive, CheckCheck, ChevronRight, Inbox, MoreHorizontal } from "lucide-react";
+import { Archive, CheckCheck, ChevronRight, Inbox, MoreHorizontal } from "@multica/ui/icons";
 import { inboxRowKey } from "@multica/core/inbox/filter-store";
 import { ageTint, type SmartEntry, type SmartSection } from "@multica/core/inbox/smart";
 import { isEditableShortcutTarget } from "@multica/core/shortcuts";

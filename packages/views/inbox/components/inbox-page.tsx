@@ -351,6 +351,8 @@ export function InboxPage({
     setSelectedKeyState("");
     replace(buildInboxUrl(nextView, ""));
   }, [replace, buildInboxUrl]);
+  // contango: the smart list's empty state links to the archive.
+  const openArchived = useCallback(() => setView("archived"), [setView]);
 
   // Applying a filter can remove the open row from the list. Clear that local
   // selection instead of treating it as a broken deep link and redirecting to

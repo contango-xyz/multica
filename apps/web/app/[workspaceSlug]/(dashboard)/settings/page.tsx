@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindow } from "lucide-react";
+import { AppWindow } from "@multica/ui/icons";
 import { SettingsPage } from "@multica/views/settings";
 import { useT } from "@multica/views/i18n";
 import { OpenInDesktopSetting } from "@/components/open-in-desktop-setting";

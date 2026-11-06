@@ -33,6 +33,7 @@
     },
     "empty": "還沒有固定項。",
     "unavailable_issue": "該固定任務不可用。",
-    "unavailable_project": "該固定專案不可用。"
+    "unavailable_project": "該固定專案不可用。",
+    "unavailable_view": "已儲存的檢視（請在網頁端開啟）"
   }
 }

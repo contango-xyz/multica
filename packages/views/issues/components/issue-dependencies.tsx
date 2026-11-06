@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "@multica/ui/icons";
 import type { Issue, IssueDependencyRef } from "@multica/core/types";
 import { issueStatusCategory } from "@multica/core/issues";
 import { useIssueStatuses } from "@multica/core/issue-statuses/hooks";

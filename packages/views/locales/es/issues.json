@@ -1866,5 +1866,19 @@
       "empty_title": "Aún no hay vistas guardadas",
       "empty_description": "Configura los filtros y las opciones de visualización de una lista de tareas y guárdalos como vista."
     }
+  },
+  "dependencies": {
+    "blocked_by": "Bloqueado por",
+    "blocks": "Bloquea",
+    "blocked_by_count_one": "Bloqueado por {{count}}",
+    "blocked_by_count_other": "Bloqueado por {{count}}",
+    "blocks_count_one": "Bloquea {{count}}",
+    "blocks_count_other": "Bloquea {{count}}",
+    "page_title": "Dependencias",
+    "hide_closed": "Ocultar hechas y canceladas",
+    "only_critical": "Solo ruta crítica",
+    "empty": "Aún no hay dependencias entre issues abiertas.",
+    "critical_one": "{{count}} tarjeta espera por esta",
+    "critical_other": "{{count}} tarjetas esperan por esta"
   }
 }

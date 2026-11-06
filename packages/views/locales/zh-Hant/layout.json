@@ -12,7 +12,8 @@
     "runtimes": "執行時",
     "skills": "Skills",
     "settings": "設定",
-    "views": "檢視"
+    "views": "檢視",
+    "dependencies": "依賴關係"
   },
   "tab": {
     "issue": "任務",

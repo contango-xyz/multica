@@ -675,6 +675,18 @@
       "granted": "Este navegador puede mostrar avisos de notificación.",
       "denied": "Bloqueado por tu navegador. Activa las notificaciones para este sitio en la configuración del navegador.",
       "enabled_badge": "Activado"
+    },
+    "work_hours": {
+      "label": "Horario laboral",
+      "description": "Los recordatorios de solicitudes que aún te esperan solo llegan dentro de este horario. Las solicitudes nuevas te siguen notificando al instante.",
+      "not_set": "Sin configurar: los recordatorios usan el horario predeterminado del equipo (07:00–22:00 UTC, todos los días). Las solicitudes nuevas te siguen notificando al instante.",
+      "zone": "Zona horaria",
+      "days": "Días laborables",
+      "from": "Desde",
+      "to": "Hasta",
+      "save": "Guardar",
+      "clear": "Borrar",
+      "saved": "Horario laboral guardado"
     }
   },
   "tokens": {
@@ -1331,6 +1343,13 @@
       "reconnect_failed": "No se ha podido reconectar el daemon",
       "try_again_moment": "Inténtalo de nuevo en un momento.",
       "try_again": "Inténtalo de nuevo."
+    },
+    "open_in_app": {
+      "tab": "App de escritorio",
+      "toggle": "Abrir enlaces en la app de escritorio",
+      "opened": "Abierto en la app de escritorio",
+      "continue_in_browser": "Continuar en el navegador",
+      "stop": "Dejar de abrir enlaces en la app"
     }
   },
   "members": {

@@ -1797,5 +1797,16 @@
       "empty_title": "還沒有儲存的檢視",
       "empty_description": "在任務列表裡調好篩選和顯示方式，然後另存為檢視。"
     }
+  },
+  "dependencies": {
+    "blocked_by": "被以下阻塞",
+    "blocks": "阻塞以下",
+    "blocked_by_count_other": "被阻塞 {{count}}",
+    "blocks_count_other": "阻塞 {{count}}",
+    "page_title": "依賴關係",
+    "hide_closed": "隱藏已完成和已取消",
+    "only_critical": "僅關鍵路徑",
+    "empty": "未完成的事項之間還沒有依賴關係。",
+    "critical_other": "{{count}} 個事項在等待"
   }
 }

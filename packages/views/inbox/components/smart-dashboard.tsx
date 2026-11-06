@@ -4,7 +4,7 @@
 // first, how much is waiting, and the squad's health, above the list. Built
 // only from the reader's own inbox entries; nothing is fetched for it.
 
-import { ExternalLink } from "lucide-react";
+import { ExternalLink } from "@multica/ui/icons";
 import {
   doThisFirst,
   smartCounters,
