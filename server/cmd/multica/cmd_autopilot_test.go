@@ -967,7 +967,8 @@ func TestAutopilotRunStarted(t *testing.T) {
 		{"running", true},
 		{"skipped", false},
 		{"failed", false},
-		{"pending", false},
+		// An ops job (contango patch 22) fires as pending, waiting for its runner.
+		{"pending", true},
 		{"completed", false},
 		{"", false},
 		// A status this build has never heard of must not be reported as a

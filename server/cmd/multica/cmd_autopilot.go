@@ -129,8 +129,10 @@ func init() {
 	// create
 	autopilotCreateCmd.Flags().String("title", "", "Autopilot title (required)")
 	autopilotCreateCmd.Flags().String("description", "", "Autopilot description (used as the run prompt)")
-	autopilotCreateCmd.Flags().String("agent", "", "Assignee agent (name or ID) — required")
-	autopilotCreateCmd.Flags().String("mode", "", "Execution mode: create_issue or run_only (required)")
+	autopilotCreateCmd.Flags().String("agent", "", "Assignee agent (name or ID) — required unless the mode is job")
+	autopilotCreateCmd.Flags().String("mode", "", "Execution mode: create_issue, run_only or job (required)")
+	autopilotCreateCmd.Flags().String("execution-mode", "", "Alias of --mode")
+	autopilotCreateCmd.Flags().String("job-name", "", "Ops job key for --mode job (e.g. pr-watch); the ops runner maps it to a command")
 	autopilotCreateCmd.Flags().String("project", "", "Project ID (optional)")
 	autopilotCreateCmd.Flags().String("issue-title-template", "", "Template for issue titles (create_issue mode). Only {{date}} (UTC, YYYY-MM-DD) is interpolated; any other {{...}} token is rejected at create-time.")
 	autopilotCreateCmd.Flags().StringArray("subscriber", nil, "Member subscriber to notify for issues this autopilot creates (name or user ID; repeatable)")
@@ -142,7 +144,9 @@ func init() {
 	autopilotUpdateCmd.Flags().String("agent", "", "New assignee agent (name or ID)")
 	autopilotUpdateCmd.Flags().String("project", "", "New project ID (use empty string to clear)")
 	autopilotUpdateCmd.Flags().String("status", "", "New status (active, paused)")
-	autopilotUpdateCmd.Flags().String("mode", "", "New execution mode (create_issue or run_only)")
+	autopilotUpdateCmd.Flags().String("mode", "", "New execution mode (create_issue, run_only or job)")
+	autopilotUpdateCmd.Flags().String("execution-mode", "", "Alias of --mode")
+	autopilotUpdateCmd.Flags().String("job-name", "", "New ops job key (job mode only)")
 	autopilotUpdateCmd.Flags().String("issue-title-template", "", "New issue title template. Only {{date}} (UTC, YYYY-MM-DD) is interpolated; any other {{...}} token is rejected.")
 	autopilotUpdateCmd.Flags().StringArray("subscriber", nil, "Replace subscribers with this member (name or user ID; repeatable)")
 	autopilotUpdateCmd.Flags().Bool("clear-subscribers", false, "Remove all autopilot subscribers")
@@ -397,29 +401,45 @@ func runAutopilotCreate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("--title is required")
 	}
 	agent, _ := cmd.Flags().GetString("agent")
-	if agent == "" {
-		return fmt.Errorf("--agent is required (agent name or ID)")
+	mode, err := autopilotModeFlag(cmd)
+	if err != nil {
+		return err
 	}
-	mode, _ := cmd.Flags().GetString("mode")
 	if mode == "" {
-		return fmt.Errorf("--mode is required (create_issue or run_only)")
+		return fmt.Errorf("--mode is required (create_issue, run_only or job)")
 	}
-	if mode != "create_issue" && mode != "run_only" {
-		return fmt.Errorf("--mode must be create_issue or run_only")
+	jobName, _ := cmd.Flags().GetString("job-name")
+	if mode == "job" {
+		if jobName == "" {
+			return fmt.Errorf("--job-name is required with --mode job")
+		}
+		if agent != "" {
+			return fmt.Errorf("--agent does not apply to --mode job (an ops job runs no agent)")
+		}
+	} else {
+		if jobName != "" {
+			return fmt.Errorf("--job-name only applies to --mode job")
+		}
+		if agent == "" {
+			return fmt.Errorf("--agent is required (agent name or ID)")
+		}
 	}
 
 	ctx, cancel := cli.APIContext(context.Background())
 	defer cancel()
 
-	agentID, err := resolveAgent(ctx, client, agent)
-	if err != nil {
-		return fmt.Errorf("resolve agent: %w", err)
-	}
-
 	body := map[string]any{
 		"title":          title,
-		"assignee_id":    agentID,
 		"execution_mode": mode,
+	}
+	if mode == "job" {
+		body["job_name"] = jobName
+	} else {
+		agentID, err := resolveAgent(ctx, client, agent)
+		if err != nil {
+			return fmt.Errorf("resolve agent: %w", err)
+		}
+		body["assignee_id"] = agentID
 	}
 	if v, _ := cmd.Flags().GetString("description"); v != "" {
 		body["description"] = v
@@ -503,12 +523,16 @@ func runAutopilotUpdate(cmd *cobra.Command, args []string) error {
 		v, _ := cmd.Flags().GetString("status")
 		body["status"] = v
 	}
-	if cmd.Flags().Changed("mode") {
-		v, _ := cmd.Flags().GetString("mode")
-		if v != "create_issue" && v != "run_only" {
-			return fmt.Errorf("--mode must be create_issue or run_only")
-		}
-		body["execution_mode"] = v
+	mode, err := autopilotModeFlag(cmd)
+	if err != nil {
+		return err
+	}
+	if mode != "" {
+		body["execution_mode"] = mode
+	}
+	if cmd.Flags().Changed("job-name") {
+		v, _ := cmd.Flags().GetString("job-name")
+		body["job_name"] = v
 	}
 	if cmd.Flags().Changed("issue-title-template") {
 		v, _ := cmd.Flags().GetString("issue-title-template")
@@ -660,7 +684,26 @@ func autopilotWriteRequestError(action string, err error) error {
 // a future or anomalous-but-parseable status must read as "did not start" rather
 // than be reported as a successful trigger.
 func autopilotRunStarted(status string) bool {
-	return status == "issue_created" || status == "running"
+	// "pending" is an ops job's fired run, waiting for the ops runner.
+	return status == "issue_created" || status == "running" || status == "pending"
+}
+
+// autopilotModeFlag reads --mode or its alias --execution-mode ("" when
+// neither is set) and validates it.
+func autopilotModeFlag(cmd *cobra.Command) (string, error) {
+	mode, _ := cmd.Flags().GetString("mode")
+	alias, _ := cmd.Flags().GetString("execution-mode")
+	if mode != "" && alias != "" && mode != alias {
+		return "", fmt.Errorf("--mode and --execution-mode disagree")
+	}
+	if mode == "" {
+		mode = alias
+	}
+	switch mode {
+	case "", "create_issue", "run_only", "job":
+		return mode, nil
+	}
+	return "", fmt.Errorf("--mode must be create_issue, run_only or job")
 }
 
 func runAutopilotRuns(cmd *cobra.Command, args []string) error {
