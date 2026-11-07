@@ -587,7 +587,15 @@ const InboxItemSchema: z.ZodType<InboxItem> = z.object({
   read: z.boolean().default(false),
   archived: z.boolean().default(false),
   created_at: z.string().default(""),
-  details: z.record(z.string(), z.string()).nullable().default(null),
+  // Values are not checked. Most kinds carry strings only, but a contango
+  // smart-inbox `signal` carries `actions`/`replies` arrays and a `rank`
+  // object (docs/contango/SMART-INBOX.md), read through core's
+  // `signalDetails`. A string-only record failed the whole array on the first
+  // signal, so flagged users saw an empty inbox. Matches web, whose
+  // InboxItemListSchema does not validate `details` either.
+  details: (z.record(z.string(), z.unknown()).nullable().catch(null).default(null) as unknown) as z.ZodType<
+    InboxItem["details"]
+  >,
 }).loose();
 
 export const InboxListSchema = z.array(InboxItemSchema).default([]);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { signalDetails } from "@multica/core/inbox/smart";
 import { InboxListSchema, InboxUnreadSummarySchema } from "./schemas";
 
 /**
@@ -9,17 +10,11 @@ import { InboxListSchema, InboxUnreadSummarySchema } from "./schemas";
  * this client REACTS to a given payload. They cannot fail when the Go server
  * starts sending something new — nothing here executes server code.
  *
- * The matching server-side guarantee is structural rather than a test: every
- * `details` map in server/cmd/server/notification_listeners.go is typed
- * `map[string]string`, so a non-string value is a compile error there.
- *
- * Why both halves exist: during MUL-5483 a new inbox type was added and the
- * mobile label map was updated so `tsc` passed — but a NUMBER went into
- * `details.child_count`, and `details` is `z.record(z.string(), z.string())`.
- * Because the endpoint parses an ARRAY, one bad row fails the whole parse and
- * `listInbox` falls back to `EMPTY_INBOX_LIST`: the entire mobile inbox
- * renders empty, not just that row. The blast radius is what these tests
- * document; the compile-time type is what prevents it.
+ * `details` values are not validated (like web's InboxItemListSchema): the
+ * contango smart inbox's `signal` rows carry arrays and objects there, and a
+ * string-only record used to fail the whole array on the first signal, so a
+ * flagged user's mobile inbox rendered empty. Signal details are read through
+ * core's `signalDetails`, which validates them per field.
  */
 describe("inbox list schema", () => {
   it("parses a row shaped like the documented server payload", () => {
@@ -38,7 +33,6 @@ describe("inbox list schema", () => {
       read: false,
       archived: false,
       created_at: "2026-07-30T00:00:00Z",
-      // Every value is a string. A number here drops the whole list.
       details: { from: "in_progress", to: "in_review" },
     };
 
@@ -48,35 +42,79 @@ describe("inbox list schema", () => {
     expect(parsed.success && parsed.data[0]?.details?.to).toBe("in_review");
   });
 
-  it("rejects a numeric details value", () => {
-    const badRow = {
+  it("keeps a smart-inbox signal and its structured details next to other rows", () => {
+    const mention = {
       id: "inbox-2",
       recipient_type: "member",
-      type: "status_changed",
-      details: { child_count: 3 },
+      type: "mentioned",
+      issue_id: "issue-1",
+      details: { comment_id: "c-1" },
+    };
+    const signal = {
+      id: "inbox-3",
+      workspace_id: "ws-1",
+      recipient_type: "member",
+      recipient_id: "user-1",
+      actor_type: "system",
+      actor_id: null,
+      type: "signal",
+      severity: "action_required",
+      issue_id: "issue-1",
+      title: "Approve plan for CTG-12",
+      body: "The plan is in the card.",
+      read: false,
+      archived: false,
+      created_at: "2026-11-07T08:00:00Z",
+      details: {
+        key: "needs-human:CTG-12:c-1",
+        group: "decision",
+        summary: "CTG-12 · waiting 6 h",
+        actions: [{ label: "Open card", url: "https://multica.example/acme/issues/CTG-12" }],
+        replies: [{ label: "Approve: agree", content: "agree", parent_comment_id: "c-1" }],
+        rank: { priority: "high", blocks: 3, since: "2026-11-07T02:00:00Z" },
+      },
     };
 
-    expect(InboxListSchema.safeParse([badRow]).success).toBe(false);
+    const parsed = InboxListSchema.safeParse([mention, signal]);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data).toHaveLength(2);
+    expect(parsed.data[1]?.type).toBe("signal");
+    expect(signalDetails(parsed.data[1]!)).toEqual({
+      key: "needs-human:CTG-12:c-1",
+      group: "decision",
+      summary: "CTG-12 · waiting 6 h",
+      actions: [{ label: "Open card", url: "https://multica.example/acme/issues/CTG-12" }],
+      replies: [{ index: 0, label: "Approve: agree", content: "agree", parent_comment_id: "c-1" }],
+      rank: { priority: "high", blocks: 3, since: "2026-11-07T02:00:00Z" },
+    });
   });
 
-  it("keeps one malformed row from emptying the entire list observable", () => {
-    // Documents the blast radius that made this a P1 rather than a cosmetic bug:
-    // the schema is an array, so a single bad row invalidates every good one.
+  it("tolerates a numeric details value instead of dropping the whole list", () => {
     const good = {
-      id: "inbox-3",
+      id: "inbox-4",
       recipient_type: "member",
       type: "status_changed",
       details: { from: "todo", to: "in_review" },
     };
-    const bad = {
-      id: "inbox-4",
+    const odd = {
+      id: "inbox-5",
       recipient_type: "member",
-      type: "status_changed",
+      type: "children_done",
       details: { child_count: 3 },
     };
 
-    expect(InboxListSchema.safeParse([good]).success).toBe(true);
-    expect(InboxListSchema.safeParse([good, bad]).success).toBe(false);
+    const parsed = InboxListSchema.safeParse([good, odd]);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.map((r) => r.id)).toEqual(["inbox-4", "inbox-5"]);
+  });
+
+  it("reads malformed details (not an object) as null rather than failing the list", () => {
+    const parsed = InboxListSchema.safeParse([
+      { id: "inbox-6", recipient_type: "member", type: "signal", details: "oops" },
+    ]);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data[0]?.details).toBeNull();
   });
 
   it("renders an unknown server type instead of dropping the row", () => {
