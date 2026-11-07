@@ -25,7 +25,8 @@
   },
   "execution_mode": {
     "create_issue": "Crear tarea",
-    "run_only": "Solo ejecutar"
+    "run_only": "Solo ejecutar",
+    "job": "Tarea de ops"
   },
   "relative_date": {
     "today": "Hoy",
@@ -114,8 +115,10 @@
     "summary": {
       "create_issue": "{{agent}} crea una tarea en cada ejecución",
       "run_only": "{{agent}} lo ejecuta sin crear una tarea",
-      "with_trigger": "{{trigger}} · {{action}}"
-    }
+      "with_trigger": "{{trigger}} · {{action}}",
+      "job": "Ejecuta la tarea de ops {{job}}"
+    },
+    "field_job": "Tarea"
   },
   "access": {
     "title": "Gestionar acceso",
@@ -136,7 +139,9 @@
     "running": "En ejecución",
     "skipped": "Omitida",
     "completed": "Completada",
-    "failed": "Fallida"
+    "failed": "Fallida",
+    "pending": "Pendiente",
+    "expired": "Caducada"
   },
   "run_source": {
     "schedule": "Programación",
@@ -150,6 +155,12 @@
     "skipped_group": {
       "label": "Omitidas",
       "summary": "{{count}} ejecuciones omitidas"
+    },
+    "job": {
+      "exit_code": "salida {{code}}",
+      "output": "Salida",
+      "no_output": "Sin salida",
+      "duration": "tardó {{duration}}"
     }
   },
   "webhook_payload": {
@@ -342,8 +353,17 @@
       "run_only": {
         "label": "Solo ejecutar",
         "description": "Ejecución silenciosa, sin crear tarea"
+      },
+      "job": {
+        "label": "Tarea de ops (sin agente)",
+        "description": "El runner de ops ejecuta un comando fijo; sin agente ni incidencia"
       }
-    }
+    },
+    "section_job_name": "Nombre de la tarea",
+    "job_name_placeholder": "p. ej. pr-watch",
+    "job_name_hint": "El runner de ops asocia este nombre a un comando.",
+    "error_job_name_required": "Introduce un nombre de tarea",
+    "error_job_name_invalid": "Usa minúsculas, dígitos y guiones (hasta 64)"
   },
   "schedule_editor": {
     "time_label": "Hora",

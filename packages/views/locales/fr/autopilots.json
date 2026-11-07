@@ -25,7 +25,8 @@
   },
   "execution_mode": {
     "create_issue": "Créer une tâche",
-    "run_only": "Exécution seule"
+    "run_only": "Exécution seule",
+    "job": "Tâche ops"
   },
   "relative_date": {
     "today": "Aujourd'hui",
@@ -101,7 +102,8 @@
     "summary": {
       "create_issue": "{{agent}} crée une tâche à chaque exécution",
       "run_only": "{{agent}} l'exécute sans créer de tâche",
-      "with_trigger": "{{trigger}} · {{action}}"
+      "with_trigger": "{{trigger}} · {{action}}",
+      "job": "Exécute la tâche ops {{job}}"
     },
     "add_trigger": "Ajouter un déclencheur",
     "no_triggers": "Aucun déclencheur configuré. Ajoutez une planification pour une exécution automatique.",
@@ -115,7 +117,8 @@
       "cancel": "Annuler",
       "confirm": "Supprimer",
       "deleting": "Suppression..."
-    }
+    },
+    "field_job": "Tâche"
   },
   "access": {
     "title": "Gérer l'accès",
@@ -136,7 +139,9 @@
     "running": "En cours",
     "skipped": "Ignorée",
     "completed": "Terminée",
-    "failed": "En échec"
+    "failed": "En échec",
+    "pending": "En attente",
+    "expired": "Expirée"
   },
   "run_source": {
     "schedule": "Planification",
@@ -150,6 +155,12 @@
     "skipped_group": {
       "label": "Ignorées",
       "summary": "{{count}} exécutions ignorées"
+    },
+    "job": {
+      "exit_code": "code {{code}}",
+      "output": "Sortie",
+      "no_output": "Aucune sortie",
+      "duration": "durée {{duration}}"
     }
   },
   "webhook_payload": {
@@ -342,8 +353,17 @@
       "run_only": {
         "label": "Exécution seule",
         "description": "Exécution silencieuse, aucune tâche créée"
+      },
+      "job": {
+        "label": "Tâche ops (sans agent)",
+        "description": "Le runner ops exécute une commande fixe ; ni agent ni ticket"
       }
-    }
+    },
+    "section_job_name": "Nom de la tâche",
+    "job_name_placeholder": "ex. pr-watch",
+    "job_name_hint": "Le runner ops associe ce nom à une commande.",
+    "error_job_name_required": "Saisissez un nom de tâche",
+    "error_job_name_invalid": "Minuscules, chiffres et tirets uniquement (64 max.)"
   },
   "schedule_editor": {
     "time_label": "Heure",

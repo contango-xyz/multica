@@ -25,7 +25,8 @@
   },
   "execution_mode": {
     "create_issue": "Create Issue",
-    "run_only": "Run Only"
+    "run_only": "Run Only",
+    "job": "Ops job"
   },
   "relative_date": {
     "today": "Today",
@@ -101,7 +102,8 @@
     "summary": {
       "create_issue": "{{agent}} creates an issue each run",
       "run_only": "{{agent}} runs it without creating an issue",
-      "with_trigger": "{{trigger}} · {{action}}"
+      "with_trigger": "{{trigger}} · {{action}}",
+      "job": "Runs ops job {{job}}"
     },
     "add_trigger": "Add trigger",
     "no_triggers": "No triggers configured. Add a schedule to run automatically.",
@@ -115,7 +117,8 @@
       "cancel": "Cancel",
       "confirm": "Delete",
       "deleting": "Deleting..."
-    }
+    },
+    "field_job": "Job"
   },
   "access": {
     "title": "Manage access",
@@ -136,7 +139,9 @@
     "running": "Running",
     "skipped": "Skipped",
     "completed": "Completed",
-    "failed": "Failed"
+    "failed": "Failed",
+    "pending": "Pending",
+    "expired": "Expired"
   },
   "run_source": {
     "schedule": "Schedule",
@@ -150,6 +155,12 @@
     "skipped_group": {
       "label": "Skipped",
       "summary": "{{count}} skipped runs"
+    },
+    "job": {
+      "exit_code": "exit {{code}}",
+      "output": "Output",
+      "no_output": "No output",
+      "duration": "took {{duration}}"
     }
   },
   "webhook_payload": {
@@ -342,8 +353,17 @@
       "run_only": {
         "label": "Run only",
         "description": "Silent run, no issue created"
+      },
+      "job": {
+        "label": "Ops job (no agent)",
+        "description": "The ops runner runs a fixed command; no agent or issue"
       }
-    }
+    },
+    "section_job_name": "Job name",
+    "job_name_placeholder": "e.g. pr-watch",
+    "job_name_hint": "The ops runner maps this name to a command.",
+    "error_job_name_required": "Enter a job name",
+    "error_job_name_invalid": "Use lowercase letters, digits and dashes (up to 64)"
   },
   "schedule_editor": {
     "time_label": "Time",

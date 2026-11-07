@@ -9,6 +9,8 @@ describe("runNowToastKind", () => {
   it("shows success only for explicit start statuses", () => {
     expect(runNowToastKind("issue_created")).toBe("success");
     expect(runNowToastKind("running")).toBe("success");
+    // An ops job fires as pending (contango patch 22).
+    expect(runNowToastKind("pending")).toBe("success");
   });
 
   it("warns on a skipped (admission-blocked) run", () => {

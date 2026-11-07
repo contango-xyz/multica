@@ -335,6 +335,7 @@ import {
   ListAutopilotsResponseSchema,
   EMPTY_LIST_AUTOPILOTS_RESPONSE,
   AutopilotRunSchema,
+  ListAutopilotRunsResponseSchema,
   AutopilotQuotaUsageSchema,
   FALLBACK_AUTOPILOT_RUN,
   CronPreviewResponseSchema,
@@ -5020,7 +5021,13 @@ export class ApiClient {
     const search = new URLSearchParams();
     if (params?.limit) search.set("limit", params.limit.toString());
     if (params?.offset) search.set("offset", params.offset.toString());
-    return this.fetch(`/api/autopilots/${id}/runs?${search}`);
+    const raw = await this.fetch<unknown>(`/api/autopilots/${id}/runs?${search}`);
+    return parseWithFallback(
+      raw,
+      ListAutopilotRunsResponseSchema,
+      { runs: [], total: 0 } as ListAutopilotRunsResponse,
+      { endpoint: "GET /api/autopilots/:id/runs" },
+    );
   }
 
   // Returns a single run including its full trigger_payload. List responses

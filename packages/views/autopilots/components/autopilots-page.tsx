@@ -6,6 +6,7 @@ import {
   Clock,
   Code,
   Pause,
+  SquareTerminal,
   Webhook,
   Zap,
 } from "@multica/ui/icons";
@@ -101,6 +102,17 @@ function ActorCell({ type, id, hoverCard = false }: { type: string; id: string; 
   );
 }
 
+// An ops job (contango patch 22) has no assignee; the column shows its job
+// name instead.
+function JobNameCell({ autopilot }: { autopilot: Autopilot }) {
+  return (
+    <>
+      <SquareTerminal className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 truncate font-mono">{autopilot.job_name ?? ""}</span>
+    </>
+  );
+}
+
 const TRIGGER_ICONS: Record<string, typeof Zap> = {
   schedule: Clock,
   webhook: Webhook,
@@ -143,7 +155,10 @@ function runStatusDotClass(status: string | null | undefined): string {
     case "skipped":
       return "bg-amber-500";
     case "running":
+    case "pending":
       return "bg-blue-500";
+    case "expired":
+      return "bg-amber-500";
     default:
       return "bg-muted-foreground/40";
   }
@@ -159,7 +174,9 @@ function LastRunCell({ autopilot }: { autopilot: Autopilot }) {
     status === "running" ||
     status === "completed" ||
     status === "failed" ||
-    status === "skipped"
+    status === "skipped" ||
+    status === "pending" ||
+    status === "expired"
       ? status
       : null;
   return (
@@ -192,7 +209,7 @@ function ModeCell({ autopilot }: { autopilot: Autopilot }) {
   const { t } = useT("autopilots");
   const mode = autopilot.execution_mode;
   const label =
-    mode === "create_issue" || mode === "run_only"
+    mode === "create_issue" || mode === "run_only" || mode === "job"
       ? t(($) => $.execution_mode[mode])
       : mode;
   return <span className="truncate">{label}</span>;
@@ -357,13 +374,16 @@ function AutopilotList() {
         width: 144,
         core: true,
         hideable: true,
-        cell: (a) => (
-          <ActorCell
-            type={a.assignee_type}
-            id={a.assignee_id}
-            hoverCard={a.assignee_type === "agent"}
-          />
-        ),
+        cell: (a) =>
+          a.execution_mode === "job" ? (
+            <JobNameCell autopilot={a} />
+          ) : (
+            <ActorCell
+              type={a.assignee_type}
+              id={a.assignee_id}
+              hoverCard={a.assignee_type === "agent"}
+            />
+          ),
       },
       {
         key: "trigger",

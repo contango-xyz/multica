@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   Zap, Play, Clock, Plus, Trash2, CheckCircle2, XCircle, Loader2, Pencil,
   Ban, ChevronDown, ChevronRight, MoreHorizontal, Link2, ArrowUpRight, FilePlus2,
-  Webhook, RotateCw, Server, FileQuestion, FileText,
+  Webhook, RotateCw, Server, FileQuestion, FileText, SquareTerminal,
 } from "@multica/ui/icons";
 import { useQuery } from "@tanstack/react-query";
 import { autopilotDetailOptions, autopilotRunsOptions, autopilotRunOptions } from "@multica/core/autopilots/queries";
@@ -74,6 +74,7 @@ import type { AgentTask } from "@multica/core/types/agent";
 import { ReadonlyContent } from "../../editor";
 import { TranscriptButton } from "../../common/task-transcript";
 import { AutopilotDialog } from "./autopilot-dialog";
+import { JobRunRow } from "./job-run-row";
 import { EditScheduleTriggerDialog } from "./edit-schedule-trigger-dialog";
 import { useRunAutopilotNow } from "./use-run-autopilot-now";
 import { useRegisterCommandBarContext } from "../../search/register-context";
@@ -115,17 +116,20 @@ const TRIGGER_ICON: Record<AutopilotTrigger["kind"], typeof Clock> = {
 const PROPERTY_TRIGGER =
   "flex min-w-0 items-center gap-1.5 rounded-sm text-caption outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-default";
 
+// "job" is not offered here: entering or leaving job mode changes the
+// required fields (job name vs assignee), so it goes through the edit dialog.
 const OUTPUT_MODES: AutopilotExecutionMode[] = ["create_issue", "run_only"];
 const OUTPUT_MODE_ICONS: Record<AutopilotExecutionMode, typeof FilePlus2> = {
   create_issue: FilePlus2,
   run_only: Play,
+  job: SquareTerminal,
 };
 
 // A run that already happened is an instant in the reader's day, so it reads in
 // the reader's zone (no timeZone passed). A run that is still to come belongs to
 // the schedule that will fire it — see the trigger row, which passes the
 // trigger's own timezone.
-type RunStatus = "issue_created" | "running" | "skipped" | "completed" | "failed";
+type RunStatus = "issue_created" | "running" | "skipped" | "completed" | "failed" | "pending" | "expired";
 
 const RUN_VISUAL: Record<RunStatus, { color: string; icon: typeof CheckCircle2; spin?: boolean }> = {
   issue_created: { color: "text-info", icon: Clock },
@@ -136,6 +140,9 @@ const RUN_VISUAL: Record<RunStatus, { color: string; icon: typeof CheckCircle2; 
   skipped: { color: "text-muted-foreground", icon: Ban },
   completed: { color: "text-success", icon: CheckCircle2 },
   failed: { color: "text-destructive", icon: XCircle },
+  // Ops-job runs (contango patch 22); job autopilots render JobRunRow.
+  pending: { color: "text-info", icon: Clock },
+  expired: { color: "text-muted-foreground", icon: Ban },
 };
 
 // WebhookPayloadSlot lazy-fetches the full run (incl. trigger_payload) once
@@ -242,19 +249,25 @@ function RunHistoryList({
   runs,
   agentId,
   agentName,
+  isJob = false,
 }: {
   runs: AutopilotRun[];
   agentId: string;
   agentName: string;
+  isJob?: boolean;
 }) {
   const visibleRuns = runs.filter((run) => run.status !== "skipped");
   const skippedRuns = runs.filter((run) => run.status === "skipped");
 
   return (
     <ObjectSectionCard>
-      {visibleRuns.map((run) => (
-        <RunRow key={run.id} run={run} agentId={agentId} agentName={agentName} />
-      ))}
+      {visibleRuns.map((run) =>
+        isJob ? (
+          <JobRunRow key={run.id} run={run} />
+        ) : (
+          <RunRow key={run.id} run={run} agentId={agentId} agentName={agentName} />
+        ),
+      )}
       {skippedRuns.length > 0 && (
         <SkippedRunsGroup runs={skippedRuns} agentId={agentId} agentName={agentName} />
       )}
@@ -538,10 +551,13 @@ function AddTriggerDialog({
   open,
   onOpenChange,
   autopilotId,
+  scheduleOnly = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   autopilotId: string;
+  /** Ops jobs take schedule triggers only. */
+  scheduleOnly?: boolean;
 }) {
   const { t } = useT("autopilots");
   const wsId = useWorkspaceId();
@@ -608,34 +624,36 @@ function AddTriggerDialog({
             its content's — and the cron readback is one unbreakable line that
             would push the track past the dialog instead of truncating. */}
         <div className="min-w-0 space-y-4 pt-2">
-          <div>
-            <label className="text-caption font-medium text-muted-foreground">
-              {t(($) => $.add_trigger_dialog.type_label)}
-            </label>
-            <div className="mt-1">
-              <SegmentedToggle
-                value={kind}
-                onChange={setKind}
-                buttonClassName="px-3 py-1.5 text-body"
-                options={[
-                  [
-                    "schedule",
-                    <span key="schedule" className="flex items-center justify-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      {t(($) => $.add_trigger_dialog.type_schedule)}
-                    </span>,
-                  ],
-                  [
-                    "webhook",
-                    <span key="webhook" className="flex items-center justify-center gap-1.5">
-                      <Webhook className="h-3.5 w-3.5" />
-                      {t(($) => $.add_trigger_dialog.type_webhook)}
-                    </span>,
-                  ],
-                ]}
-              />
+          {!scheduleOnly && (
+            <div>
+              <label className="text-caption font-medium text-muted-foreground">
+                {t(($) => $.add_trigger_dialog.type_label)}
+              </label>
+              <div className="mt-1">
+                <SegmentedToggle
+                  value={kind}
+                  onChange={setKind}
+                  buttonClassName="px-3 py-1.5 text-body"
+                  options={[
+                    [
+                      "schedule",
+                      <span key="schedule" className="flex items-center justify-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        {t(($) => $.add_trigger_dialog.type_schedule)}
+                      </span>,
+                    ],
+                    [
+                      "webhook",
+                      <span key="webhook" className="flex items-center justify-center gap-1.5">
+                        <Webhook className="h-3.5 w-3.5" />
+                        {t(($) => $.add_trigger_dialog.type_webhook)}
+                      </span>,
+                    ],
+                  ]}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {kind === "schedule" ? (
             <ScheduleEditor
@@ -805,6 +823,7 @@ function AutopilotProperties({ autopilot, canWrite }: { autopilot: Autopilot; ca
 
   const mode = autopilot.execution_mode as AutopilotExecutionMode;
   const ModeIcon = OUTPUT_MODE_ICONS[mode] ?? FilePlus2;
+  const isJob = mode === "job";
 
   const assigneeValue = (
     <>
@@ -848,23 +867,30 @@ function AutopilotProperties({ autopilot, canWrite }: { autopilot: Autopilot; ca
         />
         <span className="truncate">{t(($) => $.status[autopilot.status])}</span>
       </ObjectProperty>
-      <ObjectProperty label={t(($) => $.detail.field_agent)}>
-        {canWrite ? (
-          <AgentPicker
-            assignee={{ type: autopilot.assignee_type, id: autopilot.assignee_id }}
-            onChange={(next) => {
-              if (next.type === autopilot.assignee_type && next.id === autopilot.assignee_id) return;
-              update({ assignee_type: next.type, assignee_id: next.id });
-            }}
-            triggerRender={<button type="button" className={PROPERTY_TRIGGER} />}
-            trigger={assigneeValue}
-          />
-        ) : (
-          assigneeValue
-        )}
-      </ObjectProperty>
+      {isJob ? (
+        <ObjectProperty label={t(($) => $.detail.field_job)}>
+          <SquareTerminal className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-mono">{autopilot.job_name ?? ""}</span>
+        </ObjectProperty>
+      ) : (
+        <ObjectProperty label={t(($) => $.detail.field_agent)}>
+          {canWrite ? (
+            <AgentPicker
+              assignee={{ type: autopilot.assignee_type, id: autopilot.assignee_id }}
+              onChange={(next) => {
+                if (next.type === autopilot.assignee_type && next.id === autopilot.assignee_id) return;
+                update({ assignee_type: next.type, assignee_id: next.id });
+              }}
+              triggerRender={<button type="button" className={PROPERTY_TRIGGER} />}
+              trigger={assigneeValue}
+            />
+          ) : (
+            assigneeValue
+          )}
+        </ObjectProperty>
+      )}
       <ObjectProperty label={t(($) => $.detail.field_output_mode)}>
-        {canWrite ? (
+        {canWrite && !isJob ? (
           <DropdownMenu>
             <DropdownMenuTrigger render={<button type="button" className={PROPERTY_TRIGGER} />}>
               <ModeIcon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -899,31 +925,34 @@ function AutopilotProperties({ autopilot, canWrite }: { autopilot: Autopilot; ca
       {/* Shown for BOTH output modes (MUL-6681): a run_only autopilot's
           project decides its execution environment (repository /
           local_directory, and therefore worktree isolation), so an
-          operator debugging a run needs to see it here. */}
-      <ObjectProperty label={t(($) => $.detail.field_project)}>
-        {canWrite ? (
-          <ProjectPicker
-            projectId={projectId}
-            onUpdate={(u) => {
-              const next = u.project_id ?? null;
-              if (next !== projectId) update({ project_id: next });
-            }}
-            triggerRender={<button type="button" className={PROPERTY_TRIGGER} />}
-          />
-        ) : (
-          projectValue
-        )}
-        {project && (
-          <AppLink
-            href={wsPaths.projectDetail(project.id)}
-            aria-label={t(($) => $.detail.open_project)}
-            title={t(($) => $.detail.open_project)}
-            className="ml-auto flex shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowUpRight className="size-3.5" />
-          </AppLink>
-        )}
-      </ObjectProperty>
+          operator debugging a run needs to see it here. An ops job runs no
+          agent, so it has no project. */}
+      {!isJob && (
+        <ObjectProperty label={t(($) => $.detail.field_project)}>
+          {canWrite ? (
+            <ProjectPicker
+              projectId={projectId}
+              onUpdate={(u) => {
+                const next = u.project_id ?? null;
+                if (next !== projectId) update({ project_id: next });
+              }}
+              triggerRender={<button type="button" className={PROPERTY_TRIGGER} />}
+            />
+          ) : (
+            projectValue
+          )}
+          {project && (
+            <AppLink
+              href={wsPaths.projectDetail(project.id)}
+              aria-label={t(($) => $.detail.open_project)}
+              title={t(($) => $.detail.open_project)}
+              className="ml-auto flex shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowUpRight className="size-3.5" />
+            </AppLink>
+          )}
+        </ObjectProperty>
+      )}
       {autopilot.execution_mode === "create_issue" && (
         <ObjectProperty label={t(($) => $.detail.field_subscribers)}>
           <SubscribersProperty autopilot={autopilot} canWrite={canWrite} />
@@ -955,9 +984,11 @@ function useAutopilotSummary(autopilot: Autopilot | null, triggers: AutopilotTri
   const primary = triggers.find((trig) => trig.enabled) ?? triggers[0];
   const agent = getActorName(autopilot.assignee_type, autopilot.assignee_id);
   const action =
-    autopilot.execution_mode === "run_only"
-      ? t(($) => $.detail.summary.run_only, { agent })
-      : t(($) => $.detail.summary.create_issue, { agent });
+    autopilot.execution_mode === "job"
+      ? t(($) => $.detail.summary.job, { job: autopilot.job_name ?? "" })
+      : autopilot.execution_mode === "run_only"
+        ? t(($) => $.detail.summary.run_only, { agent })
+        : t(($) => $.detail.summary.create_issue, { agent });
   if (!primary) return { icon: Zap, text: action };
   const config = primary.cron_expression
     ? parseCron(primary.cron_expression, primary.timezone ?? "UTC")
@@ -1160,7 +1191,7 @@ export function AutopilotDetailPage({ autopilotId }: { autopilotId: string }) {
             <span className="flex-1">
               {t(($) => $.detail.paused_runtime_required)}
             </span>
-            {autopilot.assignee_type === "agent" && (
+            {autopilot.assignee_type === "agent" && autopilot.assignee_id && (
               <AppLink
                 href={`${wsPaths.agentDetail(autopilot.assignee_id)}?view=general`}
                 className="font-medium underline underline-offset-2"
@@ -1234,6 +1265,7 @@ export function AutopilotDetailPage({ autopilotId }: { autopilotId: string }) {
               runs={runs}
               agentId={autopilot.assignee_id}
               agentName={getActorName(autopilot.assignee_type, autopilot.assignee_id)}
+              isJob={autopilot.execution_mode === "job"}
             />
           )}
         </ObjectSection>
@@ -1246,6 +1278,7 @@ export function AutopilotDetailPage({ autopilotId }: { autopilotId: string }) {
           open={triggerDialogOpen}
           onOpenChange={setTriggerDialogOpen}
           autopilotId={autopilotId}
+          scheduleOnly={autopilot.execution_mode === "job"}
         />
       )}
       {editDialogOpen && (
@@ -1261,6 +1294,7 @@ export function AutopilotDetailPage({ autopilotId }: { autopilotId: string }) {
             assignee_type: autopilot.assignee_type,
             assignee_id: autopilot.assignee_id,
             execution_mode: autopilot.execution_mode as AutopilotExecutionMode,
+            job_name: autopilot.job_name ?? "",
             subscriber_user_ids:
               autopilot.subscribers
                 ?.filter((s) => s.user_type === "member")

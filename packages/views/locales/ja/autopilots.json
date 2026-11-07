@@ -25,7 +25,8 @@
   },
   "execution_mode": {
     "create_issue": "タスクを作成",
-    "run_only": "実行のみ"
+    "run_only": "実行のみ",
+    "job": "運用ジョブ"
   },
   "relative_date": {
     "today": "今日",
@@ -101,7 +102,8 @@
     "summary": {
       "create_issue": "{{agent}} が実行ごとにタスクを作成",
       "run_only": "{{agent}} がタスクを作成せずに実行",
-      "with_trigger": "{{trigger}} · {{action}}"
+      "with_trigger": "{{trigger}} · {{action}}",
+      "job": "運用ジョブ {{job}} を実行"
     },
     "add_trigger": "トリガーを追加",
     "no_triggers": "設定されたトリガーがありません。自動で実行するスケジュールを追加してください。",
@@ -115,7 +117,8 @@
       "cancel": "キャンセル",
       "confirm": "削除",
       "deleting": "削除中..."
-    }
+    },
+    "field_job": "ジョブ"
   },
   "access": {
     "title": "アクセス管理",
@@ -136,7 +139,9 @@
     "running": "実行中",
     "completed": "完了",
     "failed": "失敗",
-    "skipped": "スキップ済み"
+    "skipped": "スキップ済み",
+    "pending": "保留中",
+    "expired": "期限切れ"
   },
   "run_source": {
     "schedule": "スケジュール",
@@ -150,6 +155,12 @@
     "skipped_group": {
       "label": "スキップ済み",
       "summary": "スキップされた実行 {{count}} 件"
+    },
+    "job": {
+      "exit_code": "終了コード {{code}}",
+      "output": "出力",
+      "no_output": "出力なし",
+      "duration": "所要 {{duration}}"
     }
   },
   "webhook_payload": {
@@ -342,8 +353,17 @@
       "run_only": {
         "label": "実行のみ",
         "description": "タスクを作成せず、静かに実行します"
+      },
+      "job": {
+        "label": "運用ジョブ（エージェントなし）",
+        "description": "運用ランナーが固定コマンドを実行します。エージェントもイシューも使いません"
       }
-    }
+    },
+    "section_job_name": "ジョブ名",
+    "job_name_placeholder": "例: pr-watch",
+    "job_name_hint": "運用ランナーがこの名前をコマンドに対応付けます。",
+    "error_job_name_required": "ジョブ名を入力してください",
+    "error_job_name_invalid": "小文字・数字・ハイフンのみ（最大 64 文字）"
   },
   "schedule_editor": {
     "time_label": "時刻",

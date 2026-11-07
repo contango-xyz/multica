@@ -2652,6 +2652,8 @@ const AutopilotListItemSchema = z.object({
   assignee_id: z.string(),
   status: z.string(),
   execution_mode: z.string(),
+  // Ops-job key (contango patch 22); older servers omit it.
+  job_name: z.string().nullable().optional(),
   issue_title_template: z.string().nullable().optional(),
   created_by_type: z.string(),
   created_by_id: z.string(),
@@ -2698,6 +2700,17 @@ export const AutopilotRunSchema = z.object({
   trigger_payload: z.unknown().default(null),
   result: z.unknown().default(null),
   created_at: z.string().default(""),
+  // Ops-job run fields (contango patch 22); omitted for agent runs.
+  started_at: z.string().nullable().optional(),
+  exit_code: z.number().nullable().optional(),
+  output_tail: z.string().nullable().optional(),
+}).loose();
+
+// GET /api/autopilots/:id/runs. The run history renders ops-job fields
+// (output_tail etc.), so it is parsed like the "run now" response.
+export const ListAutopilotRunsResponseSchema = z.object({
+  runs: z.array(AutopilotRunSchema).default([]),
+  total: z.number().default(0),
 }).loose();
 
 export const AutopilotQuotaUsageSchema = z.object({

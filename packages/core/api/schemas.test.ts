@@ -19,6 +19,7 @@ import {
   TaskMessageListSchema,
   AutopilotQuotaUsageSchema,
   AutopilotRunSchema,
+  ListAutopilotRunsResponseSchema,
   FALLBACK_AUTOPILOT_RUN,
   CommentTriggerPreviewSchema,
   DashboardAgentRunTimeListSchema,
@@ -1676,6 +1677,46 @@ describe("AutopilotRunSchema", () => {
     const parsed = parseWithFallback("not-an-object", AutopilotRunSchema, FALLBACK_AUTOPILOT_RUN, ENDPOINT);
     expect(parsed).toBe(FALLBACK_AUTOPILOT_RUN);
     expect(parsed.status).toBe("failed");
+  });
+});
+
+// Contango patch 22: ops-job run fields on the run history.
+describe("ListAutopilotRunsResponseSchema", () => {
+  const ENDPOINT = { endpoint: "GET /api/autopilots/:id/runs" };
+  const FALLBACK: { runs: Array<Record<string, unknown>>; total: number } = { runs: [], total: 0 };
+  const jobRun = {
+    id: "run-2",
+    autopilot_id: "ap-2",
+    trigger_id: "trig-1",
+    source: "schedule",
+    status: "failed",
+    issue_id: null,
+    task_id: null,
+    triggered_at: "2026-11-07T10:00:00Z",
+    completed_at: "2026-11-07T10:01:05Z",
+    failure_reason: "ops job failed (exit code 3)",
+    trigger_payload: null,
+    result: null,
+    created_at: "2026-11-07T10:00:00Z",
+    started_at: "2026-11-07T10:00:02Z",
+    exit_code: 3,
+    output_tail: "boom",
+  };
+
+  it("keeps the ops-job fields", () => {
+    const parsed = parseWithFallback({ runs: [jobRun], total: 1 }, ListAutopilotRunsResponseSchema, FALLBACK, ENDPOINT);
+    expect(parsed.runs[0]).toMatchObject({ exit_code: 3, output_tail: "boom", started_at: "2026-11-07T10:00:02Z" });
+  });
+
+  it("tolerates agent runs without the job fields", () => {
+    const { started_at: _s, exit_code: _e, output_tail: _o, ...agentRun } = jobRun;
+    const parsed = parseWithFallback({ runs: [agentRun] }, ListAutopilotRunsResponseSchema, FALLBACK, ENDPOINT);
+    expect(parsed.runs[0]?.exit_code).toBeUndefined();
+    expect(parsed.total).toBe(0);
+  });
+
+  it("degrades a malformed response to an empty list", () => {
+    expect(parseWithFallback({ runs: "nope" }, ListAutopilotRunsResponseSchema, FALLBACK, ENDPOINT)).toBe(FALLBACK);
   });
 });
 

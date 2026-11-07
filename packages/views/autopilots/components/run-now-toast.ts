@@ -12,8 +12,11 @@ export type RunNowToastKind = "success" | "warning" | "error";
 // non-success outcome the user must be warned/errored about.
 export function runNowToastKind(status: string | undefined): RunNowToastKind {
   switch (status) {
+    // "pending" is an ops job's fired run, waiting for the ops runner
+    // (contango patch 22).
     case "issue_created":
     case "running":
+    case "pending":
       return "success";
     case "skipped":
       // Admission blocked / target not ready — recoverable, informational.

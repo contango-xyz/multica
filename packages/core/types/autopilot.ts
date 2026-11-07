@@ -1,6 +1,9 @@
 export type AutopilotStatus = "active" | "paused" | "archived";
 
-export type AutopilotExecutionMode = "create_issue" | "run_only";
+// "job" (contango patch 22): an ops job. Firing records a pending run that an
+// external ops runner claims and finishes; no agent, issue or task. A job has
+// a `job_name` and an empty `assignee_id`.
+export type AutopilotExecutionMode = "create_issue" | "run_only" | "job";
 
 // `assignee_type` selects which polymorphic actor backs the autopilot:
 // "agent" → assignee_id references agent(id); "squad" → assignee_id references
@@ -19,7 +22,10 @@ export type AutopilotRunStatus =
   | "running"
   | "completed"
   | "failed"
-  | "skipped";
+  | "skipped"
+  // Ops jobs only: fired and waiting for the runner / not claimed in time.
+  | "pending"
+  | "expired";
 
 export type AutopilotRunSource = "schedule" | "manual" | "webhook" | "api";
 
@@ -36,6 +42,8 @@ export interface Autopilot {
   // pauses and older servers.
   pause_reason?: string | null;
   execution_mode: AutopilotExecutionMode;
+  // Ops-job key; set only when execution_mode is "job". Older servers omit it.
+  job_name?: string | null;
   issue_title_template: string | null;
   created_by_type: string;
   created_by_id: string;
@@ -133,6 +141,11 @@ export interface AutopilotRun {
   trigger_payload: unknown;
   result: unknown;
   created_at: string;
+  // Ops-job runs only (omitted otherwise): claim time, exit code and the last
+  // 8 KiB of the command's output, as reported by the ops runner.
+  started_at?: string | null;
+  exit_code?: number | null;
+  output_tail?: string | null;
 }
 
 export interface AutopilotQuotaUsage {
@@ -160,8 +173,10 @@ export interface CreateAutopilotRequest {
   // Optional on the wire — when omitted the server defaults to "agent" so
   // older clients keep working.
   assignee_type?: AutopilotAssigneeType;
-  assignee_id: string;
+  // Required unless execution_mode is "job" (an ops job has no assignee).
+  assignee_id?: string;
   execution_mode: AutopilotExecutionMode;
+  job_name?: string;
   issue_title_template?: string;
   subscribers?: AutopilotSubscriberInput[];
 }
@@ -176,6 +191,8 @@ export interface UpdateAutopilotRequest {
   assignee_id?: string;
   status?: AutopilotStatus;
   execution_mode?: AutopilotExecutionMode;
+  // Job mode only. Leaving job mode needs assignee_type + assignee_id.
+  job_name?: string;
   issue_title_template?: string | null;
   // When present, fully replaces the autopilot's subscriber template;
   // omit to leave it untouched.

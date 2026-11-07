@@ -15,6 +15,7 @@ import {
   Play,
   Plus,
   Rocket,
+  SquareTerminal,
   Users,
   Webhook,
   X as XIcon,
@@ -82,6 +83,8 @@ export interface AutopilotInitial {
   assignee_type: AutopilotAssigneeType;
   assignee_id: string;
   execution_mode: AutopilotExecutionMode;
+  // Ops-job key (contango patch 22), used when execution_mode is "job".
+  job_name?: string;
   subscriber_user_ids?: string[];
 }
 
@@ -106,12 +109,16 @@ export type AutopilotDialogProps =
 
 // Static schema-level data (not user-visible)
 
-const OUTPUT_MODE_KEYS: AutopilotExecutionMode[] = ["create_issue", "run_only"];
+const OUTPUT_MODE_KEYS: AutopilotExecutionMode[] = ["create_issue", "run_only", "job"];
 
 const OUTPUT_MODE_ICONS: Record<AutopilotExecutionMode, typeof FilePlus2> = {
   create_issue: FilePlus2,
   run_only: Play,
+  job: SquareTerminal,
 };
+
+// Same rule as the server (contango patch 22).
+export const JOB_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 // Webhook event-filter dirty detection
 
@@ -155,6 +162,10 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
   const [subscriberUserIds, setSubscriberUserIds] = useState<string[]>(
     initial.subscriber_user_ids ?? [],
   );
+  const [jobName, setJobName] = useState<string>(initial.job_name ?? "");
+  // An ops job has no assignee; leaving job mode asks for one again through
+  // the ordinary required-assignee check (a job's assignee_id is "").
+  const isJob = executionMode === "job";
 
   // The schedule panel speaks for the autopilot's SCHEDULE trigger, not for
   // `triggers[0]` — on a webhook- or api-triggered autopilot that row is one no
@@ -276,15 +287,23 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
   // not veto edits to the title, prompt or assignee. A schedule the user just
   // added has no stored counterpart to differ from: adding it IS the change.
   const scheduleWillBeWritten =
-    triggerKind === "schedule" &&
+    (triggerKind === "schedule" || isJob) &&
     !schedulePillDisabled &&
     (isCreate || (existingSchedule !== null ? scheduleDirty : scheduleAdded));
 
   // The FIRST empty required field in reading order — the user fills one, the
   // next surfaces. Only these two are answered here: a rejected schedule is
   // re-checked against the server below, which toasts its actual reason.
-  const missingField: "title" | "assignee" | null =
-    title.trim().length === 0 ? "title" : assigneeId.length === 0 ? "assignee" : null;
+  const missingField: "title" | "assignee" | "job_name" | null =
+    title.trim().length === 0
+      ? "title"
+      : isJob
+        ? JOB_NAME_PATTERN.test(jobName.trim())
+          ? null
+          : "job_name"
+        : assigneeId.length === 0
+          ? "assignee"
+          : null;
 
   // Inline errors appear only after a submit attempt: a form that opens already
   // shouting at the user for fields they have not reached yet is worse than the
@@ -294,6 +313,8 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
   const titleEditorRef = useRef<TitleEditorRef>(null);
   const assigneeTriggerRef = useRef<HTMLButtonElement>(null);
   const assigneeErrorId = useId();
+  const jobNameInputRef = useRef<HTMLInputElement>(null);
+  const jobNameErrorId = useId();
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -302,6 +323,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
       // focusing scrolls the config column to it on its own.
       setShowErrors(true);
       if (missingField === "title") titleEditorRef.current?.focus();
+      else if (missingField === "job_name") jobNameInputRef.current?.focus();
       else assigneeTriggerRef.current?.focus();
       return;
     }
@@ -312,23 +334,32 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
         return;
       }
       if (isCreate) {
-        const autopilot = await createAutopilot.mutateAsync({
-          title: title.trim(),
-          description: description.trim() || undefined,
-          project_id: projectId,
-          assignee_type: assigneeType,
-          assignee_id: assigneeId,
-          execution_mode: executionMode,
-          subscribers: subscriberUserIds.map((user_id) => ({
-            user_type: "member" as const,
-            user_id,
-          })),
-        });
+        const autopilot = await createAutopilot.mutateAsync(
+          isJob
+            ? {
+                title: title.trim(),
+                description: description.trim() || undefined,
+                execution_mode: "job",
+                job_name: jobName.trim(),
+              }
+            : {
+                title: title.trim(),
+                description: description.trim() || undefined,
+                project_id: projectId,
+                assignee_type: assigneeType,
+                assignee_id: assigneeId,
+                execution_mode: executionMode,
+                subscribers: subscriberUserIds.map((user_id) => ({
+                  user_type: "member" as const,
+                  user_id,
+                })),
+              },
+        );
         let triggerOk = true;
         let triggerErrMessage: string | null = null;
         let webhookTrigger: AutopilotTrigger | null = null;
         try {
-          if (triggerKind === "webhook") {
+          if (triggerKind === "webhook" && !isJob) {
             webhookTrigger = await createTrigger.mutateAsync({
               autopilotId: autopilot.id,
               kind: "webhook",
@@ -347,7 +378,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
           triggerErrMessage =
             err instanceof Error && err.message ? err.message : null;
         }
-        if (triggerKind === "webhook" && webhookTrigger) {
+        if (webhookTrigger) {
           // Stay in the dialog and surface the URL inline so the user
           // can copy it without first navigating to the detail page.
           setCreatedWebhookTrigger(webhookTrigger);
@@ -364,19 +395,29 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
           toast.error(formatSchedulePartialFailureToast(t, "create", triggerErrMessage));
         }
       } else {
-        await updateAutopilot.mutateAsync({
-          id: props.autopilotId,
-          title: title.trim(),
-          description: description.trim() || null,
-          project_id: projectId,
-          assignee_type: assigneeType,
-          assignee_id: assigneeId,
-          execution_mode: executionMode,
-          subscribers: subscriberUserIds.map((user_id) => ({
-            user_type: "member" as const,
-            user_id,
-          })),
-        });
+        await updateAutopilot.mutateAsync(
+          isJob
+            ? {
+                id: props.autopilotId,
+                title: title.trim(),
+                description: description.trim() || null,
+                execution_mode: "job",
+                job_name: jobName.trim(),
+              }
+            : {
+                id: props.autopilotId,
+                title: title.trim(),
+                description: description.trim() || null,
+                project_id: projectId,
+                assignee_type: assigneeType,
+                assignee_id: assigneeId,
+                execution_mode: executionMode,
+                subscribers: subscriberUserIds.map((user_id) => ({
+                  user_type: "member" as const,
+                  user_id,
+                })),
+              },
+        );
         let triggerOk = true;
         let triggerErrMessage: string | null = null;
         // Skip the schedule sync when the autopilot's first trigger is a
@@ -608,16 +649,34 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
 
           {/* Right: Configuration */}
           <aside className="w-full lg:w-[380px] shrink-0 overflow-visible lg:overflow-y-auto px-5 py-5 space-y-5 bg-muted/30">
-            <AgentSection
-              ref={assigneeTriggerRef}
-              selectedType={assigneeType}
-              selectedId={assigneeId}
-              onChange={handleAssigneeChange}
-              selectedName={selectedAssignee?.name}
-              selectedDescription={selectedAssignee?.description}
-              invalid={showErrors && assigneeId.length === 0}
-              errorId={assigneeErrorId}
-            />
+            {isJob ? (
+              <JobNameSection
+                ref={jobNameInputRef}
+                value={jobName}
+                onChange={setJobName}
+                error={
+                  !showErrors
+                    ? null
+                    : jobName.trim().length === 0
+                      ? "required"
+                      : JOB_NAME_PATTERN.test(jobName.trim())
+                        ? null
+                        : "invalid"
+                }
+                errorId={jobNameErrorId}
+              />
+            ) : (
+              <AgentSection
+                ref={assigneeTriggerRef}
+                selectedType={assigneeType}
+                selectedId={assigneeId}
+                onChange={handleAssigneeChange}
+                selectedName={selectedAssignee?.name}
+                selectedDescription={selectedAssignee?.description}
+                invalid={showErrors && assigneeId.length === 0}
+                errorId={assigneeErrorId}
+              />
+            )}
 
             <OutputModeSection mode={executionMode} onChange={setExecutionMode} />
 
@@ -629,11 +688,13 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                 or a bare workdir. Hiding it here left run_only autopilots with
                 no way to bind one, and the save below used to send null for
                 run_only, silently clearing a binding made via the CLI. */}
-            <ProjectSection
-              projectId={projectId}
-              selectedProject={selectedProject}
-              onChange={setProjectId}
-            />
+            {!isJob && (
+              <ProjectSection
+                projectId={projectId}
+                selectedProject={selectedProject}
+                onChange={setProjectId}
+              />
+            )}
 
             {executionMode === "create_issue" && (
               <SubscribersSection
@@ -642,11 +703,12 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
               />
             )}
 
-            {isCreate && (
+            {/* Ops jobs take schedule triggers only. */}
+            {isCreate && !isJob && (
               <TriggerKindSection kind={triggerKind} onChange={setTriggerKind} />
             )}
 
-            {triggerKind === "schedule" ? (
+            {triggerKind === "schedule" || isJob ? (
               <div>
                 <SectionLabel>{t(($) => $.dialog.section_schedule)}</SectionLabel>
                 {schedulePillDisabled ? (
@@ -827,6 +889,55 @@ function AgentSection({
       {invalid && (
         <p id={errorId} role="alert" className="mt-1.5 text-caption text-destructive">
           {t(($) => $.dialog.error_assignee_required)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function JobNameSection({
+  ref,
+  value,
+  onChange,
+  error,
+  errorId,
+}: {
+  ref: React.Ref<HTMLInputElement>;
+  value: string;
+  onChange: (next: string) => void;
+  /** Set after a submit attempt with a missing or malformed name. */
+  error: "required" | "invalid" | null;
+  errorId: string;
+}) {
+  const { t } = useT("autopilots");
+  const inputId = useId();
+  return (
+    <div>
+      <label htmlFor={inputId}>
+        <SectionLabel required>{t(($) => $.dialog.section_job_name)}</SectionLabel>
+      </label>
+      <input
+        ref={ref}
+        id={inputId}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={t(($) => $.dialog.job_name_placeholder)}
+        spellCheck={false}
+        autoComplete="off"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className={cn(
+          "w-full rounded-md border bg-background px-3 py-2 font-mono text-body outline-none transition-colors focus:border-input",
+          error && "border-destructive",
+        )}
+      />
+      <p className="mt-1.5 text-micro text-muted-foreground">{t(($) => $.dialog.job_name_hint)}</p>
+      {error && (
+        <p id={errorId} role="alert" className="mt-1.5 text-caption text-destructive">
+          {error === "required"
+            ? t(($) => $.dialog.error_job_name_required)
+            : t(($) => $.dialog.error_job_name_invalid)}
         </p>
       )}
     </div>

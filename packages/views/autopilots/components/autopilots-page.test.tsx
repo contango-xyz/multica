@@ -144,6 +144,29 @@ describe("AutopilotsPage", () => {
     expect(useAutopilotsViewStore.getState().scope).toBe("paused");
   });
 
+  // Contango patch 22: an ops job shows its job name in the assignee column,
+  // and its last run's pending status.
+  it("lists an ops job with its job name and last run status", async () => {
+    vi.mocked(api.listAutopilots).mockResolvedValue({
+      autopilots: [
+        {
+          ...autopilot("j1", "PR watch", "active"),
+          assignee_id: "",
+          execution_mode: "job",
+          job_name: "pr-watch",
+          last_run_at: "2026-11-07T10:00:00Z",
+          last_run_status: "pending",
+          next_run_at: "2126-11-07T10:01:00Z",
+        } as Autopilot,
+      ],
+      total: 1,
+    });
+    mount();
+    expect(await screen.findByText("PR watch")).toBeVisible();
+    expect(screen.getByText("pr-watch")).toHaveClass("font-mono");
+    expect(screen.getByTitle("Pending")).toBeInTheDocument();
+  });
+
   it("has no search, and Reset clears the filters", async () => {
     const user = userEvent.setup();
     useAutopilotsViewStore.setState({
