@@ -1153,6 +1153,31 @@ describe("InboxPage", () => {
     });
   });
 
+  // contango: a desktop tab restored on a row that has been archived since (owner 2026-11-07, CTG-1092).
+  it("keeps a selection that is in the user's archive on the inbox instead of opening its issue", () => {
+    reset();
+    searchParams = new URLSearchParams("issue=held-epic");
+    listData.active = [item({ id: "a", issue_id: "other-issue" })];
+    listData.lookup = [item({ id: "old", issue_id: "held-epic", archived: true })];
+
+    render(<InboxPage />);
+
+    expect(replace).not.toHaveBeenCalledWith("/acme/issues/held-epic");
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+  });
+
+  it("waits for the archive lookup before deciding, then still opens a link that was never in this inbox", () => {
+    reset();
+    searchParams = new URLSearchParams("issue=someone-elses");
+    listData.lookup = [];
+    lookupState.isLoading = true;
+    const { rerender } = render(<InboxPage />);
+    expect(replace).not.toHaveBeenCalled();
+    lookupState.isLoading = false;
+    rerender(<InboxPage />);
+    expect(replace).toHaveBeenCalledWith("/acme/issues/someone-elses");
+  });
+
   it("does not swallow a deep link to an issue that is not in the archive", () => {
     // ?view=archived&issue=X with an empty archive: the drain effect and the
     // unresolved-selection fallback both want to navigate. The fallback must

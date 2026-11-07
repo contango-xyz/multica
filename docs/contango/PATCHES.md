@@ -425,6 +425,19 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** with patch 14.
 
+### 20. An archived inbox selection stays on the inbox
+
+- **What:** the inbox page treats a `?issue=` selection that is not in the inbox list as a shared link and opens the
+  issue page. The desktop app restores its Inbox tab with the last selection, so once that row was archived (by the
+  smart inbox feeder or the user) every visit to the Inbox bounced to that issue (owner 2026-11-07: "each time I try it
+  opens a tab with ctg-1092"). The inbox view now also runs the archive lookup for an unresolved selection: a row in
+  the user's own archive clears the selection and stays on the inbox; a key that was never in this inbox still opens
+  the issue (upstream's shared-link behaviour, kept). Numbered 20: 19 is the MVP page on `contango/mvp-page`.
+- **Touches:** upstream files: `packages/views/inbox/components/inbox-page{,.test}.tsx`.
+- **Migrations:** none.
+- **Upstream status:** none (worth offering upstream: it affects their desktop app too).
+- **Drop when:** upstream stops redirecting a restored archived selection.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

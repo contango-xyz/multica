@@ -270,7 +270,8 @@ export function InboxPage({
   // without adding it to the cursor chain or mistaking a page miss for a 404.
   const lookup = useQuery({
     ...archivedInboxLookupOptions(wsId, selectedKey),
-    enabled: isArchivedView && !!selectedKey && !selectedOnPage && !archivedLoading && !archivedError,
+    // contango: the inbox view looks too, so a selection that is in the user's archive is not taken for a shared link.
+    enabled: !!selectedKey && !selectedOnPage && (isArchivedView ? !archivedLoading && !archivedError : !loading),
   });
   const lookupItems = useMemo(() => deduplicateArchivedInboxItems(lookup.data?.items ?? []), [lookup.data]);
   const selectionItems = useMemo(() => {
@@ -367,6 +368,11 @@ export function InboxPage({
   const needsLookup = isArchivedView && !!selectedKey && !selectedOnPage;
   const lookupLoading = needsLookup && lookup.isLoading;
   const lookupError = needsLookup && lookup.isError && !selected;
+  // contango: a desktop tab restores the inbox with its last selection; when that row has been archived since, the
+  // fallback below took it for a shared link and opened the issue page on every visit (owner 2026-11-07: "each time I
+  // try it opens a tab with ctg-1092"). An archived row of the user's own stays on the inbox, with the selection cleared.
+  const inboxLookupPending = !isArchivedView && !!selectedKey && !selectedOnPage && lookup.isLoading;
+  const selectionArchived = !isArchivedView && !!selectedKey && lookupItems.some((i) => inboxRowKey(i) === selectedKey);
 
   // Shared inbox links (?issue=<id>) may point to notifications not in this
   // user's inbox (archived, or never received). Fall back to the issue page
@@ -375,11 +381,11 @@ export function InboxPage({
   // and `onInboxIssueDeleted` pruned the cache), the issue detail would 404
   // too — clear the selection and stay on /inbox instead.
   useEffect(() => {
-    if (viewLoading || lookupLoading || lookupError || (isArchivedView && archivedError)) return;
+    if (viewLoading || lookupLoading || lookupError || inboxLookupPending || (isArchivedView && archivedError)) return;
     if (!selectedKey) return;
     if (selected) return;
     if (selectionFilteredOut) return;
-    if (lastResolvedKeyRef.current === selectedKey) {
+    if (lastResolvedKeyRef.current === selectedKey || selectionArchived) {
       setSelectedKey("");
       return;
     }
@@ -390,6 +396,8 @@ export function InboxPage({
     archivedError,
     lookupLoading,
     lookupError,
+    inboxLookupPending,
+    selectionArchived,
     selectedKey,
     selected,
     selectionFilteredOut,
