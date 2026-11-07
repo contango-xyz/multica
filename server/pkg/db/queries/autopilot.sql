@@ -56,11 +56,11 @@ FOR UPDATE;
 INSERT INTO autopilot (
     workspace_id, title, description, assignee_type, assignee_id,
     status, execution_mode, issue_title_template, project_id,
-    created_by_type, created_by_id
+    created_by_type, created_by_id, job_name
 ) VALUES (
     $1, $2, sqlc.narg('description'), $3, $4,
     $5, $6, sqlc.narg('issue_title_template'), sqlc.narg('project_id'),
-    $7, $8
+    $7, $8, sqlc.narg('job_name')
 ) RETURNING *;
 
 -- name: UpdateAutopilot :one
@@ -68,7 +68,13 @@ UPDATE autopilot SET
     title = COALESCE(sqlc.narg('title'), title),
     description = COALESCE(sqlc.narg('description'), description),
     assignee_type = COALESCE(sqlc.narg('assignee_type'), assignee_type),
-    assignee_id = COALESCE(sqlc.narg('assignee_id')::uuid, assignee_id),
+    -- clear_assignee (contango patch 22): a switch to execution_mode 'job'
+    -- drops the assignee; job_name is set by the caller from the final mode.
+    assignee_id = CASE
+      WHEN sqlc.arg('clear_assignee')::boolean THEN NULL
+      ELSE COALESCE(sqlc.narg('assignee_id')::uuid, assignee_id)
+    END,
+    job_name = sqlc.narg('job_name'),
     status = COALESCE(sqlc.narg('status'), status),
     pause_reason = CASE
       WHEN sqlc.narg('status')::text IS NOT NULL THEN NULL

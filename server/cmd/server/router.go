@@ -2309,6 +2309,16 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				})
 			})
 
+			// Autopilot ops jobs (contango patch 22): the ops runner lists,
+			// claims and finishes job runs as a workspace member; agents'
+			// machine credentials are refused.
+			r.Route("/api/autopilot/job-runs", func(r chi.Router) {
+				r.Use(handler.RequireHumanActor)
+				r.Get("/", h.ListAutopilotJobRuns)
+				r.Post("/{runId}/claim", h.ClaimAutopilotJobRun)
+				r.Post("/{runId}/finish", h.FinishAutopilotJobRun)
+			})
+
 			// Pins
 			r.Route("/api/pins", func(r chi.Router) {
 				r.Get("/", h.ListPins)

@@ -41,11 +41,14 @@ type AutopilotResponse struct {
 	// AssigneeType is "agent" or "squad". Path A from MUL-2429: when set
 	// to "squad", AssigneeID points at squad(id) rather than agent(id) and
 	// dispatch resolves to squad.leader_id at run time.
-	AssigneeType       string  `json:"assignee_type"`
-	AssigneeID         string  `json:"assignee_id"`
-	Status             string  `json:"status"`
-	PauseReason        *string `json:"pause_reason"`
-	ExecutionMode      string  `json:"execution_mode"`
+	AssigneeType  string  `json:"assignee_type"`
+	AssigneeID    string  `json:"assignee_id"`
+	Status        string  `json:"status"`
+	PauseReason   *string `json:"pause_reason"`
+	ExecutionMode string  `json:"execution_mode"`
+	// JobName is the ops-job key, set only when execution_mode is "job"
+	// (contango patch 22); such an autopilot has an empty assignee_id.
+	JobName            *string `json:"job_name"`
 	IssueTitleTemplate *string `json:"issue_title_template"`
 	CreatedByType      string  `json:"created_by_type"`
 	CreatedByID        string  `json:"created_by_id"`
@@ -178,6 +181,11 @@ type AutopilotRunResponse struct {
 	TriggerPayload any     `json:"trigger_payload"`
 	Result         any     `json:"result"`
 	CreatedAt      string  `json:"created_at"`
+	// Ops-job run fields (contango patch 22): claim time, the runner's exit
+	// code and the last 8 KiB of output. Omitted for agent runs.
+	StartedAt  *string `json:"started_at,omitempty"`
+	ExitCode   *int32  `json:"exit_code,omitempty"`
+	OutputTail *string `json:"output_tail,omitempty"`
 }
 
 // ── Converters ──────────────────────────────────────────────────────────────
@@ -209,6 +217,7 @@ func autopilotToResponse(a db.Autopilot, subscribers []db.AutopilotSubscriber) A
 		Status:             a.Status,
 		PauseReason:        textToPtr(a.PauseReason),
 		ExecutionMode:      a.ExecutionMode,
+		JobName:            textToPtr(a.JobName),
 		IssueTitleTemplate: textToPtr(a.IssueTitleTemplate),
 		CreatedByType:      a.CreatedByType,
 		CreatedByID:        uuidToString(a.CreatedByID),
@@ -325,7 +334,15 @@ func runToResponse(r db.AutopilotRun) AutopilotRunResponse {
 	if r.Result != nil {
 		json.Unmarshal(r.Result, &result)
 	}
+	var exitCode *int32
+	if r.ExitCode.Valid {
+		v := r.ExitCode.Int32
+		exitCode = &v
+	}
 	return AutopilotRunResponse{
+		StartedAt:      timestampToPtr(r.StartedAt),
+		ExitCode:       exitCode,
+		OutputTail:     textToPtr(r.OutputTail),
 		ID:             uuidToString(r.ID),
 		AutopilotID:    uuidToString(r.AutopilotID),
 		TriggerID:      uuidToPtr(r.TriggerID),
@@ -365,6 +382,7 @@ type CreateAutopilotRequest struct {
 	AssigneeType       *string           `json:"assignee_type"`
 	AssigneeID         string            `json:"assignee_id"`
 	ExecutionMode      string            `json:"execution_mode"`
+	JobName            *string           `json:"job_name"`
 	IssueTitleTemplate *string           `json:"issue_title_template"`
 	Subscribers        []SubscriberInput `json:"subscribers"`
 }
@@ -377,6 +395,7 @@ type UpdateAutopilotRequest struct {
 	AssigneeID         *string `json:"assignee_id"`
 	Status             *string `json:"status"`
 	ExecutionMode      *string `json:"execution_mode"`
+	JobName            *string `json:"job_name"`
 	IssueTitleTemplate *string `json:"issue_title_template"`
 	// Wholesale replacement when present; omit to leave subscribers untouched.
 	Subscribers []SubscriberInput `json:"subscribers"`
@@ -815,17 +834,25 @@ func (h *Handler) CreateAutopilot(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "title is required")
 		return
 	}
-	if req.AssigneeID == "" {
-		writeError(w, http.StatusBadRequest, "assignee_id is required")
-		return
-	}
 	if req.ExecutionMode == "" {
 		writeError(w, http.StatusBadRequest, "execution_mode is required")
 		return
 	}
-	if req.ExecutionMode != "create_issue" && req.ExecutionMode != "run_only" {
-		writeError(w, http.StatusBadRequest, "execution_mode must be create_issue or run_only")
+	if !isValidAutopilotExecutionMode(req.ExecutionMode) {
+		writeError(w, http.StatusBadRequest, "execution_mode must be create_issue, run_only or job")
 		return
+	}
+	isJob := req.ExecutionMode == service.ExecutionModeJob
+	jobName, ok := validateAutopilotJobFields(w, isJob, req.JobName, req.AssigneeID != "" || (req.AssigneeType != nil && *req.AssigneeType != ""))
+	if !ok {
+		return
+	}
+	if !isJob && req.AssigneeID == "" {
+		writeError(w, http.StatusBadRequest, "assignee_id is required")
+		return
+	}
+	if isJob {
+		req.IssueTitleTemplate = nil
 	}
 	if req.IssueTitleTemplate != nil {
 		if err := service.ValidateIssueTitleTemplate(*req.IssueTitleTemplate); err != nil {
@@ -847,9 +874,12 @@ func (h *Handler) CreateAutopilot(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := uuidToString(actor.UserID)
 
-	assigneeUUID, ok := parseUUIDOrBadRequest(w, req.AssigneeID, "assignee_id")
-	if !ok {
-		return
+	var assigneeUUID pgtype.UUID
+	if !isJob {
+		assigneeUUID, ok = parseUUIDOrBadRequest(w, req.AssigneeID, "assignee_id")
+		if !ok {
+			return
+		}
 	}
 	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace id")
 	if !ok {
@@ -895,7 +925,7 @@ func (h *Handler) CreateAutopilot(w http.ResponseWriter, r *http.Request) {
 	// Keep save-time readiness validation in the same transaction as the
 	// insert. The assignment lock serializes this path with Runtime teardown,
 	// so an active Autopilot cannot slip in after teardown's pause sweep.
-	if !h.validateAutopilotAssigneeForSave(w, r, qtx, assigneeType, assigneeUUID, wsUUID, true) {
+	if !isJob && !h.validateAutopilotAssigneeForSave(w, r, qtx, assigneeType, assigneeUUID, wsUUID, true) {
 		return
 	}
 
@@ -906,6 +936,7 @@ func (h *Handler) CreateAutopilot(w http.ResponseWriter, r *http.Request) {
 		AssigneeID:         assigneeUUID,
 		Status:             "active",
 		ExecutionMode:      req.ExecutionMode,
+		JobName:            jobName,
 		CreatedByType:      "member",
 		CreatedByID:        actor.UserID,
 		Description:        ptrToText(req.Description),
@@ -1071,6 +1102,7 @@ func (h *Handler) UpdateAutopilot(w http.ResponseWriter, r *http.Request) {
 		AssigneeID:         prev.AssigneeID,
 		IssueTitleTemplate: prev.IssueTitleTemplate,
 		ProjectID:          prev.ProjectID,
+		JobName:            prev.JobName,
 	}
 	if req.Title != nil {
 		params.Title = pgtype.Text{String: *req.Title, Valid: true}
@@ -1078,9 +1110,17 @@ func (h *Handler) UpdateAutopilot(w http.ResponseWriter, r *http.Request) {
 	if req.Status != nil {
 		params.Status = pgtype.Text{String: *req.Status, Valid: true}
 	}
+	nextMode := prev.ExecutionMode
 	if req.ExecutionMode != nil {
+		if !isValidAutopilotExecutionMode(*req.ExecutionMode) {
+			writeError(w, http.StatusBadRequest, "execution_mode must be create_issue, run_only or job")
+			return
+		}
+		nextMode = *req.ExecutionMode
 		params.ExecutionMode = pgtype.Text{String: *req.ExecutionMode, Valid: true}
 	}
+	nextIsJob := nextMode == service.ExecutionModeJob
+	leavingJob := prev.ExecutionMode == service.ExecutionModeJob && !nextIsJob
 	if _, ok := rawFields["description"]; ok {
 		params.Description = ptrToText(req.Description)
 	}
@@ -1143,6 +1183,30 @@ func (h *Handler) UpdateAutopilot(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Ops jobs (contango patch 22): job_name is set exactly in job mode and a
+	// job carries no assignee; leaving job mode needs a new assignee.
+	{
+		jobNameReq := req.JobName
+		if _, sent := rawFields["job_name"]; !sent && nextIsJob && prev.JobName.Valid {
+			jobNameReq = &prev.JobName.String
+		}
+		assigneeSent := (idSent && req.AssigneeID != nil && *req.AssigneeID != "")
+		jobName, ok := validateAutopilotJobFields(w, nextIsJob, jobNameReq, assigneeSent)
+		if !ok {
+			return
+		}
+		params.JobName = jobName
+		if nextIsJob {
+			params.ClearAssignee = true
+			params.AssigneeType = pgtype.Text{}
+			params.IssueTitleTemplate = pgtype.Text{}
+		}
+		if leavingJob && !idSent {
+			writeError(w, http.StatusBadRequest, "assignee_id is required when leaving execution_mode job")
+			return
+		}
+	}
+
 	// Parse subscriber wire values up-front. Mutable membership is revalidated
 	// under the revocation serialization locks after the transaction starts.
 	var (
@@ -1180,7 +1244,7 @@ func (h *Handler) UpdateAutopilot(w http.ResponseWriter, r *http.Request) {
 	if req.Status != nil {
 		nextStatus = *req.Status
 	}
-	validateAssignee := typeSent || idSent || (req.Status != nil && *req.Status == "active")
+	validateAssignee := !nextIsJob && (typeSent || idSent || leavingJob || (req.Status != nil && *req.Status == "active"))
 	if validateAssignee && !h.validateAutopilotAssigneeForSave(
 		w, r, qtx, nextType, nextID, prev.WorkspaceID, nextStatus == "active",
 	) {
@@ -1301,6 +1365,7 @@ func autopilotRuleSubstantiveChange(prev, next db.Autopilot) bool {
 		prev.AssigneeID != next.AssigneeID ||
 		prev.Status != next.Status ||
 		prev.ExecutionMode != next.ExecutionMode ||
+		prev.JobName != next.JobName ||
 		prev.Description != next.Description ||
 		prev.IssueTitleTemplate != next.IssueTitleTemplate
 }
@@ -1556,6 +1621,10 @@ func (h *Handler) CreateAutopilotTrigger(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "kind must be schedule or webhook")
 		return
 	}
+	if req.Kind == "webhook" && ap.ExecutionMode == service.ExecutionModeJob {
+		writeError(w, http.StatusBadRequest, "ops job autopilots support schedule triggers only")
+		return
+	}
 	if req.Kind == "schedule" && (req.CronExpression == nil || *req.CronExpression == "") {
 		writeError(w, http.StatusBadRequest, "cron_expression is required for schedule triggers")
 		return
@@ -1776,6 +1845,40 @@ func isAllowedWebhookProvider(p string) bool {
 	default:
 		return false
 	}
+}
+
+func isValidAutopilotExecutionMode(m string) bool {
+	return m == "create_issue" || m == "run_only" || m == service.ExecutionModeJob
+}
+
+// validateAutopilotJobFields checks the ops-job fields (contango patch 22) for
+// the autopilot's final mode and returns the job_name to store. A job needs a
+// valid job_name and takes no assignee; other modes take no job_name.
+func validateAutopilotJobFields(w http.ResponseWriter, isJob bool, jobName *string, assigneeSent bool) (pgtype.Text, bool) {
+	name := ""
+	if jobName != nil {
+		name = strings.TrimSpace(*jobName)
+	}
+	if !isJob {
+		if name != "" {
+			writeError(w, http.StatusBadRequest, "job_name only applies to execution_mode job")
+			return pgtype.Text{}, false
+		}
+		return pgtype.Text{}, true
+	}
+	if assigneeSent {
+		writeError(w, http.StatusBadRequest, "an ops job (execution_mode job) takes no assignee")
+		return pgtype.Text{}, false
+	}
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "job_name is required for execution_mode job")
+		return pgtype.Text{}, false
+	}
+	if !service.ValidJobName(name) {
+		writeError(w, http.StatusBadRequest, "job_name must match ^[a-z0-9][a-z0-9-]{0,63}$")
+		return pgtype.Text{}, false
+	}
+	return pgtype.Text{String: name, Valid: true}, true
 }
 
 func isValidAutopilotAssigneeType(t string) bool {

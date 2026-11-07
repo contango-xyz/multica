@@ -68,6 +68,7 @@ type autopilotRuleConfigSummary struct {
 	AssigneeID    string `json:"assignee_id"`
 	Status        string `json:"status"`
 	ExecutionMode string `json:"execution_mode"`
+	JobName       string `json:"job_name,omitempty"`
 }
 
 // RecordAutopilotRuleVersion appends one rule-version snapshot for a substantive
@@ -83,6 +84,7 @@ func RecordAutopilotRuleVersion(ctx context.Context, q *db.Queries, ap db.Autopi
 		AssigneeID:    util.UUIDToString(ap.AssigneeID),
 		Status:        ap.Status,
 		ExecutionMode: ap.ExecutionMode,
+		JobName:       ap.JobName.String,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal rule version config summary: %w", err)
@@ -457,6 +459,9 @@ func (s *AutopilotService) DispatchAutopilotForPlan(
 		return nil, fmt.Errorf("dispatch for plan: planned_at is required")
 	}
 	plannedTS := pgtype.Timestamptz{Time: plannedAt.UTC(), Valid: true}
+	if autopilot.ExecutionMode == ExecutionModeJob {
+		return s.dispatchJobForPlan(ctx, autopilot, triggerID, source, plannedTS)
+	}
 
 	// Fast path: prior attempt already created a run for this exact
 	// occurrence. The partial unique index uq_autopilot_run_trigger_planned
@@ -567,6 +572,11 @@ func (s *AutopilotService) dispatchAutopilot(
 	actorUserID pgtype.UUID,
 	idempotencyKey string,
 ) (*db.AutopilotRun, dispatch.ReasonCode, error) {
+	// Ops jobs (contango patch 22) record a pending run for the external
+	// runner: no admission gate (there is no agent), no quota, no issue/task.
+	if autopilot.ExecutionMode == ExecutionModeJob && !webhookDeliveryID.Valid {
+		return s.dispatchJob(ctx, autopilot, triggerID, source, plannedAt)
+	}
 	if reason, code, skip := s.shouldSkipDispatch(ctx, autopilot, actorUserID, triggerID); skip {
 		run, err := s.recordSkippedRun(ctx, autopilot, triggerID, source, payload, plannedAt, webhookDeliveryID, reason)
 		return run, code, err
@@ -1550,6 +1560,11 @@ func (s *AutopilotService) failRun(ctx context.Context, runID pgtype.UUID, reaso
 //     agent assignee being missing is now a real condition the gate must
 //     handle (previously cascade-deleted).
 func (s *AutopilotService) shouldSkipDispatch(ctx context.Context, ap db.Autopilot, actorUserID, triggerID pgtype.UUID) (string, dispatch.ReasonCode, bool) {
+	if ap.ExecutionMode == ExecutionModeJob {
+		// Only schedule triggers and "run now" fire an ops job; any other path
+		// (a webhook left over from before a mode switch) is recorded as skipped.
+		return "ops job autopilots run only from a schedule or run now", dispatch.ReasonTargetUnavailable, true
+	}
 	if !ap.AssigneeID.Valid {
 		return "autopilot has no assignee", dispatch.ReasonTargetUnavailable, true
 	}

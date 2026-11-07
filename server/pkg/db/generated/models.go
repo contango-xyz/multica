@@ -226,6 +226,7 @@ type Autopilot struct {
 	AssigneeType       string             `json:"assignee_type"`
 	ProjectID          pgtype.UUID        `json:"project_id"`
 	PauseReason        pgtype.Text        `json:"pause_reason"`
+	JobName            pgtype.Text        `json:"job_name"`
 }
 
 type AutopilotCollaborator struct {
@@ -292,6 +293,9 @@ type AutopilotRun struct {
 	WebhookDeliveryID  pgtype.UUID        `json:"webhook_delivery_id"`
 	QuotaReservationID pgtype.UUID        `json:"quota_reservation_id"`
 	ReasonCode         pgtype.Text        `json:"reason_code"`
+	StartedAt          pgtype.Timestamptz `json:"started_at"`
+	ExitCode           pgtype.Int4        `json:"exit_code"`
+	OutputTail         pgtype.Text        `json:"output_tail"`
 }
 
 type AutopilotSubscriber struct {
