@@ -3,6 +3,7 @@ import {
   ActionSheetIOS,
   Alert,
   FlatList,
+  SectionList,
   View,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ import {
   useMarkInboxRead,
 } from "@/data/mutations/inbox";
 import { useWorkspaceStore } from "@/data/workspace-store";
+import { useAuthStore } from "@/data/auth-store";
 import { useColorScheme } from "@/lib/use-color-scheme";
 import { THEME } from "@/lib/theme";
 import { useT } from "@/lib/i18n";
@@ -33,13 +35,14 @@ import {
   deduplicateInboxItems,
   getInboxNavigationTarget,
 } from "@/lib/inbox-display";
+import { buildSmartList } from "@/lib/smart-inbox";
 
 export default function Inbox() {
   const { t } = useT("inbox");
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const wsSlug = useWorkspaceStore((s) => s.currentWorkspaceSlug);
   const { colorScheme } = useColorScheme();
-  const { data: rawItems, isLoading, error, refetch, isRefetching } = useQuery(
+  const { data: rawItems, dataUpdatedAt, isLoading, error, refetch, isRefetching } = useQuery(
     inboxListOptions(wsId),
   );
   // Dedup + drop archived to match web/desktop. See CLAUDE.md
@@ -47,6 +50,15 @@ export default function Inbox() {
   const data = useMemo(
     () => deduplicateInboxItems(rawItems ?? []),
     [rawItems],
+  );
+  // Smart inbox (contango): the server flag on /api/me decides, as on web
+  // and desktop where Smart is the flagged user's default. Mobile has no
+  // Classic toggle. Ranked as of the list's last update (fetch, focus,
+  // realtime, local write), not every minute like web.
+  const smart = useAuthStore((s) => s.user?.smart_inbox === true);
+  const sections = useMemo(
+    () => (smart ? buildSmartList(rawItems ?? [], dataUpdatedAt || 0) : []),
+    [smart, rawItems, dataUpdatedAt],
   );
   const markRead = useMarkInboxRead();
   const markAllRead = useMarkAllInboxRead();
@@ -135,6 +147,36 @@ export default function Inbox() {
         </View>
       ) : !data || data.length === 0 ? (
         <InboxEmpty iconColor={THEME[colorScheme].mutedForeground} />
+      ) : smart ? (
+        <SectionList
+          sections={sections}
+          keyExtractor={(entry) => entry.item.id}
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) => (
+            <View className="flex-row items-center gap-2 bg-background px-4 pb-1 pt-4">
+              <Text className="text-xs font-semibold uppercase text-muted-foreground">
+                {t(`smart.sections.${section.id}`)}
+              </Text>
+              <Text className="text-xs text-muted-foreground">
+                {section.data.length}
+              </Text>
+            </View>
+          )}
+          ItemSeparatorComponent={() => (
+            <View className="h-px bg-border ml-16" />
+          )}
+          contentContainerClassName="pb-6"
+          renderItem={({ item: entry }) => (
+            <SwipeableInboxRow
+              item={entry.item}
+              inSmartSection
+              onPress={() => onPressItem(entry.item)}
+              onArchive={() => archive.mutate(entry.item.id)}
+            />
+          )}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+        />
       ) : (
         <FlatList
           data={data}

@@ -93,6 +93,14 @@ export function getInboxNavigationTarget(
   historyToken: string,
 ) {
   if (!workspace) return null;
+  // A smart-inbox signal opens its own brief (body, actions, one-tap
+  // replies), not the thread: docs/contango/SMART-INBOX.md "iOS".
+  if (item.type === "signal") {
+    return {
+      pathname: "/[workspace]/inbox/[id]" as const,
+      params: { workspace, id: item.id },
+    };
+  }
   if (item.issue_id) {
     return {
       pathname: "/[workspace]/issue/[id]" as const,
@@ -129,7 +137,8 @@ export function getInboxNavigationTarget(
  *   1. Drop archived rows (these never appear in web's inbox view).
  *   2. Group by `issue_id` (fall back to `id` for items with no issue
  *      attached — e.g. quick_create_failed).
- *   3. In each group, keep the newest by `created_at`.
+ *   3. In each group, keep the newest by `created_at`, showing its newest
+ *      non-signal entry when there is one (id/read/archived stay the newest).
  *   4. Preserve the newest grouped `comment_id` anchor when the newest row
  *      is a later status/metadata event for the same issue.
  *   5. Sort the result newest-first.
@@ -151,20 +160,29 @@ export function deduplicateInboxItems(items: InboxItem[]): InboxItem[] {
     );
     const newest = group[0];
     if (!newest) continue;
+    // The row SHOWS the newest entry a person or agent caused: a smart-inbox
+    // signal refreshed on the same issue would otherwise hide that sender
+    // behind the system one. A signal-only group shows its signal. Identity
+    // and state (id, read, archived) stay the newest row's.
+    const shown = group.find((item) => item.type !== "signal") ?? newest;
+    const row: InboxItem =
+      shown === newest
+        ? newest
+        : { ...shown, id: newest.id, read: newest.read, archived: newest.archived };
 
     const commentId =
-      newest.details?.comment_id ??
+      row.details?.comment_id ??
       group.find((item) => item.details?.comment_id)?.details?.comment_id;
 
-    if (commentId && newest.details?.comment_id !== commentId) {
+    if (commentId && row.details?.comment_id !== commentId) {
       merged.push({
-        ...newest,
-        details: { ...(newest.details ?? {}), comment_id: commentId },
+        ...row,
+        details: { ...(row.details ?? {}), comment_id: commentId },
       });
       continue;
     }
 
-    merged.push(newest);
+    merged.push(row);
   }
   return merged.sort(
     (a, b) =>

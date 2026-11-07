@@ -89,5 +89,37 @@
   "type.task_completed": "运行完成",
   "type.task_failed": "运行失败",
   "type.run_limit_blocked": "已达到上限，本次运行被阻止",
-  "body.autopilot_title_limit": "自动化 \"{{title}}\" 未启动，因为该工作区已达到当前周期 {{limit}} 次运行的上限。额度将在 {{resetAt}} 重置。"
+  "body.autopilot_title_limit": "自动化 \"{{title}}\" 未启动，因为该工作区已达到当前周期 {{limit}} 次运行的上限。额度将在 {{resetAt}} 重置。",
+  "smart": {
+    "sections": {
+      "merge": "合并审批",
+      "decision": "决策",
+      "access": "权限与资金",
+      "stalled": "停滞",
+      "blocking": "阻塞他人",
+      "alert": "告警",
+      "mentions": "提及与评审",
+      "fyi": "知悉"
+    },
+    "priority": {
+      "urgent": "紧急",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "none": "无优先级"
+    },
+    "blocks_other": "阻塞 {{count}} 项",
+    "open_issue": "打开事项",
+    "open_card": "打开 {{card}}",
+    "reply": {
+      "confirm_title": "发布“{{content}}”？",
+      "confirm_title_on": "在 {{card}} 上发布“{{content}}”？",
+      "confirm_description": "将作为你对该请求的回复发布，与手动输入相同。",
+      "confirm": "发布",
+      "cancel": "取消",
+      "failed": "无法发布回复",
+      "gone": "该请求已不在你的收件箱中。",
+      "changed": "该请求已变更。请下拉刷新后重试。"
+    }
+  }
 }

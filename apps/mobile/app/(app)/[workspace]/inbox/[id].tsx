@@ -16,6 +16,7 @@ import {
 } from "@/data/queries/billing";
 import { useWorkspaceStore } from "@/data/workspace-store";
 import { useT } from "@/lib/i18n";
+import { SignalDetail } from "@/components/inbox/signal-detail";
 import {
   getAutopilotQuotaBody,
   getInboxDisplayTitle,
@@ -122,6 +123,8 @@ export default function InboxNoticeDetail() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
         </View>
+      ) : item?.type === "signal" ? (
+        <SignalDetail item={item} />
       ) : !item ||
         (item.type !== "autopilot_quota_exceeded" &&
           item.type !== "autopilot_paused") ? (

@@ -25,6 +25,12 @@ describe("pushTarget", () => {
     expect(pushTarget({ kind: "inbox", workspace_slug: "w", item_id: "i", type: "autopilot_paused" }))
       .toEqual({ pathname: "/[workspace]/inbox/[id]", params: { workspace: "w", id: "i" } });
   });
+  it("smart-inbox signals open their brief, not the issue thread", () => {
+    expect(pushTarget({ kind: "inbox", workspace_slug: "w", item_id: "sig", type: "signal", issue_id: "is" }))
+      .toEqual({ pathname: "/[workspace]/inbox/[id]", params: { workspace: "w", id: "sig" } });
+    expect(pushTarget({ kind: "inbox", workspace_slug: "w", item_id: "sig", type: "signal" }))
+      .toEqual({ pathname: "/[workspace]/inbox/[id]", params: { workspace: "w", id: "sig" } });
+  });
   it("other issue-less items open the inbox tab", () => {
     expect(pushTarget({ kind: "inbox", workspace_slug: "w", item_id: "i", type: "quick_create_done" }))
       .toEqual({ pathname: "/[workspace]/inbox", params: { workspace: "w" } });

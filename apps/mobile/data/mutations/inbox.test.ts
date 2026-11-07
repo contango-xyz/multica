@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/data/api";
 import { inboxKeys } from "@/data/queries/inbox";
-import { useMarkInboxRead } from "./inbox";
+import { useMarkInboxRead, useReplyToSignal } from "./inbox";
 
 const state = vi.hoisted(() => ({ qc: undefined as unknown as QueryClient }));
 
@@ -25,8 +25,11 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
 });
 
 vi.mock("@/data/api", () => ({
-  api: { markInboxRead: vi.fn() },
+  api: { markInboxRead: vi.fn(), replyToInboxSignal: vi.fn() },
 }));
+
+import { refreshInboxList, refreshInboxUnreadSummary } from "@/data/realtime/inbox-ws-updaters";
+import { issueKeys } from "@/data/queries/issue-keys";
 
 vi.mock("@/data/realtime/inbox-ws-updaters", () => ({
   refreshInboxList: vi.fn(),
@@ -112,5 +115,28 @@ describe("useMarkInboxRead", () => {
       "other-issue": false,
       "no-issue": false,
     });
+  });
+});
+
+describe("useReplyToSignal", () => {
+  beforeEach(() => {
+    state.qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ["succeeds", () => vi.mocked(api.replyToInboxSignal).mockResolvedValue(undefined)],
+    ["is refused", () => vi.mocked(api.replyToInboxSignal).mockRejectedValue(new Error("409"))],
+  ])("posts the reply and refreshes the inbox and the card's thread when it %s", async (_name, arrange) => {
+    arrange();
+    const invalidate = vi.spyOn(state.qc, "invalidateQueries");
+    const { mutateAsync } = useReplyToSignal();
+
+    await mutateAsync({ id: "sig", issueId: "issue-1", index: 1, content: "agree" }).catch(() => {});
+
+    expect(api.replyToInboxSignal).toHaveBeenCalledExactlyOnceWith("sig", 1, "agree");
+    expect(refreshInboxList).toHaveBeenCalledWith(state.qc, wsId);
+    expect(refreshInboxUnreadSummary).toHaveBeenCalledWith(state.qc);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: issueKeys.timeline(wsId, "issue-1") });
   });
 });

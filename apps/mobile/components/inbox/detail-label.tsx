@@ -16,6 +16,7 @@ import type {
   IssuePriority,
 } from "@multica/core/types";
 import { formatDateOnly } from "@multica/core/issues/date";
+import { signalDetails } from "@multica/core/inbox/smart";
 import { Text } from "@/components/ui/text";
 import { StatusIcon } from "@/components/ui/status-icon";
 import { PriorityIcon } from "@/components/ui/priority-icon";
@@ -77,9 +78,12 @@ function singleLine(value: string | null | undefined): string {
 export function InboxDetailLabel({
   item,
   className,
+  signalGroup = true,
 }: {
   item: InboxItem;
   className?: string;
+  /** Prefix a signal's summary with its group; off where a section header names it. */
+  signalGroup?: boolean;
 }) {
   const { getName } = useActorLookup();
   const { t } = useT("inbox");
@@ -166,6 +170,16 @@ export function InboxDetailLabel({
       }
       case "autopilot_quota_exceeded":
         return t("type.run_limit_blocked");
+      case "signal": {
+        // Smart-inbox signal (contango): the group names the system sender,
+        // the summary says why it's here. Mirrors web's inbox-detail-label.
+        const signal = signalDetails(item);
+        const group: string = signal
+          ? t(`smart.sections.${signal.group}`)
+          : t(TYPE_KEY.signal);
+        if (!signal?.summary) return group;
+        return signalGroup ? `${group} · ${signal.summary}` : signal.summary;
+      }
       default:
         return t(TYPE_KEY[item.type]) ?? item.type;
     }

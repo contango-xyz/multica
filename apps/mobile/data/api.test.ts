@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./api";
+import { api, ApiError } from "./api";
 
 // api.ts refuses to load without a base URL; set it before the import runs.
 vi.hoisted(() => {
@@ -143,5 +143,41 @@ describe("api push devices", () => {
     const [url, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
     expect(url).toBe("https://api.example.test/api/push/devices/a%2Fb");
     expect(init.method).toBe("DELETE");
+  });
+});
+
+describe("api.replyToInboxSignal", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("posts the index and content to the signal-reply endpoint", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ comment: {}, item: {} }, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.replyToInboxSignal("sig-1", 0, "agree")).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      "https://api.example.test/api/inbox/sig-1/signal-reply",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ index: 0, content: "agree" }) }),
+    );
+  });
+
+  it.each([
+    [404, "inbox item not found"],
+    [409, "this reply is no longer offered"],
+  ])("surfaces a %i as an ApiError carrying the server's reason", async (status, reason) => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: reason }, { status })));
+
+    const err = await api.replyToInboxSignal("sig-1", 0, "agree").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status, body: { error: reason } });
   });
 });

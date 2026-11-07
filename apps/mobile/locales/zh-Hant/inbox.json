@@ -89,5 +89,37 @@
   "type.task_completed": "執行完成",
   "type.task_failed": "執行失敗",
   "type.run_limit_blocked": "已達到上限，本次執行被阻止",
-  "body.autopilot_title_limit": "自動化 \"{{title}}\" 未啟動，因為該工作區已達到當前週期 {{limit}} 次執行的上限。額度將在 {{resetAt}} 重置。"
+  "body.autopilot_title_limit": "自動化 \"{{title}}\" 未啟動，因為該工作區已達到當前週期 {{limit}} 次執行的上限。額度將在 {{resetAt}} 重置。",
+  "smart": {
+    "sections": {
+      "merge": "合併審批",
+      "decision": "決策",
+      "access": "權限與資金",
+      "stalled": "停滯",
+      "blocking": "阻塞他人",
+      "alert": "警示",
+      "mentions": "提及與審查",
+      "fyi": "知悉"
+    },
+    "priority": {
+      "urgent": "緊急",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "none": "無優先級"
+    },
+    "blocks_other": "阻塞 {{count}} 項",
+    "open_issue": "開啟事項",
+    "open_card": "開啟 {{card}}",
+    "reply": {
+      "confirm_title": "發布「{{content}}」？",
+      "confirm_title_on": "在 {{card}} 上發布「{{content}}」？",
+      "confirm_description": "將作為你對該請求的回覆發布，與手動輸入相同。",
+      "confirm": "發布",
+      "cancel": "取消",
+      "failed": "無法發布回覆",
+      "gone": "此請求已不在你的收件匣中。",
+      "changed": "此請求已變更。請下拉重新整理後再試。"
+    }
+  }
 }

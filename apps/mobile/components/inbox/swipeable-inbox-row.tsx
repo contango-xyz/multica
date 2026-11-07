@@ -49,10 +49,12 @@ const ACTION_WIDTH = 80;
 interface Props {
   item: InboxItem;
   onPress: () => void;
+  /** Forwarded to InboxRow: smart inbox section row. */
+  inSmartSection?: boolean;
   onArchive: () => void;
 }
 
-export function SwipeableInboxRow({ item, onPress, onArchive }: Props) {
+export function SwipeableInboxRow({ item, onPress, onArchive, inSmartSection }: Props) {
   const ref = useRef<SwipeableMethods>(null);
 
   const fireArchive = () => {
@@ -71,7 +73,7 @@ export function SwipeableInboxRow({ item, onPress, onArchive }: Props) {
         <ArchiveAction onPress={fireArchive} drag={drag} />
       )}
     >
-      <InboxRow item={item} onPress={onPress} />
+      <InboxRow item={item} onPress={onPress} inSmartSection={inSmartSection} />
     </ReanimatedSwipeable>
   );
 }

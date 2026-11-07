@@ -33,6 +33,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { InboxItem } from "@multica/core/types";
 import { api } from "@/data/api";
 import { inboxKeys } from "@/data/queries/inbox";
+import { issueKeys } from "@/data/queries/issue-keys";
 import {
   refreshInboxList,
   refreshInboxUnreadSummary,
@@ -187,6 +188,27 @@ export function useArchiveCompletedInbox() {
     mutationFn: () => api.archiveCompletedInbox(),
     onSettled: () => {
       refreshInboxAfterWrite(qc, wsId);
+    },
+  });
+}
+
+/**
+ * One-tap answer to a smart-inbox signal (contango patch 18). Not optimistic:
+ * the post is a confirmation flow, and the server decides (404/409) whether
+ * the reply is still offered. On settle, refresh the inbox (the signal and
+ * the card's other entries are archived server-side) and the card's thread,
+ * which gained the reader's comment. Mirrors useReplyToSignal in
+ * packages/core/inbox/mutations.ts.
+ */
+export function useReplyToSignal() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  return useMutation({
+    mutationFn: (vars: { id: string; issueId: string; index: number; content: string }) =>
+      api.replyToInboxSignal(vars.id, vars.index, vars.content),
+    onSettled: (_data, _err, vars) => {
+      refreshInboxAfterWrite(qc, wsId);
+      void qc.invalidateQueries({ queryKey: issueKeys.timeline(wsId, vars.issueId) });
     },
   });
 }

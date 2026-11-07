@@ -58,6 +58,36 @@ describe("deduplicateInboxItems", () => {
   });
 });
 
+describe("deduplicateInboxItems with smart-inbox signals", () => {
+  it("shows the newest person/agent entry while keeping the newest row's identity", () => {
+    const mention = item({
+      id: "mention",
+      type: "mentioned",
+      actor_id: "agent-7",
+      created_at: "2026-06-15T08:00:00Z",
+      details: { comment_id: "c-1" },
+    });
+    const signal = item({
+      id: "signal",
+      type: "signal",
+      actor_type: "system",
+      actor_id: null,
+      read: true,
+      created_at: "2026-06-15T09:00:00Z",
+      details: { group: "decision", summary: "waiting 1 h" },
+    });
+
+    expect(deduplicateInboxItems([signal, mention])).toEqual([
+      { ...mention, id: "signal", read: true, archived: false },
+    ]);
+  });
+
+  it("shows a signal-only issue as its signal", () => {
+    const signal = item({ id: "signal", type: "signal", actor_type: "system", actor_id: null });
+    expect(deduplicateInboxItems([signal])).toEqual([signal]);
+  });
+});
+
 describe("getInboxDisplayTitle", () => {
   it("uses the same stable quota title as web instead of backend fallback copy", () => {
     expect(
@@ -95,6 +125,15 @@ describe("getInboxNavigationTarget", () => {
     ).toEqual({
       pathname: "/[workspace]/inbox/[id]",
       params: { workspace: "acme", id: "inbox-1" },
+    });
+  });
+
+  it("opens a signal's brief in the inbox sheet even when it has an issue", () => {
+    expect(
+      getInboxNavigationTarget(item({ id: "sig", type: "signal" }), "acme", "history-1"),
+    ).toEqual({
+      pathname: "/[workspace]/inbox/[id]",
+      params: { workspace: "acme", id: "sig" },
     });
   });
 

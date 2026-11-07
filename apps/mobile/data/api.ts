@@ -541,6 +541,20 @@ class ApiClient {
     return this.fetch<InboxItem>(`/api/inbox/${id}/read`, { method: "POST" });
   }
 
+  /**
+   * One-tap answer to a smart-inbox signal (contango patch 18): the server
+   * posts the reply at `index` on the signal's issue as the reader and
+   * archives the signal issue-wide. 404: not the reader's item; 409: the
+   * reply changed or the ask closed. The `{comment, item}` body is unused:
+   * the caller refreshes the inbox and the issue timeline instead.
+   */
+  async replyToInboxSignal(id: string, index: number, content: string): Promise<void> {
+    await this.fetch<unknown>(`/api/inbox/${id}/signal-reply`, {
+      method: "POST",
+      body: JSON.stringify({ index, content }),
+    });
+  }
+
   // Archive endpoints — write surface. Match web's surface in
   // packages/core/api/client.ts:981-1003. No parseWithFallback (mirrors
   // markInboxRead above and the project write endpoints): a malformed

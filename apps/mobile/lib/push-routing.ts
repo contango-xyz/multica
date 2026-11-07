@@ -49,6 +49,10 @@ export function pushTarget(data: PushData): PushTarget {
   if (data.kind === "chat") {
     return { pathname: "/[workspace]/chat", params: { workspace }, chatSessionId: data.session_id };
   }
+  // A signal's push opens its brief, like tapping its row.
+  if (data.type === "signal") {
+    return { pathname: "/[workspace]/inbox/[id]", params: { workspace, id: data.item_id } };
+  }
   if (data.issue_id) {
     return {
       pathname: "/[workspace]/issue/[id]",

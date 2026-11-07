@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { router } from "expo-router";
 import Inbox from "@/app/(app)/[workspace]/(tabs)/inbox";
 
-const state = vi.hoisted(() => ({ rows: [] as InboxItem[], markRead: vi.fn() }));
+const state = vi.hoisted(() => ({ rows: [] as InboxItem[], markRead: vi.fn(), smartInbox: false }));
 vi.mock("react", async (importOriginal) => ({
   ...await importOriginal<typeof import("react")>(),
   useMemo: (create: () => unknown) => create(),
   useCallback: (callback: unknown) => callback,
 }));
 vi.mock("react-native", () => ({
-  ActionSheetIOS: {}, Alert: {}, FlatList: "FlatList", View: "View",
+  ActionSheetIOS: {}, Alert: {}, FlatList: "FlatList", SectionList: "SectionList", View: "View",
 }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));
@@ -35,6 +35,11 @@ vi.mock("@/data/workspace-store", () => ({
     currentWorkspaceId: "workspace-1", currentWorkspaceSlug: "acme",
   }),
 }));
+vi.mock("@/data/auth-store", () => ({
+  useAuthStore: (selector: (value: unknown) => unknown) => selector({
+    user: { id: "member-1", smart_inbox: state.smartInbox },
+  }),
+}));
 vi.mock("@/lib/use-color-scheme", () => ({ useColorScheme: () => ({ colorScheme: "light" }) }));
 vi.mock("@/lib/theme", () => ({ THEME: { light: { mutedForeground: "gray" } } }));
 vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (key: string) => key }) }));
@@ -47,7 +52,10 @@ vi.mock("@/components/ui/app-header-actions", () => ({ HeaderActions: "HeaderAct
 vi.mock("@/components/inbox/swipeable-inbox-row", () => ({ SwipeableInboxRow: "SwipeableInboxRow" }));
 
 describe("Inbox navigation wiring", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.smartInbox = false;
+  });
 
   it.each([true, false])("reads the whole issue before navigation when the latest row read=%s", (read) => {
     const comment: InboxItem = {
@@ -73,5 +81,38 @@ describe("Inbox navigation wiring", () => {
       params: expect.objectContaining({ workspace: "acme", id: "issue-1" }),
     }));
     expect(state.markRead.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(router.push).mock.invocationCallOrder[0]!);
+  });
+
+  it("lists signals in ranked sections and opens a signal's brief when the server flag is on", () => {
+    state.smartInbox = true;
+    const base = {
+      workspace_id: "workspace-1", recipient_type: "member" as const, recipient_id: "member-1",
+      body: null, issue_status: null, archived: false,
+    };
+    const signal: InboxItem = {
+      ...base, id: "sig", actor_type: "system", actor_id: null, type: "signal",
+      severity: "action_required", issue_id: "issue-1", title: "Approve merge #12", read: false,
+      created_at: "2026-06-15T08:00:00Z",
+      details: { key: "k", group: "merge", summary: "blocks 2 cards" } as InboxItem["details"],
+    };
+    const comment: InboxItem = {
+      ...base, id: "comment", actor_type: "agent", actor_id: "agent-1", type: "new_comment",
+      severity: "info", issue_id: "issue-2", title: "Other", read: true,
+      created_at: "2026-06-15T09:00:00Z", details: null,
+    };
+    state.rows = [comment, signal];
+
+    const list = Inbox().props.children[1];
+    expect(list.type).toBe("SectionList");
+    expect(list.props.sections.map((section: { id: string }) => section.id)).toEqual(["merge", "fyi"]);
+    const row = list.props.renderItem({ item: list.props.sections[0].data[0] });
+    expect(row.props.inSmartSection).toBe(true);
+    row.props.onPress();
+
+    expect(state.markRead).toHaveBeenCalledExactlyOnceWith("sig");
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/[workspace]/inbox/[id]",
+      params: { workspace: "acme", id: "sig" },
+    });
   });
 });

@@ -17,6 +17,7 @@ import { ActorAvatar } from "@/components/ui/actor-avatar";
 import { StatusIcon } from "@/components/ui/status-icon";
 import { InboxDetailLabel } from "@/components/inbox/detail-label";
 import { getInboxDisplayTitle } from "@/lib/inbox-display";
+import { signalSince } from "@/lib/smart-inbox";
 import { useIssueStatuses } from "@/lib/use-issue-statuses";
 import { timeAgo } from "@/lib/time-ago";
 import { cn } from "@/lib/utils";
@@ -24,14 +25,30 @@ import { cn } from "@/lib/utils";
 interface Props {
   item: InboxItem;
   onPress: () => void;
+  /**
+   * Smart inbox section row: a signal's line 2 is its summary alone (the
+   * section header names the group) and its time is the wait (rank.since).
+   */
+  inSmartSection?: boolean;
 }
 
-export function InboxRow({ item, onPress }: Props) {
+export function InboxRow({ item, onPress, inSmartSection = false }: Props) {
   const isUnread = !item.read;
   const { categoryOf, colorOf, iconOf } = useIssueStatuses();
   const displayTitle = getInboxDisplayTitle(item);
-  const actorType = item.actor_type ?? item.recipient_type;
-  const actorId = item.actor_id ?? item.recipient_id;
+  const isSignal = item.type === "signal";
+  // A signal is raised by the system, never a person. Old rows carry no
+  // actor, which used to fall back to the reader's own avatar. A Smart row
+  // that folded in a mention carries the tagger instead (mirrors web's
+  // InboxListItem).
+  const signalTagger =
+    isSignal &&
+    (item.actor_type === "agent" || item.actor_type === "member") &&
+    item.actor_id &&
+    item.actor_id !== item.recipient_id;
+  const actorType = isSignal && !signalTagger ? "system" : (item.actor_type ?? item.recipient_type);
+  const actorId = isSignal && !signalTagger ? "" : (item.actor_id ?? item.recipient_id);
+  const time = inSmartSection && isSignal ? signalSince(item) : item.created_at;
 
   return (
     <Pressable onPress={onPress} className="bg-background active:bg-secondary px-4 py-3">
@@ -79,6 +96,7 @@ export function InboxRow({ item, onPress }: Props) {
             <View className="flex-1 min-w-0">
               <InboxDetailLabel
                 item={item}
+                signalGroup={!inSmartSection}
                 className={
                   isUnread
                     ? "text-muted-foreground"
@@ -94,7 +112,7 @@ export function InboxRow({ item, onPress }: Props) {
                   : "text-muted-foreground/60",
               )}
             >
-              {timeAgo(item.created_at)}
+              {timeAgo(time)}
             </Text>
           </View>
         </View>

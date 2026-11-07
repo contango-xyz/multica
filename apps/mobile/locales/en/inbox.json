@@ -81,5 +81,38 @@
   "body": {
     "autopilot_title_limit": "Autopilot \"{{title}}\" was not started because this workspace has reached its limit of {{limit}} runs for the current period. The allowance resets {{resetAt}}.",
     "autopilot_limit": "This workspace has reached its limit of {{limit}} autopilot runs for the current period. This execution was not started. The allowance resets {{resetAt}}."
+  },
+  "smart": {
+    "sections": {
+      "merge": "Merge approvals",
+      "decision": "Decisions",
+      "access": "Access & funding",
+      "stalled": "Stalled",
+      "blocking": "Blocking others",
+      "alert": "Alerts",
+      "mentions": "Mentions & reviews",
+      "fyi": "FYI"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "none": "No priority"
+    },
+    "blocks_one": "blocks {{count}}",
+    "blocks_other": "blocks {{count}}",
+    "open_issue": "Open issue",
+    "open_card": "Open {{card}}",
+    "reply": {
+      "confirm_title": "Post “{{content}}”?",
+      "confirm_title_on": "Post “{{content}}” on {{card}}?",
+      "confirm_description": "It is posted as your reply to the ask, as if you typed it.",
+      "confirm": "Post",
+      "cancel": "Cancel",
+      "failed": "Could not post the reply",
+      "gone": "This ask is no longer in your inbox.",
+      "changed": "This ask changed. Pull to refresh and try again."
+    }
   }
 }
