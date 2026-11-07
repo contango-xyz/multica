@@ -1024,7 +1024,7 @@ multica autopilot update <id> --clear-subscribers
 multica autopilot delete <id>
 ```
 
-`--mode` accepts `create_issue` (creates a new issue on each run and assigns it to the agent) or `run_only` (enqueues a direct agent task without creating an issue). `--agent` accepts either a name or UUID.
+`--mode` accepts `create_issue` (creates a new issue on each run and assigns it to the agent), `run_only` (enqueues a direct agent task without creating an issue) or `job` (an ops job: no agent; see below). `--execution-mode` is an alias. `--agent` accepts either a name or UUID; a `job` takes `--job-name` instead.
 `--subscriber` accepts a workspace member name or user ID and may be repeated; on update it replaces the autopilot's subscriber template. Subscribers receive inbox notifications for issues created by a `create_issue` autopilot. Use `--clear-subscribers` to remove all autopilot subscribers.
 
 ### Manual Trigger
@@ -1033,8 +1033,8 @@ multica autopilot delete <id>
 multica autopilot trigger <id>            # Fires the autopilot once, returns the run
 ```
 
-The command exits non-zero unless the run actually started (`issue_created` or
-`running`). A `skipped` run — admission refused, runtime offline, quota
+The command exits non-zero unless the run actually started (`issue_created`,
+`running`, or `pending` for an ops job). A `skipped` run — admission refused, runtime offline, quota
 exhausted, a duplicate already in flight — dispatched nothing; its
 `failure_reason` and `reason_code` are printed to stderr, and `--output json`
 still writes the full run to stdout first.
@@ -1045,6 +1045,19 @@ human needs exactly the write access they would need to trigger it themselves �
 and it is the only access checked: the machine's owner needs no grant on the
 autopilot, only workspace membership. A run carrying no originator cannot
 trigger at all, and says so rather than failing generically.
+
+### Ops Jobs (contango)
+
+An autopilot with `--mode job --job-name <name>` fires without waking an agent: each fire records a
+`pending` run that an external ops runner claims and finishes. See
+[docs/contango/AUTOPILOT-JOBS.md](docs/contango/AUTOPILOT-JOBS.md).
+
+```bash
+multica autopilot create --title "PR watch" --mode job --job-name pr-watch
+multica autopilot job-runs list                       # pending runs, JSON
+multica autopilot job-runs claim <run-id>             # 409 if already claimed
+multica autopilot job-runs finish <run-id> --status succeeded --exit-code 0 --output-tail-file out.log
+```
 
 ### Run History
 

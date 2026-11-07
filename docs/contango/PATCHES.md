@@ -467,6 +467,52 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   non-string detail value blanks their mobile inbox.
 - **Drop when:** with patch 14.
 
+### 22. Autopilot ops jobs (no agent)
+
+- **What:** a third autopilot `execution_mode`, `job`, so a schedule can fire without waking an
+  agent (owner 2026-11-07: every scheduled thing, agent autopilots and the ~20 ops-box systemd timers,
+  on the autopilot page). A job autopilot has a `job_name` (`^[a-z0-9][a-z0-9-]{0,63}$`) and no
+  assignee. Firing (schedule or Run now) records a `pending` `autopilot_run` and nothing else: no
+  issue, task, wakeup, agent or quota; overlap with a pending/running run is recorded `skipped`
+  (`already_active`), a run unclaimed for 10 minutes becomes `expired` (server sweep every minute,
+  plus inline on fire/list/claim). The ops runner (claude-sandbox, separate) uses
+  `GET /api/autopilot/job-runs?status=pending`, `POST /api/autopilot/job-runs/{id}/claim` (atomic,
+  409 on a second claim) and `POST /api/autopilot/job-runs/{id}/finish` (`succeeded|failed`,
+  `exit_code`, `output_tail` ≤ 8 KiB); human credentials only (agent task tokens 403). The server
+  never runs commands: the runner maps `job_name` to its own fixed command list. CLI:
+  `multica autopilot job-runs list|claim|finish`, `autopilot create/update --mode job --job-name`
+  (`--execution-mode` alias). UI: "Ops job (no agent)" mode with a job-name field; list and detail
+  show the job name, last run, next run, and per run status, duration, exit code and a collapsible
+  monospace output tail. Spec and runner contract: [AUTOPILOT-JOBS.md](AUTOPILOT-JOBS.md).
+- **Touches:** ours: `server/internal/service/autopilot_job{,_test}.go`,
+  `server/internal/handler/autopilot_job{,_test}.go`, `server/cmd/server/autopilot_job_expirer.go`,
+  `server/cmd/server/autopilot_ops_job_test.go`, `server/pkg/db/queries/autopilot_job.sql` (+ generated),
+  `server/cmd/multica/cmd_autopilot_job{,_test}.go`,
+  `packages/views/autopilots/components/job-run-row{,.test}.tsx`,
+  `packages/views/autopilots/components/autopilot-dialog.job.test.tsx`. Upstream files:
+  `server/internal/service/autopilot.go` (job branch at the top of `dispatchAutopilot` and in
+  `DispatchAutopilotForPlan`; `shouldSkipDispatch` skips jobs on other paths; `job_name` in the rule
+  version summary), `server/internal/handler/autopilot.go` (create/update validation, `job_name` and
+  run fields in responses, webhook trigger refused on a job, execution_mode validated on update),
+  `server/pkg/db/queries/autopilot.sql` (`CreateAutopilot`/`UpdateAutopilot`: `job_name`,
+  `clear_assignee`), `server/cmd/server/{router,main}.go`, `server/cmd/migrate/main.go`
+  (concurrent-index cleanup entry), `server/cmd/multica/cmd_autopilot{,_test}.go` (mode flag,
+  `pending` counts as started), `packages/core/{types/autopilot,api/schemas,api/client}.ts`
+  (+ `schemas.test.ts`; the run list is now schema-parsed),
+  `packages/views/autopilots/components/{autopilot-dialog,autopilot-detail-page,autopilots-page,run-now-toast}.tsx`
+  (+ `autopilots-page.test.tsx`, `run-now-toast.test.ts`), `packages/views/locales/*/autopilots.json`,
+  `CLI_AND_DAEMON.md` (ops jobs section).
+- **Migrations:** `617_autopilot_job` (`autopilot.job_name`; `execution_mode` check gains `job`;
+  `assignee_id` drops NOT NULL, replaced by `autopilot_job_shape_check`: a job has a valid
+  `job_name` and no assignee, other modes an assignee and no `job_name`; `autopilot_run` status
+  check gains `pending` and `expired`; `autopilot_run.started_at`, `exit_code`, `output_tail`) and
+  `618_autopilot_run_job_active_index` (partial `(autopilot_id, triggered_at) WHERE status IN
+  ('pending','running')`, CONCURRENTLY). Numbered after upstream's highest (616), so no lint
+  exemption. The down migration deletes job autopilots (they cannot exist under the old schema).
+- **Upstream status:** none.
+- **Drop when:** upstream has autopilots that fire without an agent; until then permanent (the
+  migrations will have run in production).
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
