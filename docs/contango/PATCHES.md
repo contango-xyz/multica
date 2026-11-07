@@ -513,6 +513,28 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Drop when:** upstream has autopilots that fire without an agent; until then permanent (the
   migrations will have run in production).
 
+### 23. Passive issue properties
+
+- **What:** property names on `MULTICA_PASSIVE_PROPERTIES` (server env, comma-separated,
+  case-insensitive, matched by property name in each workspace) never count as issue activity:
+  setting or unsetting one of their values (`PUT`/`DELETE /api/issues/{id}/properties/{propertyId}`,
+  so `multica issue property set|unset` and the web) leaves `issue.updated_at` and
+  `issue.last_activity_at` as they were. The value is still stored, `revision` still bumps and
+  `issue.properties_changed` is still published, so boards show it live. Non-passive properties bump
+  as before; every API path writes one property per call, so there is no mixed single write (issue
+  create sets properties on a new row; issue update takes none). Property writes write no
+  activity-log entry either way. Empty env = upstream behaviour. Why: ops writes a "Waiting on" text
+  property on in-flight cards each minute it changes, and stall checks and settle timers read those
+  two columns (owner 2026-11-07). Not covered: an agent's `issue.properties_changed` event wakeup
+  subscription (migration 520 trigger) still fires on a passive change.
+- **Touches:** ours: `server/internal/handler/passive_property{,_test}.go`. Upstream files:
+  `server/pkg/db/queries/issue_property.sql` (`passive` arg on `SetIssuePropertyValue` and
+  `DeleteIssuePropertyValue`; + generated), `server/internal/handler/property.go` (passes it from the
+  definition name), `server/internal/handler/handler.go` (`PassiveProperties` field, read at start).
+- **Migrations:** none.
+- **Upstream status:** none.
+- **Drop when:** upstream lets a property opt out of issue activity.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
