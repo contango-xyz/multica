@@ -51,28 +51,31 @@ RETURNING *;
 -- Single-key atomic write: concurrent writers on different property keys
 -- never clobber each other. Unlike SetIssueMetadataKey, a no-op still updates
 -- and returns the issue row.
+-- passive (contango patch 23): a passive property's write still bumps revision
+-- but never counts as issue activity, so updated_at/last_activity_at stay put.
 UPDATE issue
 SET properties = jsonb_set(properties, ARRAY[sqlc.arg('key')::text], sqlc.arg('value')::jsonb, true),
     revision = revision + CASE WHEN properties -> sqlc.arg('key')::text IS DISTINCT FROM sqlc.arg('value')::jsonb THEN 1 ELSE 0 END,
     last_activity_at = CASE
-        WHEN properties -> sqlc.arg('key')::text IS DISTINCT FROM sqlc.arg('value')::jsonb
+        WHEN NOT sqlc.arg('passive')::bool AND properties -> sqlc.arg('key')::text IS DISTINCT FROM sqlc.arg('value')::jsonb
         THEN GREATEST(COALESCE(last_activity_at, updated_at), now())
         ELSE last_activity_at
     END,
-    updated_at = CASE WHEN properties -> sqlc.arg('key')::text IS DISTINCT FROM sqlc.arg('value')::jsonb THEN now() ELSE updated_at END
+    updated_at = CASE WHEN NOT sqlc.arg('passive')::bool AND properties -> sqlc.arg('key')::text IS DISTINCT FROM sqlc.arg('value')::jsonb THEN now() ELSE updated_at END
 WHERE id = sqlc.arg('id')::uuid AND workspace_id = sqlc.arg('workspace_id')::uuid
 RETURNING *;
 
 -- name: DeleteIssuePropertyValue :one
+-- passive: as SetIssuePropertyValue (contango patch 23).
 UPDATE issue
 SET properties = properties - sqlc.arg('key')::text,
     revision = revision + CASE WHEN properties ? sqlc.arg('key')::text THEN 1 ELSE 0 END,
     last_activity_at = CASE
-        WHEN properties ? sqlc.arg('key')::text
+        WHEN NOT sqlc.arg('passive')::bool AND properties ? sqlc.arg('key')::text
         THEN GREATEST(COALESCE(last_activity_at, updated_at), now())
         ELSE last_activity_at
     END,
-    updated_at = CASE WHEN properties ? sqlc.arg('key')::text THEN now() ELSE updated_at END
+    updated_at = CASE WHEN NOT sqlc.arg('passive')::bool AND properties ? sqlc.arg('key')::text THEN now() ELSE updated_at END
 WHERE id = sqlc.arg('id')::uuid AND workspace_id = sqlc.arg('workspace_id')::uuid
 RETURNING *;
 

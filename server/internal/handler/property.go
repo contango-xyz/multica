@@ -727,6 +727,7 @@ func (h *Handler) SetIssueProperty(w http.ResponseWriter, r *http.Request) {
 			WorkspaceID: issue.WorkspaceID,
 			Key:         uuidToString(def.ID),
 			Value:       value,
+			Passive:     h.isPassiveProperty(def.Name),
 		})
 		if err != nil {
 			if isCheckViolation(err) {
@@ -777,7 +778,8 @@ func (h *Handler) DeleteIssueProperty(w http.ResponseWriter, r *http.Request) {
 	// Deleting a value is allowed even for archived definitions — cleanup
 	// must never be blocked. Unknown property ids only need to belong to the
 	// workspace; `properties - key` is a no-op when the key is absent.
-	if _, err := h.Queries.GetIssueProperty(r.Context(), db.GetIssuePropertyParams{ID: propertyID, WorkspaceID: issue.WorkspaceID}); err != nil {
+	def, err := h.Queries.GetIssueProperty(r.Context(), db.GetIssuePropertyParams{ID: propertyID, WorkspaceID: issue.WorkspaceID})
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "property not found")
 			return
@@ -792,6 +794,7 @@ func (h *Handler) DeleteIssueProperty(w http.ResponseWriter, r *http.Request) {
 			ID:          issue.ID,
 			WorkspaceID: issue.WorkspaceID,
 			Key:         uuidToString(propertyID),
+			Passive:     h.isPassiveProperty(def.Name),
 		})
 	})
 	if err != nil {

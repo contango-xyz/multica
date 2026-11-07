@@ -233,6 +233,10 @@ type Handler struct {
 	// SmartInboxEmails is the lowercase MULTICA_SMART_INBOX_EMAILS set
 	// (contango smart inbox); empty means nobody gets signals.
 	SmartInboxEmails map[string]bool
+	// PassiveProperties is the lowercase MULTICA_PASSIVE_PROPERTIES name set
+	// (contango patch 23): writes to these properties never bump
+	// issue.updated_at / last_activity_at. Empty means none.
+	PassiveProperties map[string]bool
 	// Entitlements supplies workspace-scoped commercial gates. A nil provider
 	// preserves self-hosted behavior without extra reads.
 	Entitlements entitlement.Provider
@@ -511,6 +515,7 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 	taskSvc.QuickActions = llmClient
 	h := &Handler{
 		SmartInboxEmails:             smartInboxEmailsFromEnv(),
+		PassiveProperties:            passivePropertiesFromEnv(),
 		Queries:                      queries,
 		ReadSelector:                 dbreader.NewPrimaryOnly(queries),
 		DB:                           executor,
