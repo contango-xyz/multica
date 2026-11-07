@@ -252,11 +252,11 @@ describe("dashboard", () => {
 });
 
 describe("smartInboxModeFromParam", () => {
-  it("opts in, opts out and otherwise keeps the stored mode", () => {
+  it("defaults to smart, keeps the remembered choice, and \"0\" picks classic", () => {
+    expect(smartInboxModeFromParam(null, null)).toBe("smart");
     expect(smartInboxModeFromParam("1", null)).toBe("smart");
     expect(smartInboxModeFromParam("1", "classic")).toBe("classic");
-    expect(smartInboxModeFromParam("0", "smart")).toBeNull();
     expect(smartInboxModeFromParam(null, "classic")).toBe("classic");
-    expect(smartInboxModeFromParam(null, null)).toBeNull();
+    expect(smartInboxModeFromParam("0", "smart")).toBe("classic");
   });
 });

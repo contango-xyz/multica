@@ -165,8 +165,10 @@ Archived list, grouped server-side, uses the newest non-signal row as the group'
 the shown sender. Smart is unaffected: it takes signals one by one from the raw list and groups only
 the other entries.
 
-Desktop and mobile apps are unchanged (classic only; the desktop shares the web view code but never
-sees the opt-in param). Classic rows show a signal's summary as their second line.
+**Rollout (owner 2026-11-07):** every member is on `MULTICA_SMART_INBOX_EMAILS`, and for a flagged user
+Smart is the default view on web and desktop (no URL opt-in; the header toggle switches to Classic and is
+remembered; `?smart-inbox=0` picks Classic). iOS does not render signals yet (follow-up): it shows them as
+classic rows. Classic rows show a signal's summary as their second line.
 
 ## One-tap answers (fork patch 18, owner 2026-11-06)
 Answering an ask used to mean opening the card and typing. A signal can now carry the answers

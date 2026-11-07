@@ -55,10 +55,11 @@ describe("InboxEntryPage", () => {
     expect(localStorage.getItem("multica:smart-inbox")).toBe("smart");
   });
 
-  it("is classic for enabled users who have not opted in", () => {
+  it("defaults to smart for enabled users, no opt-in needed (owner 2026-11-07)", () => {
     user = { smart_inbox: true };
     renderAt("");
-    expect(screen.getByTestId("classic")).toBeEmptyDOMElement();
+    expect(screen.getByTestId("smart")).toBeInTheDocument();
+    expect(localStorage.getItem("multica:smart-inbox")).toBeNull();
   });
 
   it("opts in from the URL, remembers it, and toggles back to classic", () => {
@@ -74,12 +75,12 @@ describe("InboxEntryPage", () => {
     expect(localStorage.getItem("multica:smart-inbox")).toBe("classic");
   });
 
-  it("forgets the opt-in on ?smart-inbox=0", () => {
+  it("picks and remembers classic on ?smart-inbox=0, keeping the toggle", () => {
     user = { smart_inbox: true };
     localStorage.setItem("multica:smart-inbox", "smart");
     renderAt("smart-inbox=0");
-    expect(screen.getByTestId("classic")).toBeEmptyDOMElement();
-    expect(localStorage.getItem("multica:smart-inbox")).toBeNull();
+    expect(screen.getByTestId("classic")).not.toBeEmptyDOMElement();
+    expect(localStorage.getItem("multica:smart-inbox")).toBe("classic");
   });
 
   it("uses Classic's two panes with smart sections from tablet width up", () => {

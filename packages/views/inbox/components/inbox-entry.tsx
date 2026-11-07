@@ -1,10 +1,11 @@
 "use client";
 
 // Chooses between the classic inbox and the contango smart inbox
-// (docs/contango/SMART-INBOX.md). The smart view needs both the server flag
-// for the current user (`user.smart_inbox`) and a client opt-in: the URL once
-// carried `?smart-inbox=1` (remembered; `?smart-inbox=0` forgets it). Anything
-// else renders the classic page unchanged.
+// (docs/contango/SMART-INBOX.md). The server flag for the current user
+// (`user.smart_inbox`) turns it on; Smart is then the default, web and desktop
+// alike (owner 2026-11-07), and the header toggle switches to Classic
+// (remembered). `?smart-inbox=0` picks Classic. Without the flag the classic
+// page renders unchanged.
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@multica/core/auth";
@@ -43,15 +44,16 @@ function writeStoredMode(mode: SmartInboxMode | null) {
   }
 }
 
-export function useSmartInboxMode(): [SmartInboxMode | null, (m: SmartInboxMode) => void] {
+export function useSmartInboxMode(): [SmartInboxMode, (m: SmartInboxMode) => void] {
   const { searchParams } = useNavigation();
   const param = searchParams.get(SMART_INBOX_URL_PARAM);
-  const [mode, setMode] = useState<SmartInboxMode | null>(() =>
+  const [mode, setMode] = useState<SmartInboxMode>(() =>
     smartInboxModeFromParam(param, readStoredMode()),
   );
   useEffect(() => {
     const next = smartInboxModeFromParam(param, readStoredMode());
-    writeStoredMode(next);
+    // Only an explicit choice is remembered, so the default can change later.
+    if (param === "0" || param === "1") writeStoredMode(next);
     setMode(next);
   }, [param]);
   const choose = (m: SmartInboxMode) => {
@@ -113,7 +115,7 @@ export function InboxEntryPage() {
   const archived = searchParams.get("view") === ARCHIVED_VIEW_PARAM;
   const isCompact = useIsCompact();
 
-  if (!enabledForUser || !mode) return <ClassicInboxPage />;
+  if (!enabledForUser) return <ClassicInboxPage />;
   const toggle = <InboxModeToggle mode={mode} onChange={setMode} />;
   if (mode === "classic") return <ClassicInboxPage headerAccessory={toggle} />;
   // Phones: the single-column list -> focused detail -> back flow. The archive

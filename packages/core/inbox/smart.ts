@@ -344,15 +344,15 @@ export const SMART_INBOX_URL_PARAM = "smart-inbox";
 export type SmartInboxMode = "smart" | "classic";
 
 /**
- * The stored mode after applying the URL param: "1" opts in (smart, or the
- * mode the user last toggled to), "0" opts out (null = not opted in). Any
- * other value keeps the stored mode.
+ * The mode to show for a user the server has the smart inbox on for. Smart is
+ * the default (owner 2026-11-07: rolled out to every member, web and desktop);
+ * the toggle's choice is remembered. "1" keeps the remembered mode (smart if
+ * none), "0" picks classic; any other value keeps the remembered mode.
  */
 export function smartInboxModeFromParam(
   param: string | null,
   stored: SmartInboxMode | null,
-): SmartInboxMode | null {
-  if (param === "1") return stored ?? "smart";
-  if (param === "0") return null;
-  return stored;
+): SmartInboxMode {
+  if (param === "0") return "classic";
+  return stored ?? "smart";
 }
