@@ -414,7 +414,7 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   the ask closes, and its updates keep an archived signal quiet). Web: the reply is the row's primary
   action and the first buttons of the signal brief. A separate field, not a new kind in `actions`:
   older clients' parser drops the whole `actions` list on an entry without a `url`, and they now just
-  never see replies. Mobile does not render signals. Owner 2026-11-06. Spec: [SMART-INBOX.md](SMART-INBOX.md).
+  never see replies. Mobile renders them since patch 21. Owner 2026-11-06. Spec: [SMART-INBOX.md](SMART-INBOX.md).
 - **Touches:** ours: `server/internal/handler/inbox_signal_reply{,_test}.go`,
   `packages/views/inbox/components/signal-reply-button{,.test}.tsx`; patch 14 files:
   `server/internal/handler/inbox_signal.go`, `packages/core/inbox/smart{,.test}.ts`,
@@ -437,6 +437,35 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Migrations:** none.
 - **Upstream status:** none (worth offering upstream: it affects their desktop app too).
 - **Drop when:** upstream stops redirecting a restored archived selection.
+
+### 21. Smart inbox signals on iOS
+
+- **What:** the iOS app renders smart-inbox signals, so the smart inbox can be on for every member on
+  every client (owner 2026-11-07). First a fix: mobile's inbox schema typed `details` as
+  `Record<string, string>`, so one signal (arrays and an object in its details) failed the whole
+  `GET /api/inbox` parse and flagged users saw an empty inbox; `details` values are now unchecked,
+  like web. Then, for users with `smart_inbox` on `/api/me`: the list is Smart's phone layout (one row
+  per card with the card's entries folded into its action signal, sections ranked by core's
+  `buildSmartSections`); a signal row shows the system mark, title, summary and wait; tapping it opens
+  a brief in the inbox sheet (body as plain text, one-tap replies with a native confirm calling
+  `POST /api/inbox/{id}/signal-reply`, link actions with card links opened in-app, Open card,
+  Archive); a signal push opens that brief. Classic grouping shows a card's newest non-signal entry,
+  as web. Not ported: the dashboard, group filter, toggle and per-minute re-rank. Spec:
+  [SMART-INBOX.md](SMART-INBOX.md) "iOS".
+- **Touches:** ours: `apps/mobile/lib/smart-inbox{,.test}.ts`,
+  `apps/mobile/components/inbox/signal-detail.tsx`. Upstream files: `apps/mobile/data/schemas.ts`
+  (`details`), `apps/mobile/data/api{,.test}.ts` (`replyToInboxSignal`),
+  `apps/mobile/data/mutations/inbox{,.test}.ts` (`useReplyToSignal`),
+  `apps/mobile/data/inbox-schema.test.ts`, `apps/mobile/lib/inbox-display{,.test}.ts` (dedup shows the
+  newest non-signal entry; signal target), `apps/mobile/lib/push-routing{,.test}.ts`,
+  `apps/mobile/components/inbox/{inbox-row,swipeable-inbox-row,detail-label}.tsx`,
+  `apps/mobile/components/inbox/inbox-screen.test.ts`, `apps/mobile/app/(app)/[workspace]/(tabs)/inbox.tsx`,
+  `apps/mobile/app/(app)/[workspace]/inbox/[id].tsx`, `apps/mobile/locales/*/inbox.json` (`smart`).
+  Reads patch 14/18's `packages/core/inbox/smart.ts`.
+- **Migrations:** none.
+- **Upstream status:** none. The `details` schema fix is worth offering upstream on its own: any
+  non-string detail value blanks their mobile inbox.
+- **Drop when:** with patch 14.
 
 ## Last rebase
 

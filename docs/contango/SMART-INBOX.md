@@ -167,8 +167,8 @@ the other entries.
 
 **Rollout (owner 2026-11-07):** every member is on `MULTICA_SMART_INBOX_EMAILS`, and for a flagged user
 Smart is the default view on web and desktop (no URL opt-in; the header toggle switches to Classic and is
-remembered; `?smart-inbox=0` picks Classic). iOS does not render signals yet (follow-up): it shows them as
-classic rows. Classic rows show a signal's summary as their second line.
+remembered; `?smart-inbox=0` picks Classic). iOS renders signals too (fork patch 21, see "iOS" below), so
+every client can show them. Classic rows show a signal's summary as their second line.
 
 ## One-tap answers (fork patch 18, owner 2026-11-06)
 Answering an ask used to mean opening the card and typing. A signal can now carry the answers
@@ -197,10 +197,36 @@ themselves: "Approve: agree" posts `agree` on the card, as a reply to the ask, f
 - **Web:** a signal's first reply is the row's primary action (instead of its first link), and its
   replies come first in the signal brief (the first one filled), then the links. Tapping one opens a
   confirmation ("Post “agree” on CTG-123?" · Post / Cancel); the dialog stays open on an error and
-  shows it. Desktop renders the same views; mobile shows no signals.
+  shows it. Desktop renders the same views; iOS confirms with a native alert (see "iOS").
 - **Feeder:** sends replies only with `MULTICA_INBOX_ONE_TAP=1` (default off: turn it on after this
   backend and web are live). Only decision asks get them (merge asks keep Open PR: merges are approved
   on GitHub), and only when the ask's `Reply with` options parse cleanly; see `inbox-signals.py`.
+
+## iOS (fork patch 21, 2026-11-07)
+- **Parsing (was a bug):** mobile's inbox schema typed `details` as string-only, so the first signal
+  (arrays in `actions`/`replies`, an object in `rank`) failed the whole list and a flagged user's iOS
+  inbox was empty. `details` values are no longer checked, like web; signals are read through core's
+  `signalDetails`.
+- **List:** with `smart_inbox: true` on `GET /api/me` (the user mobile loads at launch) the inbox is
+  Smart's phone layout: one row per card (the card's other entries fold into its action signal, as
+  `smart-fold.ts`), in sections (Merge approvals … Mentions & reviews, FYI last) ranked as on web,
+  with a header showing the label and count. A signal row is the classic row with the system mark
+  (or the tagger, when a mention folded in), its title, its summary as line 2, the wait as its time
+  and the unread dot. Swipe-to-archive and read-on-open work as for other rows. Not on iOS: the
+  Do this first / counters dashboard, the group filter, "Show N more", per-section menus, the
+  Smart/Classic toggle (flagged users always get Smart) and the per-minute re-rank (ranked as of the
+  list's last refresh). Unflagged users keep Classic, where a signal-only card shows
+  "Group · summary" and a card with a mention shows the mention (as web).
+- **Detail:** tapping a signal opens the inbox sheet with its brief: group, summary, the reason
+  (priority · blocks · wait), the body as plain text, then the one-tap replies (first one primary),
+  the link actions, "Open CTG-N" and Archive. A reply asks "Post “agree” on CTG-123?" in a native
+  alert, then calls `signal-reply`; on success the sheet closes (the server archived the card); a 404
+  says the ask is no longer in your inbox, a 409 shows the server's reason. Actions that link to a
+  card in this workspace (`https://<host>/<ws>/issues/CTG-N`) open the issue in-app; other links open
+  in the browser. Opening the brief marks the entry read.
+- **Pushes:** a signal push (`type: "signal"`) opens that signal's brief, not the issue thread.
+- Code: `apps/mobile/lib/smart-inbox.ts`, `components/inbox/signal-detail.tsx`, the inbox tab and
+  `inbox/[id]` screen, `lib/push-routing.ts`, `lib/inbox-display.ts`, `data/schemas.ts`.
 
 ## What the feeder produces (ops job, every 2 min)
 - **merge / decision / access**: each open `[NEEDS HUMAN]` ask (needs-human set) → its Responsible human; group from the ask's text (merge ask, plan/design approval, login/access/funding, other decision). Also a merge-ready PR whose approval is owned by that human (pr-watch's merge asks).
