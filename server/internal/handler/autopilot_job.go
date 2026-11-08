@@ -70,6 +70,16 @@ func jobRunHumanOnly(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// autopilotJobHumanOnly refuses agent credentials on any change to, or manual
+// fire of, a job autopilot: its job_name selects a privileged command on the
+// ops box, so an agent must not be able to schedule or start one.
+func autopilotJobHumanOnly(w http.ResponseWriter, r *http.Request, ap db.Autopilot) bool {
+	if ap.ExecutionMode != service.ExecutionModeJob {
+		return true
+	}
+	return jobRunHumanOnly(w, r)
+}
+
 // ListAutopilotJobRuns handles GET /api/autopilot/job-runs?status=pending|running.
 // Stale pending runs are expired first, so the list never offers a run the
 // claim would refuse for age.

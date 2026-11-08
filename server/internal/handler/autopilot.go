@@ -793,6 +793,9 @@ func (h *Handler) requireAutopilotActingMember(w http.ResponseWriter, r *http.Re
 // the handler must also stamp into whatever it writes, so the gate and the row
 // can never name two different people (MUL-7108).
 func (h *Handler) requireAutopilotWrite(w http.ResponseWriter, r *http.Request, ap db.Autopilot, workspaceID string) (db.Member, bool) {
+	if !autopilotJobHumanOnly(w, r, ap) {
+		return db.Member{}, false
+	}
 	member, ok := h.requireAutopilotActingMember(w, r, workspaceID, autopilotWriteRefusal)
 	if !ok {
 		return db.Member{}, false
@@ -843,6 +846,9 @@ func (h *Handler) CreateAutopilot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isJob := req.ExecutionMode == service.ExecutionModeJob
+	if isJob && !jobRunHumanOnly(w, r) {
+		return
+	}
 	jobName, ok := validateAutopilotJobFields(w, isJob, req.JobName, req.AssigneeID != "" || (req.AssigneeType != nil && *req.AssigneeType != ""))
 	if !ok {
 		return
@@ -1120,6 +1126,9 @@ func (h *Handler) UpdateAutopilot(w http.ResponseWriter, r *http.Request) {
 		params.ExecutionMode = pgtype.Text{String: *req.ExecutionMode, Valid: true}
 	}
 	nextIsJob := nextMode == service.ExecutionModeJob
+	if nextIsJob && !jobRunHumanOnly(w, r) {
+		return
+	}
 	leavingJob := prev.ExecutionMode == service.ExecutionModeJob && !nextIsJob
 	if _, ok := rawFields["description"]; ok {
 		params.Description = ptrToText(req.Description)
@@ -2451,6 +2460,9 @@ func (h *Handler) GetAutopilotRun(w http.ResponseWriter, r *http.Request) {
 // generic "no access" copy, and these two are the ones an operator can act on —
 // the CLI branches on them by code, never on the English sentence (#8078).
 func (h *Handler) requireAutopilotTriggerInvoker(w http.ResponseWriter, r *http.Request, ap db.Autopilot, workspaceID string) (pgtype.UUID, bool) {
+	if !autopilotJobHumanOnly(w, r, ap) {
+		return pgtype.UUID{}, false
+	}
 	member, ok := h.requireAutopilotActingMember(w, r, workspaceID, autopilotTriggerRefusal)
 	if !ok {
 		return pgtype.UUID{}, false

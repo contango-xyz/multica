@@ -478,7 +478,7 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   plus inline on fire/list/claim). The ops runner (claude-sandbox, separate) uses
   `GET /api/autopilot/job-runs?status=pending`, `POST /api/autopilot/job-runs/{id}/claim` (atomic,
   409 on a second claim) and `POST /api/autopilot/job-runs/{id}/finish` (`succeeded|failed`,
-  `exit_code`, `output_tail` ≤ 8 KiB); human credentials only (agent task tokens 403). The server
+  `exit_code`, `output_tail` ≤ 8 KiB); human credentials only (agent task tokens 403). Creating, changing, scheduling, firing or archiving a job autopilot is human-only too (`autopilotJobHumanOnly`): `job_name` selects a privileged ops command. The server
   never runs commands: the runner maps `job_name` to its own fixed command list. CLI:
   `multica autopilot job-runs list|claim|finish`, `autopilot create/update --mode job --job-name`
   (`--execution-mode` alias). UI: "Ops job (no agent)" mode with a job-name field; list and detail

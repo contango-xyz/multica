@@ -354,6 +354,50 @@ func TestAutopilotJobRunRefusesAgentTokens(t *testing.T) {
 	}
 }
 
+// An agent must not be able to create, change, schedule, fire or archive a job
+// autopilot: job_name selects a privileged command on the ops box.
+func TestAutopilotJobRefusesAgentWrites(t *testing.T) {
+	if testHandler == nil || testPool == nil {
+		t.Skip("database not available")
+	}
+	ap := createJobAutopilot(t, "agent-refused")
+	asAgent := func(r *http.Request) *http.Request {
+		r.Header.Set("X-Actor-Source", "task_token")
+		return r
+	}
+	onAP := func(r *http.Request) *http.Request { return asAgent(withURLParam(r, "id", ap.ID)) }
+	calls := []struct {
+		name string
+		fn   func(http.ResponseWriter, *http.Request)
+		req  *http.Request
+	}{
+		{"create", testHandler.CreateAutopilot, asAgent(newRequest("POST", "/api/autopilots", map[string]any{
+			"title": "Agent job", "execution_mode": "job", "job_name": "agent-made",
+		}))},
+		{"update", testHandler.UpdateAutopilot, onAP(newRequest("PATCH", "/x", map[string]any{"job_name": "other-job"}))},
+		{"run now", testHandler.TriggerAutopilot, onAP(newRequest("POST", "/x", nil))},
+		{"add schedule", testHandler.CreateAutopilotTrigger, onAP(newRequest("POST", "/x", map[string]any{
+			"kind": "schedule", "cron_expression": "* * * * *",
+		}))},
+		{"archive", testHandler.DeleteAutopilot, onAP(newRequest("DELETE", "/x", nil))},
+	}
+	for _, c := range calls {
+		w := httptest.NewRecorder()
+		c.fn(w, c.req)
+		if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "human actors") {
+			t.Errorf("%s with a task token: want 403 human-only, got %d: %s", c.name, w.Code, w.Body.String())
+		}
+	}
+	var runs, active int
+	testPool.QueryRow(context.Background(), `SELECT count(*) FROM autopilot_run WHERE autopilot_id = $1`, ap.ID).Scan(&runs)
+	testPool.QueryRow(context.Background(), `SELECT count(*) FROM autopilot WHERE id = $1 AND status = 'active' AND job_name = 'agent-refused'`, ap.ID).Scan(&active)
+	if runs != 0 || active != 1 {
+		t.Fatalf("refused calls changed the autopilot: runs=%d active=%d", runs, active)
+	}
+	// A member still can.
+	runNow(t, ap.ID)
+}
+
 func TestAutopilotJobRunUnknownAndAgentRuns404(t *testing.T) {
 	if testHandler == nil || testPool == nil {
 		t.Skip("database not available")
