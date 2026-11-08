@@ -549,6 +549,21 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none. The signal key is ours (patch 14); the failed-lookup path is patch 20's.
 - **Drop when:** with patches 14 and 20.
 
+### 25. "Waiting on" line on board cards and list rows
+
+- **What:** board cards (board and swimlane views) and list rows show the issue's "Waiting on" custom property as one
+  truncated line, with the full text on hover. The property is found by name in the workspace's property list. The
+  line is hidden while the value is empty or the issue has a running or queued task, the same test as the agent
+  activity badge. A line starting with `⚠` uses the warning colour and icon. Values arrive live through the existing
+  `issue_properties:changed` handling. Why: at a glance, why a card has nothing happening (owner 2026-11-08). The ops
+  job that writes the value is `team/waiting-on.py`. The table view is not covered.
+- **Touches:** ours: `packages/views/issues/components/issue-waiting-on{,.test}.tsx`. Upstream files:
+  `packages/views/issues/components/board-card.tsx`, `packages/views/issues/components/list-row.tsx` (one line each,
+  plus the import).
+- **Migrations:** none.
+- **Upstream status:** none.
+- **Drop when:** upstream shows a chosen custom property on idle cards, or the "Waiting on" job goes away.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

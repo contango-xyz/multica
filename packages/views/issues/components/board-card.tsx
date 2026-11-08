@@ -31,6 +31,7 @@ import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
 import { CustomStatusChip, useIsCustomStatus } from "./custom-status-chip";
 import { IssueDuplicateOfMarker } from "./issue-duplicates";
 import { IssueDependencyMarker } from "./issue-dependencies";
+import { IssueWaitingOn } from "./issue-waiting-on";
 import { useIssueSurfaceActionsOptional } from "../surface/actions-context";
 import {
   PEEK_TARGET_ATTR,
@@ -225,6 +226,8 @@ export const BoardCardContent = memo(function BoardCardContent({
           </p>
         );
       })()}
+
+      <IssueWaitingOn issue={issue} className="mt-1 flex max-w-full" />
 
       {/* Chip row: status + project + labels + custom property values.
           The status chip renders only for a CUSTOM status — the column header
