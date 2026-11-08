@@ -665,6 +665,8 @@ reassigned AS (
     WHERE agent_id = @agent_id
       AND status IN ('queued', 'deferred')
       AND runtime_id IS DISTINCT FROM @new_runtime_id
+      -- A run pinned to a seat (contango patch 29) must not follow the agent.
+      AND context->'run_override' IS NULL
       AND (SELECT ok FROM fence)
     RETURNING id
 )
@@ -757,6 +759,15 @@ SELECT atq.* FROM agent_task_queue atq
 JOIN agent a ON a.id = atq.agent_id
 WHERE atq.id = $1 AND a.workspace_id = $2;
 
+-- name: HasQueuedPinnedTask :one
+-- Whether this agent has a queued run pinned to a runtime it is not bound to
+-- (contango patch 29), so the claim's early rebind check lets it through.
+SELECT EXISTS (
+    SELECT 1 FROM agent_task_queue
+    WHERE agent_id = @agent_id AND runtime_id = @runtime_id AND status = 'queued'
+      AND context->'run_override' IS NOT NULL
+)::bool AS pinned;
+
 -- name: ClaimAgentTask :one
 -- Claims the next queued task for an agent on one healthy runtime, enforcing
 -- per-(issue, agent) serialization:
@@ -784,7 +795,8 @@ WHERE id = (
           JOIN agent_runtime r ON r.id = atq.runtime_id
           WHERE a.id = atq.agent_id
             -- A task's persisted runtime is not authority after an agent rebind.
-            AND a.runtime_id = atq.runtime_id
+            -- A pinned run (context.run_override) stays on the seat it was started on.
+            AND (a.runtime_id = atq.runtime_id OR atq.context->'run_override' IS NOT NULL)
             -- Queued private-runtime rows are claimable so the handler can
             -- settle an owner mismatch through the existing FailTask path
             -- before daemon delivery. Public runtimes remain shareable across
@@ -902,7 +914,8 @@ WHERE id = (
           FROM agent a
           JOIN agent_runtime r ON r.id = atq.runtime_id
           WHERE a.id = atq.agent_id
-            AND a.runtime_id = atq.runtime_id
+            -- A pinned run (context.run_override) stays on the seat it was started on.
+            AND (a.runtime_id = atq.runtime_id OR atq.context->'run_override' IS NOT NULL)
             AND (
                 r.visibility = 'public'
                 OR (
@@ -949,7 +962,8 @@ WITH candidates AS MATERIALIZED (
           FROM agent a
           JOIN agent_runtime r ON r.id = atq.runtime_id
           WHERE a.id = atq.agent_id
-            AND a.runtime_id = atq.runtime_id
+            -- A pinned run (context.run_override) stays on the seat it was started on.
+            AND (a.runtime_id = atq.runtime_id OR atq.context->'run_override' IS NOT NULL)
             AND (
                 r.visibility = 'public'
                 OR (
@@ -1079,6 +1093,9 @@ WITH retired_sessions AS (
       AND COALESCE(t.context->>'type', '') <> 'triage'
       AND t.session_id IS NOT NULL
       AND t.status IN ('completed', 'failed', 'cancelled')
+      -- A pinned run's session stays out of the agent's own conversation;
+      -- only a retry of a pinned run (also pinned) may continue it.
+      AND (t.context->'run_override' IS NULL OR @include_pinned::bool)
     ORDER BY t.session_id, COALESCE(t.completed_at, t.started_at, t.dispatched_at, t.created_at) DESC
 )
 -- status, started_at and issue_snapshot ride along because the row this query
@@ -1331,7 +1348,7 @@ RETURNING *;
 -- the update so concurrent claims cannot be overwritten.
 WITH victims AS (
     SELECT id FROM agent_task_queue
-    WHERE status = 'queued' AND context->>'wakeup_id' IS NULL
+    WHERE status = 'queued' AND (context->>'wakeup_id' IS NULL OR context->'run_override' IS NOT NULL)
       AND created_at < now() - make_interval(secs => @reconnect_grace_secs::double precision)
       AND (
           runtime_id IS NULL
@@ -2189,7 +2206,8 @@ WHERE atq.runtime_id = $1
       FROM agent a
       JOIN agent_runtime r ON r.id = atq.runtime_id
       WHERE a.id = atq.agent_id
-        AND a.runtime_id = atq.runtime_id
+        -- A pinned run (context.run_override) stays on the seat it was started on.
+        AND (a.runtime_id = atq.runtime_id OR atq.context->'run_override' IS NOT NULL)
         AND (
             r.visibility = 'public'
             OR r.visibility = 'private'
@@ -2310,7 +2328,8 @@ WHERE atq.runtime_id = ANY(@runtime_ids::uuid[])
       FROM agent a
       JOIN agent_runtime r ON r.id = atq.runtime_id
       WHERE a.id = atq.agent_id
-        AND a.runtime_id = atq.runtime_id
+        -- A pinned run (context.run_override) stays on the seat it was started on.
+        AND (a.runtime_id = atq.runtime_id OR atq.context->'run_override' IS NOT NULL)
         AND (
             r.visibility = 'public'
             OR r.visibility = 'private'

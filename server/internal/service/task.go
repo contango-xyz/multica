@@ -3647,10 +3647,19 @@ func (s *TaskService) claimTask(ctx context.Context, agentID, runtimeID pgtype.U
 		// before its state transition; the claim handler then rechecks the freshly
 		// loaded Agent before returning any payload. Runtime mutation paths settle
 		// the remaining queued rows: teardown and revocation cancel them, and
-		// UpdateAgent re-stamps them to the new runtime.
+		// UpdateAgent re-stamps them to the new runtime. A run pinned to this
+		// runtime (contango patch 29) is the one case where the agent is
+		// deliberately bound elsewhere; ClaimAgentTask admits only pinned rows.
 		if runtimeID.Valid && agent.RuntimeID != runtimeID {
-			outcome = "runtime_mismatch"
-			return nil
+			pinned, err := qtx.HasQueuedPinnedTask(ctx, db.HasQueuedPinnedTaskParams{AgentID: agentID, RuntimeID: runtimeID})
+			if err != nil {
+				outcome = "error_get_agent"
+				return fmt.Errorf("check pinned tasks: %w", err)
+			}
+			if !pinned {
+				outcome = "runtime_mismatch"
+				return nil
+			}
 		}
 
 		t0 = time.Now()

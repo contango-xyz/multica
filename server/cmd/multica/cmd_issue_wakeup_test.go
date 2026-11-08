@@ -39,6 +39,33 @@ func TestIssueWakeupCLIPreservesInstructionAndDuration(t *testing.T) {
 	}
 }
 
+func TestIssueWakeupNowSendsRunOverrideFlags(t *testing.T) {
+	t.Chdir(t.TempDir())
+	const issue = "a57c0511-1ebc-471d-a314-438ca16cc75d"
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/api/issues/"+issue+"/wakeups/now" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"wakeup_id": "wake", "outcome": "queued"})
+	}))
+	defer srv.Close()
+	t.Setenv("MULTICA_SERVER_URL", srv.URL)
+	t.Setenv("MULTICA_WORKSPACE_ID", "ws-1")
+	t.Setenv("MULTICA_TOKEN", "test-token")
+	cmd := newIssueWakeupCommand()
+	cmd.SetArgs([]string{"now", issue, "--agent-id", "agent-1", "--instruction", "audit", "--runtime-id", "rt-1", "--model", "gpt-5.5", "--thinking-level", "xhigh"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if body["runtime_id"] != "rt-1" || body["model"] != "gpt-5.5" || body["thinking_level"] != "xhigh" || body["agent_id"] != "agent-1" {
+		t.Fatalf("unexpected body %+v", body)
+	}
+}
+
 func TestIssueWakeupCreateRetriesOnlyRolledBackSourceConflict(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

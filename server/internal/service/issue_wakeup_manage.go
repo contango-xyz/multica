@@ -76,6 +76,11 @@ func (s *IssueWakeupService) Trigger(ctx context.Context, issueID, id, member pg
 	if w.DisabledAt.Valid {
 		return fmt.Errorf("%w: turn the wakeup on first", ErrWakeupInput)
 	}
+	// A pinned run's seat was approved once; firing it again would let an agent
+	// reuse that seat. Start a new run with `wakeup now` instead.
+	if len(w.RunOverride) > 0 {
+		return ErrWakeupForbidden
+	}
 	agent, err := q.GetAgentInWorkspace(ctx, db.GetAgentInWorkspaceParams{ID: w.AgentID, WorkspaceID: w.WorkspaceID})
 	if err != nil {
 		return ErrWakeupForbidden

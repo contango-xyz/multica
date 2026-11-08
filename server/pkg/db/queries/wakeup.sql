@@ -1,6 +1,6 @@
 -- name: CreateIssueWakeup :one
-INSERT INTO issue_wakeup(id,workspace_id,issue_id,agent_id,created_by,source_task_id,parent_comment_id,instruction,kind,mode,event_types,filter_agent_id,filter_task_id,filter_actor_type,filter_actor_id,interval_seconds,cron_expression,timezone,next_fire_at,expires_at,expiry_seconds,on_timeout,condition,max_fires,hidden)
-VALUES(@id,@workspace_id,@issue_id,@agent_id,@created_by,sqlc.narg(source_task_id),sqlc.narg(parent_comment_id),@instruction,@kind,@mode,@event_types,sqlc.narg(filter_agent_id),sqlc.narg(filter_task_id),sqlc.narg(filter_actor_type),sqlc.narg(filter_actor_id),sqlc.narg(interval_seconds),sqlc.narg(cron_expression),@timezone,sqlc.narg(next_fire_at),sqlc.narg(expires_at),sqlc.narg(expiry_seconds),sqlc.narg(on_timeout),sqlc.narg(condition),sqlc.narg(max_fires),@hidden) RETURNING *;
+INSERT INTO issue_wakeup(id,workspace_id,issue_id,agent_id,created_by,source_task_id,parent_comment_id,instruction,kind,mode,event_types,filter_agent_id,filter_task_id,filter_actor_type,filter_actor_id,interval_seconds,cron_expression,timezone,next_fire_at,expires_at,expiry_seconds,on_timeout,condition,max_fires,hidden,run_override)
+VALUES(@id,@workspace_id,@issue_id,@agent_id,@created_by,sqlc.narg(source_task_id),sqlc.narg(parent_comment_id),@instruction,@kind,@mode,@event_types,sqlc.narg(filter_agent_id),sqlc.narg(filter_task_id),sqlc.narg(filter_actor_type),sqlc.narg(filter_actor_id),sqlc.narg(interval_seconds),sqlc.narg(cron_expression),@timezone,sqlc.narg(next_fire_at),sqlc.narg(expires_at),sqlc.narg(expiry_seconds),sqlc.narg(on_timeout),sqlc.narg(condition),sqlc.narg(max_fires),@hidden,sqlc.narg(run_override)) RETURNING *;
 -- name: ListIssueWakeups :many
 SELECT w.id,w.workspace_id,w.issue_id,w.agent_id,w.created_by,w.source_task_id,w.parent_comment_id,w.instruction,
  w.kind,w.mode,w.event_types,w.filter_actor_type,
@@ -298,6 +298,15 @@ WHERE w.workspace_id= @workspace_id AND NOT w.enabled AND NOT w.hidden AND w.pau
  AND NOT EXISTS(SELECT 1 FROM issue_status s WHERE s.workspace_id=i.workspace_id AND s.key=i.status AND s.category IN ('done','closed'))
 ORDER BY w.updated_at DESC LIMIT 200;
 
+-- name: HasUnstartedIssueRunOfAgent :one
+-- Any run of the agent on the issue that has not started, regardless of who it
+-- runs as. A pinned run is refused when one exists: joining it would run the
+-- instruction on another seat, and an extra queued row breaks the pending slot.
+SELECT EXISTS (
+    SELECT 1 FROM agent_task_queue
+    WHERE issue_id = @issue_id AND agent_id = @agent_id AND status IN ('queued', 'dispatched', 'deferred')
+)::bool AS waiting;
+
 -- name: FindWaitingIssueRun :one
 -- A run of the agent on the issue that has not been claimed and runs as this
 -- person. A rule that fires meanwhile keeps its inputs for that run instead
@@ -310,7 +319,7 @@ SELECT id FROM agent_task_queue WHERE issue_id= @issue_id AND agent_id= @agent_i
 -- agent's own rules and the platform's. Read without locks; each one is
 -- locked and checked again before it joins.
 SELECT w.id FROM issue_wakeup w
-WHERE w.issue_id= @issue_id AND (w.agent_id= @agent_id OR w.system_rule IS NOT NULL) AND w.disabled_at IS NULL
+WHERE w.issue_id= @issue_id AND (w.agent_id= @agent_id OR w.system_rule IS NOT NULL) AND w.disabled_at IS NULL AND w.run_override IS NULL
  AND EXISTS(SELECT 1 FROM issue_wakeup_receipt r WHERE r.wakeup_id=w.id AND r.revision=w.revision AND r.processed_at IS NULL
   AND (w.condition IS NULL OR r.event_type IN ('condition.met','wakeup.timeout','wakeup.manual')))
 ORDER BY w.created_at,w.id;

@@ -707,6 +707,10 @@ func ValidateThinkingLevelWith(loadCatalog func() (Catalog, error), providerType
 type ThinkingLevelCheck struct {
 	Valid  bool
 	Reason string
+	// ModelUnknown marks a rejection only because the model is absent from the
+	// catalog, so a caller with a possibly stale catalog can leave the verdict
+	// to the daemon's live check.
+	ModelUnknown bool
 }
 
 // CheckThinkingLevelWith also explains a rejected level so the daemon can
@@ -761,7 +765,7 @@ func CheckThinkingLevelWith(loadCatalog func() (Catalog, error), providerType, m
 				}
 				return ThinkingLevelCheck{Reason: "no discovered model supports this thinking level"}, nil
 			}
-			return ThinkingLevelCheck{Reason: "the runtime's default model could not be resolved"}, nil
+			return ThinkingLevelCheck{Reason: "the runtime's default model could not be resolved", ModelUnknown: true}, nil
 		}
 	}
 	if providerType == "claude" {
@@ -798,7 +802,7 @@ func CheckThinkingLevelWith(loadCatalog func() (Catalog, error), providerType, m
 	if providerType == "claude" && model != "" && !strings.ContainsAny(target, "[]") {
 		return ThinkingLevelCheck{}, fmt.Errorf("%w for model %q; cannot validate claude thinking level %q", errUnverifiedCatalog, model, value)
 	}
-	return ThinkingLevelCheck{Reason: fmt.Sprintf("model %q was not found in the runtime catalog", target)}, nil
+	return ThinkingLevelCheck{Reason: fmt.Sprintf("model %q was not found in the runtime catalog", target), ModelUnknown: true}, nil
 }
 
 // errUnverifiedCatalog means the catalog cannot establish the capability,

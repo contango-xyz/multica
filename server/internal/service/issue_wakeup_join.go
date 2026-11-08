@@ -172,7 +172,9 @@ type joinedWakeup struct {
 // changed or no longer allowed since then drops out and gets its inputs back.
 // A rule another writer holds keeps what it had.
 func (s *IssueWakeupService) JoinWaitingWakeups(ctx context.Context, task db.AgentTaskQueue) ([]byte, error) {
-	if !task.IssueID.Valid || !task.OriginatorUserID.Valid || task.Status != "dispatched" {
+	// A pinned run takes nothing along: work of the agent's own must not run on
+	// the pinned seat. Those rules keep their inputs and run after it.
+	if !task.IssueID.Valid || !task.OriginatorUserID.Valid || task.Status != "dispatched" || TaskRunPinned(task) {
 		return task.Context, nil
 	}
 	var stored struct {

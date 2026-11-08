@@ -1112,6 +1112,7 @@ type IssueWakeup struct {
 	FireCount       int32              `json:"fire_count"`
 	PausedReason    pgtype.Text        `json:"paused_reason"`
 	Hidden          bool               `json:"hidden"`
+	RunOverride     []byte             `json:"run_override"`
 }
 
 type IssueWakeupReceipt struct {

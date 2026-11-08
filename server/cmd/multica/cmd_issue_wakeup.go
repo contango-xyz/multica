@@ -94,6 +94,10 @@ func newIssueWakeupCommand() *cobra.Command {
 	now.Flags().String("instruction", "", "Instruction for the run")
 	now.Flags().String("instruction-file", "", "Read instruction from a UTF-8 file")
 	now.Flags().String("parent", "", "Comment thread for result delivery")
+	now.Flags().String("runtime-id", "", "Run on this runtime (seat) for this run only; the run stays there and never moves to another seat")
+	now.Flags().String("model", "", "Use this model for this run only")
+	now.Flags().String("thinking-level", "", "Use this reasoning effort for this run only")
+	now.Long += " With --runtime-id, --model or --thinking-level the run is pinned: it starts a fresh session, stays on its seat, and the agent's own settings and other runs are unchanged. It is refused (409) if the seat is offline or a run of the agent on the issue has not started yet, and fails rather than move to another seat. Human credentials only; agents cannot use these flags."
 	wake.AddCommand(now)
 	return wake
 }
@@ -114,7 +118,7 @@ func runIssueWakeupNow(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	body := map[string]any{"instruction": instruction}
-	for flag, key := range map[string]string{"agent-id": "agent_id", "parent": "parent_comment_id"} {
+	for flag, key := range map[string]string{"agent-id": "agent_id", "parent": "parent_comment_id", "runtime-id": "runtime_id", "model": "model", "thinking-level": "thinking_level"} {
 		if v, _ := cmd.Flags().GetString(flag); v != "" {
 			body[key] = v
 		}

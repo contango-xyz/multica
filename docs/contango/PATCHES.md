@@ -633,6 +633,46 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** upstream links waited-on issues itself.
 
+### 29. Per-run seat and effort overrides
+
+- **What:** `multica issue wakeup now <issue> --agent-id <id> --instruction[-file] ... [--runtime-id <id>] [--model <m>] [--thinking-level <l>]`
+  starts one run on another seat, model or effort without touching the agent. The planners' `agent update` +
+  `placements.json` + restore moved the agent for about 3 hours, so every other run of it (including merge-gating security
+  audits) inherited the change. A request with any of the three flags makes a **pinned** run: the task's `runtime_id` holds
+  the seat, and `context.run_override` holds the final model and effort, resolved at request time (flags, else the agent's
+  value, the model cleared if it is foreign to the seat). The rule stores the same override in `issue_wakeup.run_override`
+  because a dispatch can be deferred to the scheduler.
+- **Trust:** a task's runtime is deliberately not trusted (`agent.runtime_id = task.runtime_id`). Pinned runs (`context
+  ->'run_override' IS NOT NULL`, written only by the server) pass that fence in the five SQL predicates in `agent.sql`
+  (`ClaimAgentTask`, the two `ReclaimStale*`, the two `ListQueuedClaimCandidates*`), `claimTask`'s early check (via
+  `HasQueuedPinnedTask`), and both delivery checks in `daemon.go`. The private-runtime owner checks are unchanged; ordinary
+  runs on a foreign seat stay refused. Agents can't move seats: the flags are human-credential only (the
+  `autopilotJobHumanOnly` pattern, plus the `X-Agent-ID`/`X-Task-ID` identity on a human token), the caller must be able to
+  manage the agent, and the target runtime passes `UpdateAgent`'s two checks. A pinned rule can't be retriggered, rearmed
+  or updated, so an agent can't reuse the seat.
+- **Behaviour:** fresh session (`force_fresh_session`, retries keep the seat and may resume the pinned session). The
+  `GetLastTaskSession` lookup leaves pinned sessions out, so a pinned run does not cost the agent its own next resume. The
+  re-stamp query skips pinned runs, so failover can't move them. Service tier is cleared on delivery; custom args are left
+  as they are, and provider-tied args can misfit another provider.
+- **Fail, never substitute:** offline seat or a run of the agent not started yet is refused with 409 and writes nothing;
+  a pinned run is never joined to a waiting run and takes no other rule's inputs along (`ListWaitingWakeups`,
+  `JoinWaitingWakeups`). Queued then offline: `ExpireStaleQueuedTasks` now also covers pinned wakeup runs (it exempts other
+  wakeup runs). Invalid effort is refused at request time: literal value, ACP capability, and per-model from the runtime's
+  cached catalog when one exists; a model missing from the catalog passes to the daemon's live check, so a stale catalog
+  can't block a real model. The server substitutes model and effort in `buildClaimedTaskResponse`, so no daemon or CLI
+  release is needed for the daemon side (the `multica` CLI needs this build for the flags).
+- **Off switch:** `MULTICA_RUN_OVERRIDES=0` on the server refuses the flags with 403. Queued pinned runs still run.
+- **Touches:** ours: `server/internal/service/issue_wakeup_{now,run_override_test}.go`,
+  `server/internal/handler/issue_wakeup_run_override_test.go`, `server/migrations/620_*`. Upstream files:
+  `server/internal/service/{issue_wakeup,issue_wakeup_join,issue_wakeup_manage,task}.go`,
+  `server/internal/handler/{issue_wakeup,daemon}.go`, `server/pkg/agent/thinking.go` (`ThinkingLevelCheck.ModelUnknown`),
+  `server/pkg/db/queries/{agent,wakeup}.sql` (+ generated), `server/cmd/multica/cmd_issue_wakeup{,_test}.go`,
+  `server/internal/service/builtin_skills/multica-platform/references/issues.md`.
+- **Migrations:** `620_issue_wakeup_run_override` (`ADD COLUMN run_override jsonb`, nullable, no default, no rewrite: safe
+  online; down drops it). Before rolling back the server, cancel queued pinned runs: an older server will not claim them.
+- **Upstream status:** none.
+- **Drop when:** upstream has per-run runtime and model overrides.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
