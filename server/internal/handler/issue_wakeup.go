@@ -236,6 +236,38 @@ func (h *Handler) CreateIssueWakeup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, result)
 }
 
+// WakeIssueAgentNow starts one run with an instruction and no visible rule
+// (contango patch 27). The checks are CreateIssueWakeup's.
+func (h *Handler) WakeIssueAgentNow(w http.ResponseWriter, r *http.Request) {
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	var in service.WakeupNowInput
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32768))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		writeError(w, 400, "invalid wakeup body")
+		return
+	}
+	actorType, actorID := h.resolveActor(r, requestUserID(r), uuidToString(issue.WorkspaceID))
+	if in.AgentID == "" && actorType == "agent" {
+		in.AgentID = actorID
+	}
+	originator := h.invokeOriginatorFromRequest(r, actorType, actorID)
+	if originator == "" {
+		writeError(w, 403, "a human originator is required")
+		return
+	}
+	svc := service.IssueWakeupService{Tasks: h.TaskService}
+	result, err := svc.Now(r.Context(), issue.ID, parseUUID(originator), h.wakeupSourceTaskID(r), in)
+	if err != nil {
+		wakeupError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, result)
+}
+
 func (h *Handler) DisableIssueWakeup(w http.ResponseWriter, r *http.Request) {
 	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
 	if !ok {

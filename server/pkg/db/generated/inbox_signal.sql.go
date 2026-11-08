@@ -41,7 +41,7 @@ func (q *Queries) ArchiveInboxRelatedToSignal(ctx context.Context, arg ArchiveIn
 
 const getLiveInboxSignalForUpdate = `-- name: GetLiveInboxSignalForUpdate :one
 
-SELECT id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details FROM inbox_item
+SELECT id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details, section FROM inbox_item
 WHERE workspace_id = $1
   AND recipient_type = 'member'
   AND recipient_id = $2
@@ -80,6 +80,7 @@ func (q *Queries) GetLiveInboxSignalForUpdate(ctx context.Context, arg GetLiveIn
 		&i.ActorType,
 		&i.ActorID,
 		&i.Details,
+		&i.Section,
 	)
 	return i, err
 }
@@ -94,7 +95,7 @@ INSERT INTO inbox_item (
 ON CONFLICT (workspace_id, recipient_id, (details->>'key'))
     WHERE type = 'signal' AND (details->>'resolved_at') IS NULL
 DO NOTHING
-RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details
+RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details, section
 `
 
 type InsertInboxSignalParams struct {
@@ -139,6 +140,7 @@ func (q *Queries) InsertInboxSignal(ctx context.Context, arg InsertInboxSignalPa
 		&i.ActorType,
 		&i.ActorID,
 		&i.Details,
+		&i.Section,
 	)
 	return i, err
 }
@@ -153,7 +155,7 @@ WHERE workspace_id = $1
   AND type = 'signal'
   AND details->>'key' = $3::text
   AND (details->>'resolved_at') IS NULL
-RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details
+RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details, section
 `
 
 type ResolveInboxSignalParams struct {
@@ -181,6 +183,7 @@ func (q *Queries) ResolveInboxSignal(ctx context.Context, arg ResolveInboxSignal
 		&i.ActorType,
 		&i.ActorID,
 		&i.Details,
+		&i.Section,
 	)
 	return i, err
 }
@@ -198,7 +201,7 @@ UPDATE inbox_item SET
     archived = CASE WHEN $7::bool THEN false ELSE archived END,
     created_at = CASE WHEN $7::bool THEN now() ELSE created_at END
 WHERE id = $1
-RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details
+RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details, section
 `
 
 type UpdateInboxSignalParams struct {
@@ -240,6 +243,7 @@ func (q *Queries) UpdateInboxSignal(ctx context.Context, arg UpdateInboxSignalPa
 		&i.ActorType,
 		&i.ActorID,
 		&i.Details,
+		&i.Section,
 	)
 	return i, err
 }

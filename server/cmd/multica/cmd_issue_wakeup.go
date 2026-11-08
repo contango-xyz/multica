@@ -88,7 +88,42 @@ func newIssueWakeupCommand() *cobra.Command {
 		}
 		wake.AddCommand(c)
 	}
+	now := &cobra.Command{Use: "now <issue-id>", Args: cobra.ExactArgs(1), Short: "Start one run on this issue now with an instruction", RunE: runIssueWakeupNow}
+	now.Long = "Start one agent run immediately, without a timer or a rule shown on the issue. It behaves like a wakeup that just fired: if a run of that agent is about to start on the issue, the instruction joins that run (outcome \"pending\") instead of queuing another."
+	now.Flags().String("agent-id", "", "Agent to run (defaults to authenticated agent)")
+	now.Flags().String("instruction", "", "Instruction for the run")
+	now.Flags().String("instruction-file", "", "Read instruction from a UTF-8 file")
+	now.Flags().String("parent", "", "Comment thread for result delivery")
+	wake.AddCommand(now)
 	return wake
+}
+
+func runIssueWakeupNow(cmd *cobra.Command, args []string) error {
+	client, err := newAPIClient(cmd)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := cli.APIContext(context.Background())
+	defer cancel()
+	ref, err := resolveIssueRef(ctx, client, args[0])
+	if err != nil {
+		return err
+	}
+	instruction, _, err := resolveTextFlag(cmd, "instruction")
+	if err != nil {
+		return err
+	}
+	body := map[string]any{"instruction": instruction}
+	for flag, key := range map[string]string{"agent-id": "agent_id", "parent": "parent_comment_id"} {
+		if v, _ := cmd.Flags().GetString(flag); v != "" {
+			body[key] = v
+		}
+	}
+	var result map[string]any
+	if err = client.PostJSON(ctx, "/api/issues/"+url.PathEscape(ref.ID)+"/wakeups/now", body, &result); err != nil {
+		return err
+	}
+	return cli.PrintJSON(os.Stdout, result)
 }
 
 func runIssueWakeup(cmd *cobra.Command, args []string, action string) error {

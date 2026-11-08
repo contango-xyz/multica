@@ -1,6 +1,6 @@
 -- name: CreateIssueWakeup :one
-INSERT INTO issue_wakeup(id,workspace_id,issue_id,agent_id,created_by,source_task_id,parent_comment_id,instruction,kind,mode,event_types,filter_agent_id,filter_task_id,filter_actor_type,filter_actor_id,interval_seconds,cron_expression,timezone,next_fire_at,expires_at,expiry_seconds,on_timeout,condition,max_fires)
-VALUES(@id,@workspace_id,@issue_id,@agent_id,@created_by,sqlc.narg(source_task_id),sqlc.narg(parent_comment_id),@instruction,@kind,@mode,@event_types,sqlc.narg(filter_agent_id),sqlc.narg(filter_task_id),sqlc.narg(filter_actor_type),sqlc.narg(filter_actor_id),sqlc.narg(interval_seconds),sqlc.narg(cron_expression),@timezone,sqlc.narg(next_fire_at),sqlc.narg(expires_at),sqlc.narg(expiry_seconds),sqlc.narg(on_timeout),sqlc.narg(condition),sqlc.narg(max_fires)) RETURNING *;
+INSERT INTO issue_wakeup(id,workspace_id,issue_id,agent_id,created_by,source_task_id,parent_comment_id,instruction,kind,mode,event_types,filter_agent_id,filter_task_id,filter_actor_type,filter_actor_id,interval_seconds,cron_expression,timezone,next_fire_at,expires_at,expiry_seconds,on_timeout,condition,max_fires,hidden)
+VALUES(@id,@workspace_id,@issue_id,@agent_id,@created_by,sqlc.narg(source_task_id),sqlc.narg(parent_comment_id),@instruction,@kind,@mode,@event_types,sqlc.narg(filter_agent_id),sqlc.narg(filter_task_id),sqlc.narg(filter_actor_type),sqlc.narg(filter_actor_id),sqlc.narg(interval_seconds),sqlc.narg(cron_expression),@timezone,sqlc.narg(next_fire_at),sqlc.narg(expires_at),sqlc.narg(expiry_seconds),sqlc.narg(on_timeout),sqlc.narg(condition),sqlc.narg(max_fires),@hidden) RETURNING *;
 -- name: ListIssueWakeups :many
 SELECT w.id,w.workspace_id,w.issue_id,w.agent_id,w.created_by,w.source_task_id,w.parent_comment_id,w.instruction,
  w.kind,w.mode,w.event_types,w.filter_actor_type,
@@ -24,7 +24,7 @@ LEFT JOIN member actor_member ON w.filter_actor_type='member' AND actor_member.u
 LEFT JOIN "user" actor_user ON actor_user.id=actor_member.user_id
 LEFT JOIN agent source ON source.id=w.filter_agent_id AND source.workspace_id=w.workspace_id AND source.id=ANY(@agent_ids::uuid[])
 LEFT JOIN agent_task_queue t ON t.id=w.last_task_id AND t.issue_id=w.issue_id AND t.agent_id=w.agent_id
-WHERE w.workspace_id= @workspace_id AND w.issue_id= @issue_id ORDER BY w.created_at,w.id;
+WHERE w.workspace_id= @workspace_id AND w.issue_id= @issue_id AND NOT w.hidden ORDER BY w.created_at,w.id;
 
 -- name: ListWorkspaceWakeupSummaryRows :many
 -- No prompts/history; at most three previews per issue plus exact counts.
@@ -45,7 +45,7 @@ WITH ranked AS (
 LEFT JOIN member actor_member ON w.filter_actor_type='member' AND actor_member.user_id=w.filter_actor_id AND actor_member.workspace_id=w.workspace_id
 LEFT JOIN "user" actor_user ON actor_user.id=actor_member.user_id
 LEFT JOIN agent source ON source.id=w.filter_agent_id AND source.workspace_id=w.workspace_id AND source.id=ANY(@agent_ids::uuid[])
- WHERE w.workspace_id= @workspace_id AND w.enabled
+ WHERE w.workspace_id= @workspace_id AND w.enabled AND NOT w.hidden
   AND i.status NOT IN ('done','cancelled')
   AND NOT EXISTS(SELECT 1 FROM issue_status s WHERE s.workspace_id=i.workspace_id AND s.key=i.status AND s.category IN ('done','closed'))
 )
@@ -265,6 +265,23 @@ SELECT t.id,t.status,t.created_at,t.started_at,t.completed_at,
 FROM agent_task_queue t WHERE t.context->>'wakeup_id'= @wakeup_id::text AND t.issue_id= @issue_id
 ORDER BY t.created_at DESC,t.id DESC LIMIT 10;
 
+-- name: SweepFinishedHiddenWakeups :execrows
+-- Removes "wakeup now" rules (contango patch 27) that fired and went quiet
+-- before the cutoff, with their processed receipts. The claim queries and
+-- CheckClaim need the rule of any run that can still start, so a rule stays
+-- while a run carrying its id has not ended; a retry carries the same id and
+-- is inserted with its parent's failure. Finished runs only keep the id as data.
+WITH doomed AS MATERIALIZED (
+ SELECT w.id FROM issue_wakeup w
+ WHERE w.hidden AND NOT w.enabled AND w.updated_at < @cutoff
+  AND NOT EXISTS(SELECT 1 FROM agent_task_queue t WHERE t.issue_id=w.issue_id AND t.context->>'wakeup_id'=w.id::text AND t.status NOT IN ('completed','failed','cancelled'))
+  AND NOT EXISTS(SELECT 1 FROM issue_wakeup_receipt r WHERE r.wakeup_id=w.id AND r.processed_at IS NULL)
+ ORDER BY w.updated_at LIMIT @row_limit FOR UPDATE OF w SKIP LOCKED
+), receipts AS (
+ DELETE FROM issue_wakeup_receipt r USING doomed d WHERE r.wakeup_id=d.id
+)
+DELETE FROM issue_wakeup w USING doomed d WHERE w.id=d.id;
+
 -- name: DeleteIssueWakeupReceipts :exec
 DELETE FROM issue_wakeup_receipt WHERE wakeup_id= @id;
 
@@ -276,7 +293,7 @@ DELETE FROM issue_wakeup WHERE id= @id AND issue_id= @issue_id;
 -- workspace banner. Access follows shared issue visibility.
 SELECT w.issue_id,w.id,w.agent_id,w.paused_reason
 FROM issue_wakeup w JOIN issue i ON i.id=w.issue_id AND i.workspace_id=w.workspace_id
-WHERE w.workspace_id= @workspace_id AND NOT w.enabled AND w.paused_reason IN ('loop','rate','max_fires')
+WHERE w.workspace_id= @workspace_id AND NOT w.enabled AND NOT w.hidden AND w.paused_reason IN ('loop','rate','max_fires')
  AND i.status NOT IN ('done','cancelled')
  AND NOT EXISTS(SELECT 1 FROM issue_status s WHERE s.workspace_id=i.workspace_id AND s.key=i.status AND s.category IN ('done','closed'))
 ORDER BY w.updated_at DESC LIMIT 200;

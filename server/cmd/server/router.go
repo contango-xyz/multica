@@ -2138,6 +2138,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/unread", h.MarkIssueUnread)
 					r.Get("/wakeups", h.ListIssueWakeups)
 					r.Post("/wakeups", h.CreateIssueWakeup)
+					r.Post("/wakeups/now", h.WakeIssueAgentNow)
 					r.Put("/wakeups/{wakeupID}", h.CreateIssueWakeup)
 					r.Post("/wakeups/{wakeupID}/disable", h.DisableIssueWakeup)
 					r.Post("/wakeups/{wakeupID}/enable", h.EnableIssueWakeup)

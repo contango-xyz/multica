@@ -36,7 +36,7 @@ LEFT JOIN "user" actor_user ON actor_user.id=actor_member.user_id
   WHERE t.context->>'wakeup_id'=w.id::text AND t.issue_id=w.issue_id AND t.agent_id=w.agent_id
    AND t.status IN ('queued','deferred','dispatched','running','waiting_local_directory')
  ) r ON true
- WHERE w.workspace_id= @workspace_id AND w.system_rule IS NULL
+ WHERE w.workspace_id= @workspace_id AND w.system_rule IS NULL AND NOT w.hidden
  UNION ALL
  -- The child-done system rule of each open parent that still waits for a
  -- sub-issue: every child when unstaged, else its lowest unfinished stage.

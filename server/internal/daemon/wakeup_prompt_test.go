@@ -16,3 +16,10 @@ func TestWakeupPromptPreservesInstructionAndDeliveryThread(t *testing.T) {
 		t.Fatal("replayed the old comment instead of the wakeup")
 	}
 }
+
+func TestHiddenWakeupPromptDoesNotPointAtItsRule(t *testing.T) {
+	p := BuildPrompt(Task{IssueID: "issue", WakeupID: "wake", WakeupHidden: true, HandoffNote: "go now"}, "codex")
+	if !strings.Contains(p, "[WAKEUP]\ngo now") || strings.Contains(p, "multica issue wakeup get") {
+		t.Fatalf("prompt = %s", p)
+	}
+}

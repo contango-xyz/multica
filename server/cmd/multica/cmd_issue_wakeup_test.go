@@ -154,6 +154,8 @@ func TestIssueWakeupCLIConditionsAndManagement(t *testing.T) {
 			_ = json.NewEncoder(w).Encode([]map[string]any{{"id": "run", "status": "completed", "checkin_note": "fine"}})
 		case r.Method == "POST" && r.URL.Path == "/api/issues/"+issue+"/wakeups":
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": "wake"})
+		case r.Method == "POST" && r.URL.Path == "/api/issues/"+issue+"/wakeups/now":
+			_ = json.NewEncoder(w).Encode(map[string]any{"wakeup_id": "w2", "task_id": "t1", "outcome": "queued"})
 		default:
 			w.WriteHeader(http.StatusNoContent)
 		}
@@ -230,5 +232,13 @@ func TestIssueWakeupCLIConditionsAndManagement(t *testing.T) {
 	}
 	if err := run("checkin", issue, "w1"); err == nil {
 		t.Error("check-in without a note accepted")
+	}
+	calls = nil
+	if err := run("now", issue, "--agent-id", "a1", "--instruction", "go", "--parent", "c1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 || calls[0].method != "POST" || calls[0].path != "/api/issues/"+issue+"/wakeups/now" ||
+		calls[0].body["agent_id"] != "a1" || calls[0].body["instruction"] != "go" || calls[0].body["parent_comment_id"] != "c1" {
+		t.Errorf("wakeup now sent %+v", calls)
 	}
 }

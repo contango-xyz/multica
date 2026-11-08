@@ -780,6 +780,7 @@ func main() {
 	// Source-context cleanup is object-store work, so it gets its own goroutine
 	// instead of a slot in the runtime sweep tick.
 	go runSourceContextSweeper(sweepCtx, taskSvc)
+	go runHiddenWakeupSweeper(sweepCtx, &service.IssueWakeupService{Tasks: taskSvc}) // contango patch 27
 	go heartbeatScheduler.Run(sweepCtx)
 	go runAutopilotFailureMonitor(autopilotCtx, queries, bus, envFailureMonitorConfig())
 	go runAutopilotJobExpirer(autopilotCtx, autopilotSvc) // contango patch 22

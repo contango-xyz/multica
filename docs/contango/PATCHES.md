@@ -580,15 +580,38 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   there; shown as a `last_error` diagnostic). All three read columns the webhooks write, so unlike `checks`/`conflicts`
   they need no snapshot client. Like every PR condition they are checked by the wakeup scheduler (about every 30s)
   against stored rows; nothing calls GitHub. `--expires-in` / `--on-timeout wake` work as for any condition rule. Why:
-  fewer timed "wake at" rules (owner 2026-11-08).
+  fewer timed "wake at" rules (owner 2026-11-08). Web and desktop show the real labels (`cond`/`wait` strings in all
+  locales); the create form still offers only the older three.
 - **Touches:** upstream files: `server/internal/service/issue_wakeup_condition{,_test,_pr_test}.go`,
   `server/cmd/multica/cmd_issue_wakeup{,_test}.go`,
-  `server/internal/service/builtin_skills/multica-platform/references/issues.md`.
+  `server/internal/service/builtin_skills/multica-platform/references/issues.md`,
+  `packages/core/api/schemas.ts`, `packages/core/types/issue-wakeup.ts`,
+  `packages/views/issues/components/wakeup-{presentation.ts,activity.test.tsx}`, `packages/views/locales/*/issues.json`.
 - **Migrations:** none.
 - **Upstream status:** none.
-- **Drop when:** upstream adds equivalent PR conditions. The web and desktop enums
-  (`packages/core/api/schemas.ts`, `packages/core/types/issue-wakeup.ts`) do not know these events yet, so the UI reads
-  such a rule as having no condition until they are added.
+- **Drop when:** upstream adds equivalent PR conditions.
+
+### 27. `multica issue wakeup now`: run an agent on a card immediately
+
+- **What:** `multica issue wakeup now <issue> --agent-id <id> --instruction[-file] ... [--parent <comment>]`
+  (`POST /api/issues/{id}/wakeups/now`) replaces the `--kind at --after 1m --mode once` rules our scripts made just to
+  start a run. It saves a one-shot rule with `hidden=true` under the same checks as create and dispatches it in the same
+  request, so the run is what a fired rule's run is: its own pending slot, the `[WAKEUP]` prompt, joining a run already
+  waiting (`outcome: pending`), cancel on close, the claim re-check. A dispatch that fails is retried by the scheduler
+  like any due rule. Hidden rules are left out of `ListIssueWakeups`, the workspace list, the summaries and the paused
+  list, and write no timeline entries. The run's context carries `wakeup_hidden`, so a new daemon omits the "inspect this
+  configuration" line (an older daemon still prints it; `wakeup get` then answers not found). Every hour the server
+  removes hidden rules finished for 7 days with no run still able to start and no unprocessed input, along with their
+  processed receipts. Finished runs keep the rule's id as plain data: the run labels fall back to "triggered by wakeup".
+  Why: about 1,650 rules a week only to start a run (owner 2026-11-08).
+- **Touches:** ours: `server/internal/service/issue_wakeup_now{,_test}.go`, `server/cmd/server/hidden_wakeup_sweep.go`.
+  Upstream files: `server/internal/service/issue_wakeup.go`, `server/internal/handler/{issue_wakeup,issue_wakeup_test,agent}.go`,
+  `server/internal/daemon/{types,prompt}.go`, `server/cmd/multica/cmd_issue_wakeup{,_test}.go`,
+  `server/cmd/server/{main,router}.go`, `server/pkg/db/queries/{wakeup,workspace_wakeup}.sql` (+ generated),
+  `server/internal/service/builtin_skills/multica-platform/references/issues.md`.
+- **Migrations:** `619_issue_wakeup_hidden` (`ADD COLUMN hidden boolean NOT NULL DEFAULT false`; no rewrite).
+- **Upstream status:** none.
+- **Drop when:** upstream has a first-class "run now" action.
 
 ### 28. Links to the issue a wakeup is waiting on
 

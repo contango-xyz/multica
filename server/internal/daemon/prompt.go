@@ -354,7 +354,7 @@ func buildPromptBody(task Task, provider string) string {
 		if task.WakeupSystemRule != "" {
 			// Platform rules belong to the issue, not to a run; members manage them.
 			fmt.Fprintf(&b, "This wakeup is the platform's sub-issue rule for this issue. Do not try to change or disable it; members manage it on the issue.\n")
-		} else {
+		} else if !task.WakeupHidden {
 			fmt.Fprintf(&b, "Inspect this configuration with `multica issue wakeup get %s %s --output json`. If recurring work is no longer needed, disable it with `multica issue wakeup disable %s %s`.\n", task.IssueID, task.WakeupID, task.IssueID, task.WakeupID)
 		}
 		if task.TriggerCommentID != "" {

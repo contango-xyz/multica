@@ -364,3 +364,46 @@ func TestIssueWakeupInstructionAPI(t *testing.T) {
 		testutil.Call(t, testHandler.EditIssueWakeupInstruction, req).Want(tc.want)
 	}
 }
+
+func TestWakeIssueAgentNowAPIStaysOutOfEveryList(t *testing.T) {
+	issue := dbfx.Issue(t, "wake now api")
+	agent := dbfx.Agent(t, "wake now", testRuntimeID)
+	dbfx.Cleanup(t, "DELETE FROM issue_wakeup WHERE issue_id=$1", issue)
+	dbfx.Cleanup(t, "DELETE FROM issue_wakeup_receipt WHERE wakeup_id IN(SELECT id FROM issue_wakeup WHERE issue_id=$1)", issue)
+	dbfx.Cleanup(t, "DELETE FROM agent_task_queue WHERE issue_id=$1", issue)
+
+	rec := httptest.NewRecorder()
+	testHandler.WakeIssueAgentNow(rec, withURLParam(newRequest("POST", "/api/issues/"+issue+"/wakeups/now", map[string]any{"agent_id": agent, "instruction": "go now"}), "id", issue))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("now %d: %s", rec.Code, rec.Body.String())
+	}
+	var result service.WakeupNowResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != service.WakeupNowQueued || result.TaskID == "" || result.WakeupID == "" {
+		t.Fatalf("result = %+v", result)
+	}
+
+	for name, read := range map[string]func(http.ResponseWriter){
+		"issue": func(w http.ResponseWriter) {
+			testHandler.ListIssueWakeups(w, withURLParam(newRequest("GET", "/", nil), "id", issue))
+		},
+		"summaries": func(w http.ResponseWriter) { testHandler.ListWorkspaceWakeupSummaries(w, newRequest("GET", "/", nil)) },
+		"workspace": func(w http.ResponseWriter) {
+			testHandler.ListWorkspaceWakeups(w, newRequest("GET", "/api/issue-wakeups?scope=all&limit=100", nil))
+		},
+	} {
+		listed := httptest.NewRecorder()
+		read(listed)
+		if listed.Code != 200 || strings.Contains(listed.Body.String(), result.WakeupID) {
+			t.Errorf("%s list %d shows the hidden rule: %s", name, listed.Code, listed.Body.String())
+		}
+	}
+
+	bad := httptest.NewRecorder()
+	testHandler.WakeIssueAgentNow(bad, withURLParam(newRequest("POST", "/", map[string]any{"agent_id": agent, "instruction": "x", "kind": "cron"}), "id", issue))
+	if bad.Code != 400 {
+		t.Errorf("unknown field %d: %s", bad.Code, bad.Body.String())
+	}
+}
