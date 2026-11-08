@@ -9,6 +9,56 @@ import { useWorkspaceId } from "@multica/core/hooks";
 import { cn } from "@multica/ui/lib/utils";
 import { useT } from "../../i18n";
 import { useWakeupText } from "./wakeup-presentation";
+import { IssueRef, waitedIssue, type WaitedIssue } from "./wait-issue-links";
+
+const CHIP_CLASS = "inline-flex h-7 max-w-72 min-w-0 items-center rounded-full border border-border text-caption hover:bg-accent";
+
+/**
+ * The chip when it waits on another issue. A link can't live inside the chip's
+ * button, so the label is a link and the icon and count still open the Wakeups
+ * section.
+ */
+function WaitedIssueChip({
+  issue,
+  label,
+  count,
+  openLabel,
+  onOpen,
+}: {
+  issue: WaitedIssue;
+  label: string;
+  count: number;
+  openLabel: string;
+  onOpen: () => void;
+}) {
+  return (
+    <span className={cn(CHIP_CLASS, "text-foreground")}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={openLabel}
+        className="inline-flex h-full shrink-0 items-center rounded-l-full pl-2.5 pr-1.5 max-sm:rounded-full max-sm:pr-2.5 focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        <Bell className="size-3.5" aria-hidden="true" />
+      </button>
+      <span title={label} className={cn("min-w-0 truncate max-sm:hidden", count > 1 ? "pr-1.5" : "pr-2.5")}>
+        <IssueRef routeId={issue.id} tabTitle={issue.identifier}>
+          {label}
+        </IssueRef>
+      </span>
+      {count > 1 && (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={openLabel}
+          className="inline-flex h-full shrink-0 items-center rounded-r-full pr-2.5 tabular-nums text-muted-foreground max-sm:pl-0 focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          +{count - 1}
+        </button>
+      )}
+    </span>
+  );
+}
 
 /**
  * Picks what the header says an issue is waiting for: the first rule waiting
@@ -64,14 +114,20 @@ export const IssueWakeupHeaderChip = memo(function IssueWakeupHeaderChip({
         : t(($) => $.wakeups.wait.paused),
   );
   const Icon = primary.kind === "paused" ? TriangleAlert : Bell;
+  const waited = primary.kind === "rule" ? waitedIssue(primary.rule) : null;
+  const openLabel = `${label}${primary.count > 1 ? ` +${primary.count - 1}` : ""} · ${t(($) => $.wakeups.wait.open)}`;
+  if (waited) {
+    return <WaitedIssueChip issue={waited} label={label} count={primary.count} openLabel={openLabel} onOpen={onOpen} />;
+  }
   return (
     <button
       type="button"
       onClick={onOpen}
       title={label}
-      aria-label={`${label}${primary.count > 1 ? ` +${primary.count - 1}` : ""} · ${t(($) => $.wakeups.wait.open)}`}
+      aria-label={openLabel}
       className={cn(
-        "inline-flex h-7 max-w-72 min-w-0 items-center gap-1.5 rounded-full border border-border px-2.5 text-caption hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
+        CHIP_CLASS,
+        "gap-1.5 px-2.5 focus-visible:outline-2 focus-visible:outline-ring",
         primary.kind === "paused" ? "text-warning" : "text-foreground",
       )}
     >

@@ -21,6 +21,12 @@ import { selectIssueTasks, type IssueTaskGroups } from "../surface/activity";
 import { useT } from "../../i18n";
 import { useWakeupText } from "./wakeup-presentation";
 import { IssueWaitingOn } from "./issue-waiting-on";
+import {
+  WAIT_HOVER_CLOSE_DELAY_MS,
+  WAIT_HOVER_OPEN_DELAY_MS,
+  WaitedIssueText,
+  waitedIssue,
+} from "./wait-issue-links";
 
 const EMPTY_GROUPS: IssueTaskGroups = { running: [], queued: [] };
 
@@ -37,11 +43,10 @@ const EMPTY_GROUPS: IssueTaskGroups = { running: [], queued: [] };
 // doing?" pause. The header chip (issue-agent-header-chip) keeps its 150ms
 // on purpose: it is one large chip the user aims at, not a per-row cue.
 //
-// The card body is read-only — no links, no buttons — so there is no hover
-// bridge to protect and the close delay only needs to absorb pointer wobble
-// across the 4px gap.
-const OPEN_DELAY_MS = 900;
-const CLOSE_DELAY_MS = 150;
+// The close delay absorbs pointer wobble across the 4px gap, and is what lets
+// the pointer reach the waited-on issue links in the card body.
+const OPEN_DELAY_MS = WAIT_HOVER_OPEN_DELAY_MS;
+const CLOSE_DELAY_MS = WAIT_HOVER_CLOSE_DELAY_MS;
 
 interface IssueAgentActivityIndicatorProps {
   issueId: string;
@@ -76,7 +81,8 @@ interface IssueAgentActivityIndicatorProps {
  *
  * Hover opens AgentActivityHoverContent which lists every active task
  * with status dot + duration. No link rows — the card itself is the
- * navigation target for issue detail.
+ * navigation target for issue detail. A wakeup waiting on another issue is
+ * the exception: its key is linked on the label and in the hover card.
  *
  * Surfaces that only need the cue can pass `hoverCard={false}` and get the
  * badge alone. Inbox does (MUL-5189): the badge already shows who is running
@@ -157,6 +163,7 @@ export const IssueAgentActivityIndicator = memo(
       return <IssueWaitingOn properties={waitingOnProperties} />;
     }
     const isRunning = opacity === "full";
+    const labelIssue = wakeups[0] && hoverCard ? waitedIssue(wakeups[0]) : null;
     // One sentence of what the issue waits for; a paused rule speaks up only
     // when nothing else is waiting, because it needs someone to look.
     const waitingLabel = wakeups[0]
@@ -212,7 +219,7 @@ export const IssueAgentActivityIndicator = memo(
           <Clock3 className="size-3 text-muted-foreground" aria-hidden="true" />
         )}
         <span className={cn("max-w-36 truncate text-micro", wakeups[0] ? "text-muted-foreground" : "text-destructive")}>
-          {waitingLabel}
+          {labelIssue ? <WaitedIssueText text={waitingLabel} issue={labelIssue} inRow /> : waitingLabel}
         </span>
         {wakeupCount > 1 && (
           <span className="text-micro tabular-nums text-muted-foreground">
@@ -237,7 +244,9 @@ export const IssueAgentActivityIndicator = memo(
             <span
               tabIndex={0}
               aria-label={`${label}${wakeupTriggered ? ` · ${t(($) => $.wakeups.triggered_by_wakeup)}` : ""}${wakeupCount ? ` · ${t(($) => $.wakeups.upcoming, { count: wakeupCount })}` : ""}`}
-              onFocus={() => setOpen(true)}
+              // A key inside the label takes focus too, and is not a request
+              // for the card.
+              onFocus={(e) => e.target === e.currentTarget && setOpen(true)}
               onBlur={() => setOpen(false)}
               className="inline-flex shrink-0 items-center gap-1 rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
             />
@@ -262,10 +271,12 @@ export const IssueAgentActivityIndicator = memo(
               <p className="text-muted-foreground">
                 {t(($) => $.wakeups.upcoming, { count: wakeupCount })}
               </p>
-              {wakeups.map((wakeup) => (
+              {wakeups.map((wakeup) => {
+                const issue = waitedIssue(wakeup);
+                return (
                 <div key={wakeup.id}>
                   <p className="break-words font-medium">
-                    {text.trigger(wakeup)}
+                    {issue ? <WaitedIssueText text={text.trigger(wakeup)} issue={issue} /> : text.trigger(wakeup)}
                   </p>
                   <p className="text-muted-foreground">
                     {t(($) => $.wakeups.wake_agent, {
@@ -274,7 +285,8 @@ export const IssueAgentActivityIndicator = memo(
                     · {text.schedule(wakeup)}
                   </p>
                 </div>
-              ))}
+                );
+              })}
               {wakeupCount > wakeups.length && (
                 <p className="text-muted-foreground">
                   {t(($) => $.wakeups.more, {

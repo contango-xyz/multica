@@ -34,6 +34,7 @@ vi.mock("@multica/core/hooks", () => ({
 
 vi.mock("@multica/core/paths", () => ({
   useWorkspacePaths: () => ({ issueDetail: (id: string) => `/acme/issues/${id}` }),
+  useCurrentWorkspace: () => ({ id: "ws-1", issue_prefix: "CTG" }),
 }));
 
 vi.mock("@multica/core/issues/stores/view-store-context", () => ({
@@ -87,7 +88,8 @@ vi.mock("../../agents/components/agent-avatar-stack", () => ({
 }));
 
 const PROPERTY_ID = "prop-waiting-on";
-const LINE = "blocked by CTG-1907 (in progress) · since 09:21";
+// Key-free on purpose; the linked form is covered by wait-issue-links.test.tsx.
+const LINE = "blocked by review · since 09:21";
 const WAKE_LABEL = "Waiting for a run to end";
 const propertiesKey = propertyKeys.list("ws-1");
 const tasksKey = agentTaskSnapshotOptions("ws-1").queryKey;

@@ -35,6 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@multica/ui/components/ui/alert-dialog";
+import { IssueRef, WaitedIssueText, waitedIssue } from "./wait-issue-links";
 import { WakeupInstructionEditor } from "./wakeup-instruction-editor";
 import { WakeupControl } from "./wakeup-control";
 import { WakeupCreate } from "./wakeup-create";
@@ -174,6 +175,7 @@ function WakeupRow({
   const trigger = useTriggerIssueWakeup(workspaceId, wakeup.issue_id);
   const paused = text.paused(wakeup);
   const fires = text.fires(wakeup);
+  const waited = waitedIssue(wakeup);
   return (
     <div
       className="grid grid-cols-[minmax(0,1fr)_auto]"
@@ -190,7 +192,7 @@ function WakeupRow({
         >
           <span className="flex min-h-7 min-w-0 items-center gap-2 pl-2 pr-1">
             <Icon
-              className="mt-px size-3.5 shrink-0 text-muted-foreground"
+              className={`mt-px size-3.5 shrink-0 text-muted-foreground ${waited ? "invisible" : ""}`}
               aria-hidden="true"
             />
             <span className="line-clamp-2 min-w-0 break-words">
@@ -230,7 +232,9 @@ function WakeupRow({
           className="max-h-[70dvh] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto"
           keepMounted
         >
-          <PopoverTitle>{text.trigger(wakeup)}</PopoverTitle>
+          <PopoverTitle>
+            {waited ? <WaitedIssueText text={text.trigger(wakeup)} issue={waited} /> : text.trigger(wakeup)}
+          </PopoverTitle>
           <p className="text-caption text-muted-foreground">
             {t(($) => $.wakeups.wake_agent, { agent: wakeup.agent_name })} ·{" "}
             {text.schedule(wakeup)}
@@ -347,6 +351,16 @@ function WakeupRow({
           )}
         </PopoverContent>
       </Popover>
+      {/* The row is a button, so the link to the waited-on issue sits over its icon as a sibling. */}
+      {waited && (
+        <span className="pointer-events-none z-10 col-start-1 row-start-1 flex min-h-7 items-center self-start justify-self-start pt-2 pl-2">
+          <span className="pointer-events-auto mt-px inline-flex text-muted-foreground" title={waited.identifier}>
+            <IssueRef routeId={waited.id} tabTitle={waited.identifier}>
+              <Icon className="size-3.5" aria-label={waited.identifier ?? t(($) => $.wakeups.cond.another_issue)} />
+            </IssueRef>
+          </span>
+        </span>
+      )}
       <div className="z-10 col-start-2 row-start-1 self-start">
         <WakeupControl
           size="sm"

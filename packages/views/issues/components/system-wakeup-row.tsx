@@ -17,6 +17,7 @@ import {
 } from "@multica/ui/components/ui/popover";
 import { TruncatedTooltip } from "@multica/ui/components/common/truncated-tooltip";
 import { useT } from "../../i18n";
+import { IssueKeysText, useIssueKeyParts } from "./wait-issue-links";
 import { useWakeupText } from "./wakeup-presentation";
 
 const MAX_INSTRUCTION_BYTES = 4000;
@@ -34,6 +35,7 @@ export function SystemWakeupRow({
   const { t } = useT("issues");
   const text = useWakeupText();
   const update = useUpdateIssueSystemWakeup(workspaceId, issueId);
+  const waitingParts = useIssueKeyParts(t(($) => $.wakeups.system.waiting_on, { ids: rule.waiting.join(", ") }));
   const title =
     rule.staged && rule.stage !== null
       ? t(($) => $.wakeups.system.title_stage, { stage: rule.stage })
@@ -102,7 +104,10 @@ export function SystemWakeupRow({
             <dd>
               {t(($) => $.wakeups.system.progress, { done: rule.total - rule.remaining, total: rule.total })}
               {rule.waiting.length > 0 &&
-                ` · ${t(($) => $.wakeups.system.waiting_on, { ids: rule.waiting.join(", ") })}`}
+                <>
+                  {" · "}
+                  <IssueKeysText parts={waitingParts} />
+                </>}
             </dd>
             <dt className="text-muted-foreground">{t(($) => $.wakeups.system.skip_title)}</dt>
             <dd>{t(($) => $.wakeups.system.skip)}</dd>

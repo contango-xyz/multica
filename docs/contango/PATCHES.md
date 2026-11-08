@@ -567,6 +567,26 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** upstream shows a chosen custom property on idle cards, or the "Waiting on" job goes away.
 
+### 28. Links to the issue a wakeup is waiting on
+
+- **What:** wherever a wakeup waits on another issue, the issue is one click away (owner 2026-11-08). Board cards and
+  list rows are links themselves, so the key inside the wake label and the "Waiting on" line is the same span-as-link
+  `IssueDuplicateOfMarker` uses: no nested anchor, it stops the row's click and drag, and honours cmd/middle click
+  through `useIntentNavigate`. The hover cards list the same keys as real `AppLink`s; a "Waiting on" line with keys
+  now has a hover card (same delays) in place of its `title`, because the label truncates and can cut a key off. The
+  detail header chip's label is a direct link, with its icon and count still opening the Wakeups section. In the
+  Wakeups section the row's chain icon is the link and the rule's popover names the key; a system rule's popover links
+  its waiting keys. A wakeup links by `condition.issue_id`; free text links by key, only for the workspace's own prefix
+  (`/issues/CTG-123` resolves on the route and API). Inbox rows (`hoverCard={false}`) stay plain.
+- **Touches:** ours: `packages/views/issues/components/wait-issue-links{,.test}.tsx`,
+  `packages/views/issues/components/issue-waiting-on{,.test}.tsx`. Upstream files:
+  `packages/views/issues/components/issue-agent-activity-indicator.tsx`,
+  `packages/views/issues/components/issue-wakeup-header-chip.tsx`, `packages/views/issues/components/wakeups-section.tsx`,
+  `packages/views/issues/components/system-wakeup-row.tsx`.
+- **Migrations:** none.
+- **Upstream status:** none.
+- **Drop when:** upstream links waited-on issues itself.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
