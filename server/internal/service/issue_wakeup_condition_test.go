@@ -300,6 +300,181 @@ func TestWakeupConditionPRConflictsWakesOnEachNewConflict(t *testing.T) {
 	expectRuns(2, "merged PR")
 }
 
+func prConditionFixture(t *testing.T, f principalFixture, issue pgtype.UUID, repo, state, head string) string {
+	t.Helper()
+	pr := f.Insert(t, "github_pull_request", testutil.Cols{
+		"workspace_id": f.WorkspaceID, "installation_id": 1,
+		"repo_owner": "fixture", "repo_name": repo, "pr_number": 7,
+		"title": "PR", "state": state, "html_url": "https://example.test/pr/7",
+		"pr_created_at": "2026-01-01T00:00:00Z", "pr_updated_at": "2026-01-01T00:00:00Z",
+		"head_sha": head,
+	})
+	f.Cleanup(t, "DELETE FROM issue_pull_request WHERE pull_request_id=$1", pr)
+	f.Cleanup(t, "DELETE FROM github_pull_request_review WHERE pull_request_id=$1", pr)
+	f.Exec(t, "INSERT INTO issue_pull_request(issue_id,pull_request_id) VALUES($1,$2)", issue, pr)
+	return pr
+}
+
+func TestWakeupConditionPRHeadWakesOnEachPush(t *testing.T) {
+	f, s, issue, agent := conditionFixture(t)
+	pr := prConditionFixture(t, f, issue, "head", "open", "a")
+	w := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Mode: "continuous", Instruction: "Review the push",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "head"})})
+	if !strings.Contains(w.ConditionState, "@a") {
+		t.Fatalf("starting head not recorded: %q", w.ConditionState)
+	}
+	push := func(head string, want int) db.IssueWakeup {
+		t.Helper()
+		f.Exec(t, "UPDATE github_pull_request SET head_sha=$2 WHERE id=$1", pr, head)
+		got := wakeTick(t, f, s, w.ID)
+		if n := wakeRuns(t, f, w.ID); n != want {
+			t.Fatalf("head %s: %d runs, want %d", head, n, want)
+		}
+		f.Exec(t, "UPDATE agent_task_queue SET status='completed',completed_at=now() WHERE context->>'wakeup_id'=$1 AND status<>'completed'", util.UUIDToString(w.ID))
+		return got
+	}
+	push("a", 0)
+	push("a", 0)
+	got := push("b", 1)
+	task, err := f.q.GetAgentTask(context.Background(), got.LastTaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(task.HandoffNote.String, `"head_sha":"b"`) || !strings.Contains(task.HandoffNote.String, `"previous_head_sha":"a"`) {
+		t.Fatalf("head facts missing from the run: %s", task.HandoffNote.String)
+	}
+	push("b", 1)
+	// A later push moves the baseline, including back to an earlier sha.
+	push("c", 2)
+	push("b", 3)
+}
+
+// A PR linked after registration has no starting head: linking it is not a
+// push, and its next one is.
+func TestWakeupConditionPRHeadIgnoresALateLink(t *testing.T) {
+	f, s, issue, agent := conditionFixture(t)
+	w := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Instruction: "Review the push",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "head"})})
+	if got := wakeTick(t, f, s, w.ID); !got.LastError.Valid || got.LastError.String != conditionDiagnosticPrefix+errPRNotLinked.Error() {
+		t.Fatalf("unlinked diagnostic = %+v", got.LastError)
+	}
+	pr := prConditionFixture(t, f, issue, "late", "open", "a")
+	wakeTick(t, f, s, w.ID)
+	if n := wakeRuns(t, f, w.ID); n != 0 {
+		t.Fatalf("linking the PR started %d runs", n)
+	}
+	f.Exec(t, "UPDATE github_pull_request SET head_sha='b' WHERE id=$1", pr)
+	got := wakeTick(t, f, s, w.ID)
+	if n := wakeRuns(t, f, w.ID); n != 1 || got.Enabled {
+		t.Fatalf("after the push: %d runs, enabled=%t", n, got.Enabled)
+	}
+}
+
+func TestWakeupConditionPRHeadOnTimeoutWakes(t *testing.T) {
+	f, s, issue, agent := conditionFixture(t)
+	prConditionFixture(t, f, issue, "timeout", "open", "a")
+	w := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Instruction: "Check the push", ExpiresInSeconds: 120, OnTimeout: "wake",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "head"})})
+	f.Exec(t, "UPDATE issue_wakeup SET expires_at=now()-interval '1 second' WHERE id=$1", w.ID)
+	got := wakeTick(t, f, s, w.ID)
+	if n := wakeRuns(t, f, w.ID); n != 1 || got.Enabled || !got.TimedOutAt.Valid {
+		t.Fatalf("deadline: %d runs, enabled=%t timed_out=%v", n, got.Enabled, got.TimedOutAt)
+	}
+}
+
+func TestWakeupConditionPRApproved(t *testing.T) {
+	f, s, issue, agent := conditionFixture(t)
+	pr := prConditionFixture(t, f, issue, "approved", "open", "a")
+	w := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Mode: "continuous", Instruction: "Merge it",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "approved"})})
+	review := func(id int, login, kind, state, commit, at string) {
+		t.Helper()
+		f.Exec(t, "INSERT INTO github_pull_request_review(pull_request_id,github_review_id,reviewer_login,reviewer_type,state,commit_id,submitted_at) VALUES($1,$2,$3,$4,$5,$6,$7::timestamptz)", pr, id, login, kind, state, commit, at)
+	}
+	expect := func(want int, step string) {
+		t.Helper()
+		wakeTick(t, f, s, w.ID)
+		if n := wakeRuns(t, f, w.ID); n != want {
+			t.Fatalf("%s: %d runs, want %d", step, n, want)
+		}
+		f.Exec(t, "UPDATE agent_task_queue SET status='completed',completed_at=now() WHERE context->>'wakeup_id'=$1 AND status<>'completed'", util.UUIDToString(w.ID))
+	}
+	expect(0, "no reviews")
+	review(1, "ci-bot[bot]", "Bot", "APPROVED", "a", "2026-01-01T00:00:00Z")
+	expect(0, "bot approval")
+	review(2, "ana", "User", "COMMENTED", "a", "2026-01-01T00:01:00Z")
+	expect(0, "a comment is not an approval")
+	review(3, "ana", "User", "APPROVED", "old", "2026-01-01T00:02:00Z")
+	expect(0, "approval of an older head")
+	review(4, "ana", "User", "APPROVED", "a", "2026-01-01T00:03:00Z")
+	expect(1, "approval at the head")
+	expect(1, "same approval")
+	review(5, "bo", "User", "APPROVED", "a", "2026-01-01T00:04:00Z")
+	expect(1, "second approver on the same head")
+	f.Exec(t, "UPDATE github_pull_request SET head_sha='b' WHERE id=$1", pr)
+	expect(1, "push invalidates the approvals")
+	review(6, "ana", "User", "APPROVED", "b", "2026-01-01T00:05:00Z")
+	review(7, "ana", "User", "CHANGES_REQUESTED", "b", "2026-01-01T00:06:00Z")
+	expect(1, "approval replaced by a change request")
+	review(8, "bo", "User", "APPROVED", "b", "2026-01-01T00:07:00Z")
+	expect(2, "another person approves the new head")
+	f.Exec(t, "UPDATE github_pull_request_review SET state='DISMISSED' WHERE pull_request_id=$1 AND github_review_id=8", pr)
+	expect(2, "dismissed")
+	review(9, "bo", "User", "APPROVED", "b", "2026-01-01T00:08:00Z")
+	expect(3, "approved again after a dismissal")
+}
+
+func TestWakeupConditionPRReady(t *testing.T) {
+	f, s, issue, agent := conditionFixture(t)
+	pr := prConditionFixture(t, f, issue, "ready", "draft", "a")
+	w := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Instruction: "Review it",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "ready"})})
+	wakeTick(t, f, s, w.ID)
+	if n := wakeRuns(t, f, w.ID); n != 0 {
+		t.Fatalf("draft started %d runs", n)
+	}
+	f.Exec(t, "UPDATE github_pull_request SET state='open' WHERE id=$1", pr)
+	got := wakeTick(t, f, s, w.ID)
+	if n := wakeRuns(t, f, w.ID); n != 1 || got.Enabled {
+		t.Fatalf("ready: %d runs, enabled=%t", n, got.Enabled)
+	}
+}
+
+func TestWakeupConditionPRHeadAndReadyCoverVCSProviders(t *testing.T) {
+	f, s, issue, agent := conditionFixture(t)
+	ctx := context.Background()
+	var pr pgtype.UUID
+	if err := f.Pool.QueryRow(ctx, `INSERT INTO vcs_pull_request(workspace_id,connection_id,provider,repo_owner,repo_name,pr_number,title,state,html_url,pr_created_at,pr_updated_at,head_sha)
+		VALUES($1,gen_random_uuid(),'forgejo','o','r',9,'t','draft','https://x/9',now(),now(),'a') RETURNING id`, f.WorkspaceID).Scan(&pr); err != nil {
+		t.Fatal(err)
+	}
+	f.Cleanup(t, "DELETE FROM vcs_pull_request WHERE id=$1", pr)
+	f.Cleanup(t, "DELETE FROM issue_vcs_pull_request WHERE pull_request_id=$1", pr)
+	f.Exec(t, "INSERT INTO issue_vcs_pull_request(issue_id,pull_request_id) VALUES($1,$2)", issue, pr)
+	head := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Instruction: "Push",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "head"})})
+	ready := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Instruction: "Ready",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "ready"})})
+	approved := wakeCreate(t, f, s, issue, WakeupInput{AgentID: agent, Kind: "event", Instruction: "Approved",
+		Condition: condition(t, map[string]any{"type": "pull_request", "event": "approved"})})
+	wakeTick(t, f, s, head.ID)
+	wakeTick(t, f, s, ready.ID)
+	if got := wakeTick(t, f, s, approved.ID); !got.LastError.Valid || got.LastError.String != conditionDiagnosticPrefix+errPRReviewsUnsupported.Error() {
+		t.Fatalf("self-hosted approved diagnostic = %+v", got.LastError)
+	}
+	if n := wakeRuns(t, f, head.ID) + wakeRuns(t, f, ready.ID); n != 0 {
+		t.Fatalf("no change yet, %d runs", n)
+	}
+	f.Exec(t, "UPDATE vcs_pull_request SET head_sha='b',state='open' WHERE id=$1", pr)
+	wakeTick(t, f, s, head.ID)
+	// A second rule firing while the first one's run waits to start joins that run.
+	f.Exec(t, "UPDATE agent_task_queue SET status='completed',completed_at=now() WHERE context->>'wakeup_id'=$1", util.UUIDToString(head.ID))
+	wakeTick(t, f, s, ready.ID)
+	if a, b := wakeRuns(t, f, head.ID), wakeRuns(t, f, ready.ID); a != 1 || b != 1 {
+		t.Fatalf("head runs=%d ready runs=%d", a, b)
+	}
+}
+
 func TestWakeupConditionPRConflictsAcrossSeveralPRs(t *testing.T) {
 	for _, tc := range []struct {
 		name       string

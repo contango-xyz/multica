@@ -567,6 +567,29 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** upstream shows a chosen custom property on idle cards, or the "Waiting on" job goes away.
 
+### 26. Pull request wake conditions: head, approved, ready
+
+- **What:** `multica issue wakeup create --until-pr` (and the `pull_request` condition's `event`) also takes `head`,
+  `approved` and `ready`. `head`: a linked PR's head differs from the head recorded when the rule was created; the
+  starting heads live in `condition_state` (`pr:<id>@<sha>,...`), a push advances them, so `--mode continuous` fires per
+  push, and a PR linked later starts from its first seen head (linking is not a push). `approved`: a `User` review in
+  `github_pull_request_review` is APPROVED at the PR's current head, each reviewer counted by their latest verdict on
+  that head (their later change request replaces it, dismissed reviews never count, as on GitHub). `ready`: the PR's
+  stored `state` is `open` or `merged`, i.e. it left draft (the webhook mirror already derives `draft` from the payload,
+  so no new column). `head` and `ready` also cover self-hosted PRs; `approved` is GitHub only (reviews are stored only
+  there; shown as a `last_error` diagnostic). All three read columns the webhooks write, so unlike `checks`/`conflicts`
+  they need no snapshot client. Like every PR condition they are checked by the wakeup scheduler (about every 30s)
+  against stored rows; nothing calls GitHub. `--expires-in` / `--on-timeout wake` work as for any condition rule. Why:
+  fewer timed "wake at" rules (owner 2026-11-08).
+- **Touches:** upstream files: `server/internal/service/issue_wakeup_condition{,_test,_pr_test}.go`,
+  `server/cmd/multica/cmd_issue_wakeup{,_test}.go`,
+  `server/internal/service/builtin_skills/multica-platform/references/issues.md`.
+- **Migrations:** none.
+- **Upstream status:** none.
+- **Drop when:** upstream adds equivalent PR conditions. The web and desktop enums
+  (`packages/core/api/schemas.ts`, `packages/core/types/issue-wakeup.ts`) do not know these events yet, so the UI reads
+  such a rule as having no condition until they are added.
+
 ### 28. Links to the issue a wakeup is waiting on
 
 - **What:** wherever a wakeup waits on another issue, the issue is one click away (owner 2026-11-08). Board cards and

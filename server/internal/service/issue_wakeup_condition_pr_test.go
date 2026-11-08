@@ -21,6 +21,7 @@ type prConditionTx struct {
 	pgx.Tx
 	issue     pgtype.UUID
 	prs       [][]any
+	reviews   [][]any
 	queryErr  error
 	lastError pgtype.Text
 	next      pgtype.Timestamptz
@@ -36,6 +37,9 @@ func (tx *prConditionTx) Query(_ context.Context, sql string, args ...any) (pgx.
 	// itself is covered against PostgreSQL by the condition test suite.
 	if strings.Contains(sql, "FROM vcs_pull_request") {
 		return &sliceRows{}, nil
+	}
+	if strings.Contains(sql, "github_pull_request_review") {
+		return &sliceRows{rows: tx.reviews}, nil
 	}
 	if !strings.Contains(sql, "WHERE ipr.issue_id=$1") || len(args) != 1 || args[0] != tx.issue {
 		return nil, fmt.Errorf("unexpected PR scope: %s %v", sql, args)
@@ -104,6 +108,47 @@ func TestWakeupConditionPREvaluation(t *testing.T) {
 			}
 			if met && (fingerprint == "" || len(observed["pull_requests"].([]map[string]any)) != 1) {
 				t.Fatalf("missing terminal PR evidence: fingerprint=%q observed=%v", fingerprint, observed)
+			}
+		})
+	}
+}
+
+func TestWakeupConditionPRNewEvents(t *testing.T) {
+	row := func(state, head string) []any { return []any{int32(1), state, "", "", head, "", "p1"} }
+	approval := [][]any{{"p1", int32(1), "h1"}}
+	for _, tc := range []struct {
+		name, event, state string
+		prs                [][]any
+		reviews            [][]any
+		wantErr            error
+		wantMet            bool
+	}{
+		{name: "ready unlinked", event: "ready", wantErr: errPRNotLinked},
+		{name: "still a draft", event: "ready", prs: [][]any{row("draft", "h1")}},
+		{name: "marked ready", event: "ready", prs: [][]any{row("open", "h1")}, wantMet: true},
+		{name: "merged is past draft", event: "ready", prs: [][]any{row("merged", "h1")}, wantMet: true},
+		{name: "closed draft", event: "ready", prs: [][]any{row("closed", "h1")}},
+		{name: "approved unlinked", event: "approved", wantErr: errPRNotLinked},
+		{name: "no approval", event: "approved", prs: [][]any{row("open", "h1")}},
+		{name: "approved at head", event: "approved", prs: [][]any{row("open", "h1")}, reviews: approval, wantMet: true},
+		{name: "head unlinked", event: "head", wantErr: errPRNotLinked},
+		{name: "head unchanged", event: "head", state: "pr:p1@h1", prs: [][]any{row("open", "h1")}},
+		{name: "head moved", event: "head", state: "pr:p1@h0", prs: [][]any{row("open", "h1")}, wantMet: true},
+		{name: "force push back to an older sha", event: "head", state: "pr:p1@h2", prs: [][]any{row("open", "h1")}, wantMet: true},
+		{name: "first sighting is the baseline", event: "head", prs: [][]any{row("open", "h1")}},
+		{name: "unknown head", event: "head", state: "pr:p1@h0", prs: [][]any{row("open", "")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// These read webhook-written columns, so no snapshot client is needed.
+			s := &IssueWakeupService{Tasks: &TaskService{}}
+			w := db.IssueWakeup{IssueID: dbid.NewV7(), ConditionState: tc.state, Condition: condition(t, map[string]any{"type": "pull_request", "event": tc.event})}
+			tx := &prConditionTx{issue: w.IssueID, prs: tc.prs, reviews: tc.reviews}
+			met, fingerprint, observed, err := s.evaluateCondition(context.Background(), tx, db.New(tx), w)
+			if met != tc.wantMet || !errors.Is(err, tc.wantErr) {
+				t.Fatalf("met=%t err=%v; want met=%t err=%v", met, err, tc.wantMet, tc.wantErr)
+			}
+			if met && (fingerprint == "" || len(observed["pull_requests"].([]map[string]any)) != 1) {
+				t.Fatalf("missing PR evidence: fingerprint=%q observed=%v", fingerprint, observed)
 			}
 		})
 	}
