@@ -22,6 +22,7 @@ const listData: { active: InboxItem[]; archived: InboxItem[]; lookup?: InboxItem
 
 const queryCalls: Array<{ queryKey: readonly unknown[]; enabled?: boolean }> = [];
 const lookupState = { isLoading: false, isError: false, refetch: vi.fn() };
+const issueState = { isLoading: false, isError: false };
 const queryClient = vi.hoisted(() => ({ setQueryData: vi.fn() }));
 vi.mock("@tanstack/react-query", () => ({
   queryOptions: (options: unknown) => options,
@@ -36,6 +37,7 @@ vi.mock("@tanstack/react-query", () => ({
     isError: false,
     refetch: vi.fn(),
     ...(options.queryKey.includes("lookup") ? lookupState : {}),
+    ...(options.queryKey.includes("detail") ? issueState : {}),
   }); },
   useInfiniteQuery: (options: { queryKey: readonly unknown[]; enabled?: boolean }) => {
     queryCalls.push(options);
@@ -292,6 +294,8 @@ function reset() {
   lookupState.isLoading = false;
   lookupState.isError = false;
   lookupState.refetch.mockClear();
+  issueState.isLoading = false;
+  issueState.isError = false;
   queryCalls.length = 0;
   searchParams = new URLSearchParams();
   replace.mockClear();
@@ -1176,6 +1180,84 @@ describe("InboxPage", () => {
     lookupState.isLoading = false;
     rerender(<InboxPage />);
     expect(replace).toHaveBeenCalledWith("/acme/issues/someone-elses");
+  });
+
+  // contango: Smart's rows are keyed by the signal's id, which the archive lookup (by issue) cannot find and which is not
+  // an issue either, so opening it as one lands on a not-found page (owner 2026-11-08).
+  it("clears a selected signal that left the inbox instead of opening its id as an issue", () => {
+    reset();
+    searchParams = new URLSearchParams("issue=signal-1");
+    listData.active = [item({ id: "a", issue_id: "other-issue" })];
+    listData.lookup = [];
+    issueState.isError = true;
+
+    render(<InboxPage smart />);
+
+    expect(replace).not.toHaveBeenCalledWith("/acme/issues/signal-1");
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+  });
+
+  it("clears the open row when it is archived elsewhere while the inbox is showing it", () => {
+    reset();
+    layout.width = DESKTOP;
+    searchParams = new URLSearchParams("issue=issue-1");
+    listData.active = [item({ id: "a" }), item({ id: "b", issue_id: "other-issue" })];
+    listData.lookup = [];
+    const { rerender } = render(<InboxPage />);
+    expect(issueDetailProps.at(-1)).toMatchObject({ issueId: "issue-1" });
+
+    listData.active = [item({ id: "b", issue_id: "other-issue" })];
+    listData.lookup = [item({ id: "a", archived: true })];
+    rerender(<InboxPage />);
+
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+    expect(replace).not.toHaveBeenCalledWith("/acme/issues/issue-1");
+  });
+
+  it("does not decide on an unresolved selection until the issue check settles", () => {
+    reset();
+    searchParams = new URLSearchParams("issue=signal-1");
+    listData.lookup = [];
+    issueState.isLoading = true;
+
+    render(<InboxPage smart />);
+
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("clears the selection when the archive lookup fails rather than opening the issue", () => {
+    reset();
+    searchParams = new URLSearchParams("issue=held-epic");
+    listData.lookup = [];
+    lookupState.isError = true;
+
+    render(<InboxPage />);
+
+    expect(replace).not.toHaveBeenCalledWith("/acme/issues/held-epic");
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+  });
+
+  it("treats an issue whose archive is signals only as archived", () => {
+    reset();
+    searchParams = new URLSearchParams("issue=held-epic");
+    listData.lookup = [item({ id: "signal-1", type: "signal", issue_id: "held-epic", archived: true })];
+
+    render(<InboxPage />);
+
+    expect(replace).not.toHaveBeenCalledWith("/acme/issues/held-epic");
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+  });
+
+  it("follows an issue selection onto the signal row its card folded into", () => {
+    reset();
+    searchParams = new URLSearchParams("issue=issue-1");
+    listData.active = [item({ id: "signal-1", type: "signal", issue_id: "issue-1", details: { group: "merge" } as never })];
+    listData.lookup = [];
+
+    render(<InboxPage smart />);
+
+    expect(replace).not.toHaveBeenCalledWith("/acme/issues/issue-1");
+    expect(replace).toHaveBeenCalledWith("/acme/inbox?issue=signal-1");
   });
 
   it("does not swallow a deep link to an issue that is not in the archive", () => {

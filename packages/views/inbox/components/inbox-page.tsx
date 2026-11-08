@@ -23,6 +23,7 @@ import {
 } from "@multica/core/shortcuts";
 import { isImeComposing } from "@multica/core/utils";
 import { useIssueDraftStore } from "@multica/core/issues/stores/draft-store";
+import { issueDetailOptions } from "@multica/core/issues/queries";
 import {
   inboxListOptions,
   archivedInboxPagesOptions,
@@ -266,12 +267,22 @@ export function InboxPage({
   }, [smartSections]);
   const hasActiveFilters = inboxFilterCount(effectiveFilters) > 0;
   const selectedOnPage = viewItems.find((i) => inboxRowKey(i) === selectedKey);
+  // contango: a card with an action signal is listed under the signal's key, so an issue-keyed selection (a restored
+  // tab, a notification click) stops matching its row once the card has a signal. It is the same row: follow it.
+  const selectionMovedTo =
+    !isArchivedView && !!selectedKey && !selectedOnPage
+      ? viewItems.find((i) => i.issue_id === selectedKey)
+      : undefined;
   // A deep link can point beyond every loaded page. Resolve its group directly
   // without adding it to the cursor chain or mistaking a page miss for a 404.
   const lookup = useQuery({
     ...archivedInboxLookupOptions(wsId, selectedKey),
     // contango: the inbox view looks too, so a selection that is in the user's archive is not taken for a shared link.
-    enabled: !!selectedKey && !selectedOnPage && (isArchivedView ? !archivedLoading && !archivedError : !loading),
+    enabled:
+      !!selectedKey &&
+      !selectedOnPage &&
+      !selectionMovedTo &&
+      (isArchivedView ? !archivedLoading && !archivedError : !loading),
   });
   const lookupItems = useMemo(() => deduplicateArchivedInboxItems(lookup.data?.items ?? []), [lookup.data]);
   const selectionItems = useMemo(() => {
@@ -368,11 +379,29 @@ export function InboxPage({
   const needsLookup = isArchivedView && !!selectedKey && !selectedOnPage;
   const lookupLoading = needsLookup && lookup.isLoading;
   const lookupError = needsLookup && lookup.isError && !selected;
-  // contango: a desktop tab restores the inbox with its last selection; when that row has been archived since, the
-  // fallback below took it for a shared link and opened the issue page on every visit (owner 2026-11-07: "each time I
-  // try it opens a tab with ctg-1092"). An archived row of the user's own stays on the inbox, with the selection cleared.
+  // contango: a desktop tab restores the inbox with its last selection, so a selection that left the list since is not
+  // a shared link. Stay on the inbox with nothing selected unless the key really is an issue this inbox never held. The
+  // lookup is by group, so any row it returns is this selection; it cannot find a signal on an issue by the signal's
+  // id (the row key), hence the issue check: such a key is not an issue, and opening it as one would be a not-found page.
   const inboxLookupPending = !isArchivedView && !!selectedKey && !selectedOnPage && lookup.isLoading;
-  const selectionArchived = !isArchivedView && !!selectedKey && lookupItems.some((i) => inboxRowKey(i) === selectedKey);
+  const inboxLookupFailed = !isArchivedView && !!selectedKey && !selectedOnPage && lookup.isError;
+  const selectionArchived = !isArchivedView && !!selectedKey && lookupItems.length > 0;
+  const selectionUnknown =
+    !isArchivedView &&
+    !!selectedKey &&
+    !selectedOnPage &&
+    !selectionMovedTo &&
+    !loading &&
+    !lookup.isLoading &&
+    !lookup.isError &&
+    !selectionArchived;
+  const issueCheck = useQuery({
+    ...issueDetailOptions(wsId, selectedKey),
+    enabled: selectionUnknown,
+    retry: false,
+  });
+  const issueCheckPending = selectionUnknown && issueCheck.isLoading;
+  const selectionNotAnIssue = selectionUnknown && issueCheck.isError;
 
   // Shared inbox links (?issue=<id>) may point to notifications not in this
   // user's inbox (archived, or never received). Fall back to the issue page
@@ -381,11 +410,15 @@ export function InboxPage({
   // and `onInboxIssueDeleted` pruned the cache), the issue detail would 404
   // too — clear the selection and stay on /inbox instead.
   useEffect(() => {
-    if (viewLoading || lookupLoading || lookupError || inboxLookupPending || (isArchivedView && archivedError)) return;
+    if (viewLoading || lookupLoading || lookupError || inboxLookupPending || issueCheckPending || (isArchivedView && archivedError)) return;
     if (!selectedKey) return;
     if (selected) return;
     if (selectionFilteredOut) return;
-    if (lastResolvedKeyRef.current === selectedKey || selectionArchived) {
+    if (selectionMovedTo) {
+      setSelectedKey(inboxRowKey(selectionMovedTo));
+      return;
+    }
+    if (lastResolvedKeyRef.current === selectedKey || selectionArchived || inboxLookupFailed || selectionNotAnIssue) {
       setSelectedKey("");
       return;
     }
@@ -397,6 +430,10 @@ export function InboxPage({
     lookupLoading,
     lookupError,
     inboxLookupPending,
+    inboxLookupFailed,
+    issueCheckPending,
+    selectionNotAnIssue,
+    selectionMovedTo,
     selectionArchived,
     selectedKey,
     selected,

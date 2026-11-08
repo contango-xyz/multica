@@ -128,6 +128,23 @@ it.each([false, true])("clears an older unread assignment when opening a read ro
   expect(qc.getQueryData<InboxItem[]>(inboxKeys.list("workspace-1"))?.every((row) => row.read)).toBe(true);
 });
 
+it("lands on an empty inbox when the restored selection is a signal archived elsewhere", async () => {
+  useInboxFilterStore.setState({ filtersByWorkspace: {} });
+  searchParams = new URLSearchParams("issue=signal-1");
+  const listArchivedInboxPage = vi.fn(async () => page([]));
+  const getIssue = vi.fn(async () => { throw new Error("issue not found"); });
+  setApiInstance({
+    listInbox: async () => [item({ id: "other", issue_id: "other-issue" })],
+    listArchivedInboxPage, getIssue, getInboxUnreadSummary: async () => [],
+  } as unknown as ApiClient);
+
+  renderPage();
+
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/acme/inbox"));
+  expect(getIssue).toHaveBeenCalledExactlyOnceWith("signal-1");
+  expect(replace).not.toHaveBeenCalledWith("/acme/issues/signal-1");
+});
+
 function archivedFixture() {
   searchParams = new URLSearchParams("view=archived");
   const readGate = deferred<void>();

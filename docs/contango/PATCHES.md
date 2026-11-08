@@ -535,6 +535,20 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** upstream lets a property opt out of issue activity.
 
+### 24. A stale inbox selection opens the inbox with nothing selected
+
+- **What:** patch 20 only recognised an archived selection when the archive lookup returned a row under the same key.
+  Smart rows are keyed by the signal's id, and the lookup matches by issue, so a selected signal that left the list
+  came back empty and the page opened its inbox-row id as an issue (not found); an issue-keyed selection whose card
+  has an action signal now, or whose lookup failed, opened the card page (owner 2026-11-08). On the main list an
+  unresolved selection now: follows its issue's row if that row is listed under another key; clears when the row is
+  in the archive, the lookup failed, or the key is not an issue (one `getIssue`); and opens the issue only for a real
+  issue this inbox never held (upstream's shared link, kept). The archived sub-view is unchanged.
+- **Touches:** upstream files: `packages/views/inbox/components/inbox-page{,.test,-query.test}.tsx`.
+- **Migrations:** none.
+- **Upstream status:** none. The signal key is ours (patch 14); the failed-lookup path is patch 20's.
+- **Drop when:** with patches 14 and 20.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
