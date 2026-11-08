@@ -216,3 +216,25 @@ func TestInboxSignalReplyPassesCommentRefusalThrough(t *testing.T) {
 		t.Fatal("a failed post archived the signal")
 	}
 }
+
+func TestSignalReplyAnswersItsAsk(t *testing.T) {
+	f := newReplyFixture(t)
+	dbfx.Cleanup(t, `DELETE FROM issue_ask WHERE issue_id = $1`, f.issueID)
+	askRow := dbfx.Insert(t, "issue_ask", testutil.Cols{
+		"workspace_id": f.workspaceID, "issue_id": f.issueID, "comment_id": f.askID, "author_type": "member",
+		"author_id": f.botUserID, "addressee_type": "member", "addressee_id": f.recipientID, "kind": "decision",
+		"topic": "Which copy?", "source": "cli",
+	})
+	replies := f.replies()
+	replies[0]["ask_id"] = askRow
+	itemID := f.raise(t, map[string]any{"replies": replies})
+
+	testutil.Call(t, replyHandler(), replyRequest(itemID, f.recipientID, f.workspaceID, map[string]any{"index": 0, "content": "agree"})).
+		Want(http.StatusCreated)
+
+	var state, via, by, text string
+	dbfx.QueryRow(t, `SELECT state, answered_via, answered_by::text, answer_text FROM issue_ask WHERE id = $1`, askRow).Scan(&state, &via, &by, &text)
+	if state != "answered" || via != "one_tap" || by != f.recipientID || text != "agree" {
+		t.Fatalf("got state=%s via=%s by=%s text=%s", state, via, by, text)
+	}
+}

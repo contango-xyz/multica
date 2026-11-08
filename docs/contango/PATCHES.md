@@ -673,6 +673,44 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none.
 - **Drop when:** upstream has per-run runtime and model overrides.
 
+### 30. Asks as real objects (stage 1)
+
+- **What:** an `issue_ask` row per `[NEEDS HUMAN]` / `[NEEDS OPERATOR]` ask, written in the same transaction as the ask's
+  comment, so answered-or-not is stored instead of inferred from who commented next. Stage 1 is server + CLI only; no ops
+  script or agent uses it yet, and the board UI is unchanged.
+- **Creating:** `multica issue ask create CTG-1 --to @ana|operator --kind … --topic … --reply … [--default … --reversible]` →
+  `POST /api/issues/{id}/asks`. The server renders today's comment format (`service.RenderAskComment`) and delegates to
+  `CreateComment` as patch 18's one-tap does, so auth, the run/parent guard, mentions, notifications and agent triggers are
+  a typed comment's. The row joins that transaction through `createCommentWithAsk`. `--to @agent` is refused: there is no
+  marker for it, and `[NEEDS HUMAN]` would page a person.
+- **Compatibility:** the comment must parse exactly as a hand-written ask: bold tag first, `[TECH]` / `[TECH OWNER]` after
+  it, one `**Field:**` per line, `Reply with` as `code` spans, `Default if no answer: `x` (reversible)` below the `---`, the
+  member mention last, and `[NEEDS OPERATOR]` with no mention. `TestRenderAskComment*` pin the text; the scripts' own
+  parsers (`stall-watch.parse_ask`, `ask-defaults`, `inbox-signals`, `tech_owner`) were run against it.
+- **Answering:** a person's reply in the ask's thread answers it (`handler.answerAskFromComment`, one line after the comment
+  commits, before agent triggers). In the thread means under the ask, or a later sibling: the web reply box posts under the
+  root, so a reply to an ask that is itself a reply arrives as its sibling. Anything else leaves it open: top-level
+  comments, other threads, `/note`s, `MULTICA_BOT_USER_IDS` members, agents, and a member replying to their own ask.
+  One-tap: a signal reply's `ask_id` makes the delegated comment answer that ask as `one_tap`. `POST /api/asks/{id}/resolve`
+  records `status_move`, `pr_approved`, `default_applied` or `ops`; `comment`/`one_tap` are refused there.
+- **Closing:** `StopClosedIssueWakeups` (every close path, in the status write's transaction) withdraws the card's open asks;
+  deleting the ask's comment withdraws it; issue and workspace deletion remove the rows. `expired` is in the schema but nothing
+  writes it yet.
+- **Permissions:** identity is `resolveActor`, the same as comments. Agents may create asks and resolve or withdraw only asks
+  they created (never `ops`); members may resolve and withdraw any ask. `answered_by` is always the caller and
+  `answered_by_type` says which; a task token cannot produce a member answer or the reply paths.
+- **Off switch:** `MULTICA_ASKS=0` on the server: routes 403, hooks no-ops; markers carry on as before.
+- **Touches:** ours: `server/internal/service/issue_ask{,_test}.go`, `server/internal/handler/issue_ask{,_test,_helpers_test}.go`,
+  `server/pkg/db/queries/issue_ask.sql` (+ generated), `server/cmd/multica/cmd_issue_ask{,_test}.go`,
+  `server/cmd/server/issue_ask_routes_test.go`. Upstream, one-line hooks: `handler/comment.go` (write, answer, delete),
+  `service/issue_wakeup.go` (close), `handler/inbox_signal{,_reply}.go`, `cmd/server/router.go`, `queries/issue.sql` and
+  `queries/workspace_delete.sql` (row deletion), `cmd/migrate/main.go` and `handler/workspace_delete_manifest_test.go`
+  (registries).
+- **Migrations:** `621_issue_ask` (new table, no foreign keys), `622_issue_ask_comment_unique_index` and
+  `623_issue_ask_issue_created_index` (each `CONCURRENTLY`, one per file as the repo requires). Safe online: nothing touches an
+  existing table. Downs drop them.
+- **Upstream status:** none. **Drop when:** upstream has first-class asks; migrate the rows then.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

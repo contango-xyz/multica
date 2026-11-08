@@ -886,6 +886,37 @@ type Issue struct {
 	DuplicateOfIssueID pgtype.UUID        `json:"duplicate_of_issue_id"`
 }
 
+type IssueAsk struct {
+	ID              pgtype.UUID        `json:"id"`
+	WorkspaceID     pgtype.UUID        `json:"workspace_id"`
+	IssueID         pgtype.UUID        `json:"issue_id"`
+	CommentID       pgtype.UUID        `json:"comment_id"`
+	TaskID          pgtype.UUID        `json:"task_id"`
+	PrID            pgtype.UUID        `json:"pr_id"`
+	AuthorType      string             `json:"author_type"`
+	AuthorID        pgtype.UUID        `json:"author_id"`
+	AddresseeType   string             `json:"addressee_type"`
+	AddresseeID     pgtype.UUID        `json:"addressee_id"`
+	AddresseeRole   pgtype.Text        `json:"addressee_role"`
+	Kind            string             `json:"kind"`
+	Topic           string             `json:"topic"`
+	Options         []byte             `json:"options"`
+	Recommended     pgtype.Text        `json:"recommended"`
+	DefaultOption   pgtype.Text        `json:"default_option"`
+	Reversible      bool               `json:"reversible"`
+	State           string             `json:"state"`
+	AnswerText      pgtype.Text        `json:"answer_text"`
+	AnswerCommentID pgtype.UUID        `json:"answer_comment_id"`
+	AnsweredByType  pgtype.Text        `json:"answered_by_type"`
+	AnsweredBy      pgtype.UUID        `json:"answered_by"`
+	AnsweredVia     pgtype.Text        `json:"answered_via"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	Source          string             `json:"source"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ClosedAt        pgtype.Timestamptz `json:"closed_at"`
+}
+
 type IssueChildEvent struct {
 	ID           pgtype.UUID        `json:"id"`
 	WorkspaceID  pgtype.UUID        `json:"workspace_id"`

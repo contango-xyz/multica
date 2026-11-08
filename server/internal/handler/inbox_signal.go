@@ -104,6 +104,7 @@ type signalReply struct {
 	Label           string `json:"label"`
 	Content         string `json:"content"`
 	ParentCommentID string `json:"parent_comment_id,omitempty"`
+	AskID           string `json:"ask_id,omitempty"` // contango patch 30: the ask this reply answers
 }
 
 type signalRank struct {

@@ -112,7 +112,7 @@ func (h *Handler) ReplyToInboxSignal(w http.ResponseWriter, r *http.Request) {
 		body.ParentID = &p
 	}
 	out := &bufferedResponse{header: http.Header{}}
-	h.CreateComment(out, commentRequestFor(r, issueID, body))
+	h.CreateComment(out, withAskOneTap(commentRequestFor(r, issueID, body), reply.AskID))
 	if out.status >= 300 {
 		// Pass the comment handler's refusal through unchanged.
 		for k, v := range out.header {

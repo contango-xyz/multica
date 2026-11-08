@@ -263,6 +263,9 @@ func StopClosedIssueWakeups(ctx context.Context, q *db.Queries, issue db.Issue) 
 	if err != nil || active {
 		return nil, err
 	}
+	if err = WithdrawOpenAsksOnClose(ctx, q, issue); err != nil {
+		return nil, err
+	}
 	if err = q.DisableIssueWakeups(ctx, issue.ID); err != nil {
 		return nil, err
 	}

@@ -1906,7 +1906,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		created, err = wakeupWrite(h, r, func(q *db.Queries) (db.CreateCommentRow, error) {
-			return q.CreateComment(r.Context(), createParams)
+			return h.createCommentWithAsk(r.Context(), q, createParams)
 		})
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -1940,6 +1940,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	// the agent task path (TaskService.createAgentComment) — both reply paths
 	// must keep the resolved root in sync.
 	h.TaskService.AutoUnresolveThreadOnReply(r.Context(), rootComment, uuidToString(issue.WorkspaceID), authorType, authorID, h.wakeupSourceTaskID(r))
+	h.answerAskFromComment(r, comment)
 
 	originatorUserID := h.invokeOriginatorFromRequest(r, authorType, authorID)
 	// The comment is already saved; a blocked mention must not fail the whole
@@ -3838,6 +3839,9 @@ func (h *Handler) deleteComment(ctx context.Context, commentID, workspaceID pgty
 		WorkspaceID: workspaceID,
 	})
 	if err != nil {
+		return out, err
+	}
+	if err := service.WithdrawAskOnCommentDelete(ctx, qtx, target.ID, target.WorkspaceID); err != nil {
 		return out, err
 	}
 	// Keep receipt admission locked through deletion so a concurrent retry

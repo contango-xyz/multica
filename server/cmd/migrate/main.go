@@ -140,6 +140,8 @@ var pgBigmOperatorClass = extensionOperatorClass{
 // they are still pending: a fresh self-hosted install, which is exactly where an
 // interrupted build would otherwise leave a permanently unusable index.
 var concurrentIndexCleanups = map[string]string{
+	"623_issue_ask_issue_created_index":                         "idx_issue_ask_issue_created",  // contango patch 30
+	"622_issue_ask_comment_unique_index":                        "idx_issue_ask_comment",        // contango patch 30
 	"618_autopilot_run_job_active_index":                        "idx_autopilot_run_job_active", // contango patch 22
 	"613_skill_version_index":                                   "idx_skill_version_skill_version",
 	"606_agent_task_queue_runtime_active_index":                 "idx_agent_task_queue_runtime_active",
