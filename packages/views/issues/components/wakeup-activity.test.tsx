@@ -42,6 +42,13 @@ describe("wakeup timeline entries", () => {
     expect(read(entry("wakeup_triggered", { wakeup: { ...reply, condition: { type: "pull_request", event: "conflicts" } } }))).toBe(
       "当关联 PR 出现合并冲突时，唤醒了 Emacs",
     );
+    for (const [event, sentence] of [
+      ["head", "当关联 PR 有新推送时，唤醒了 Emacs"],
+      ["approved", "当有人批准关联 PR 时，唤醒了 Emacs"],
+      ["ready", "当关联 PR 可供评审时，唤醒了 Emacs"],
+    ] as const) {
+      expect(read(entry("wakeup_triggered", { wakeup: { ...reply, condition: { type: "pull_request", event } } }))).toBe(sentence);
+    }
     expect(read(entry("wakeup_triggered", { wakeup: reply, events: ["wakeup.manual"], actor_type: "member", actor_id: "u" }))).toBe(
       "Jiayuan 立即唤醒了 Emacs",
     );

@@ -1317,6 +1317,9 @@
       "checked": "marcado",
       "unchecked": "sin marcar",
       "pr_conflicts": "Cuando un PR enlazado tiene conflictos de fusión",
+      "pr_head": "Cuando un PR enlazado recibe un nuevo push",
+      "pr_approved": "Cuando una persona aprueba un PR enlazado",
+      "pr_ready": "Cuando un PR enlazado está listo para revisión",
       "other_blocked": "Cuando {{issue}} pase a Bloqueado"
     },
     "wait": {
@@ -1340,6 +1343,9 @@
       "paused": "Activación pausada",
       "open": "Mostrar activaciones",
       "pr_conflicts": "Vigilando conflictos de fusión",
+      "pr_head": "Esperando un nuevo push",
+      "pr_approved": "Esperando la aprobación del PR",
+      "pr_ready": "Esperando a que el PR deje de ser borrador",
       "other_blocked": "Esperando a que {{issue}} pase a Bloqueado"
     },
     "paused": {

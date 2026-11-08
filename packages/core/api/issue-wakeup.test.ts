@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
 import { ApiClient } from "./client";
-import { AgentTaskSchema } from "./schemas";
+import { AgentTaskSchema, WakeupConditionSchema } from "./schemas";
 afterEach(() => vi.unstubAllGlobals());
 const client = new ApiClient("https://api.example.test");
 it("does not present malformed wakeup state as an empty list", async () => {
@@ -220,6 +220,9 @@ it("sends a workspace default change", async () => {
   expect(JSON.parse(init.body)).toEqual({ enabled: false });
 });
 
+it.each(["head", "approved", "ready"])("keeps the %s pull request condition", (event) => {
+  expect(WakeupConditionSchema.parse({ type: "pull_request", event })).toEqual({ type: "pull_request", event });
+});
 it("reads conditions, caps and pauses, and drops shapes it does not know", async () => {
   const base = {
     id: "w", issue_id: "i", agent_id: "a", agent_name: "Emacs", instruction: "go", kind: "event", mode: "continuous",
