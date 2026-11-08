@@ -12,8 +12,9 @@ import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
 import { IssueWakeupHeaderChip } from "./issue-wakeup-header-chip";
 import { IssueWaitingOn } from "./issue-waiting-on";
 import { splitIssueKeys } from "./wait-issue-links";
+import { WakeupsSection } from "./wakeups-section";
 
-const mockRules = vi.hoisted(() => ({ rules: [] as unknown[] }));
+const mockRules = vi.hoisted(() => ({ rules: [] as unknown[], system: [] as unknown[] }));
 
 vi.mock("@multica/core/hooks", () => ({ useWorkspaceId: () => "ws-1" }));
 vi.mock("@multica/core/paths", () => ({
@@ -23,7 +24,8 @@ vi.mock("@multica/core/paths", () => ({
 vi.mock("@multica/core/issues", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@multica/core/issues")>()),
   issueWakeupsOptions: () => ({ queryKey: ["chip-rules"], queryFn: () => mockRules.rules }),
-  issueSystemWakeupsOptions: () => ({ queryKey: ["chip-system"], queryFn: () => [] }),
+  issueSystemWakeupsOptions: () => ({ queryKey: ["chip-system"], queryFn: () => mockRules.system }),
+  issueTasksOptions: () => ({ queryKey: ["chip-tasks"], queryFn: () => [] }),
 }));
 vi.mock("../../i18n", () => ({
   useLocale: () => "en",
@@ -100,6 +102,7 @@ function anchorsInAnchors() {
 beforeEach(() => {
   push.mockClear();
   mockRules.rules = [];
+  mockRules.system = [];
 });
 afterEach(cleanup);
 
@@ -259,5 +262,67 @@ describe("the detail header chip", () => {
     renderUi(<IssueWakeupHeaderChip issueId="issue" onOpen={() => {}} />);
     expect(await screen.findByRole("button")).toBeTruthy();
     expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+describe("the wakeups section", () => {
+  const waitingRule = {
+    id: "w",
+    issue_id: "issue",
+    agent_id: "a",
+    agent_name: "Emacs",
+    instruction: "",
+    kind: "event",
+    mode: "once",
+    event_types: [],
+    timezone: "UTC",
+    next_fire_at: null,
+    enabled: true,
+    disabled_at: null,
+    last_task_id: null,
+    last_error: null,
+    condition: { type: "other_issue", issue_id: "uuid-2421", state: "done", identifier: "CTG-2421" },
+  } as unknown as IssueWakeup;
+
+  it("links the rule's icon to the issue without opening the rule's popover", async () => {
+    mockRules.rules = [waitingRule];
+    renderUi(<WakeupsSection issueId="issue" />);
+    const link = await screen.findByRole("link", { name: "CTG-2421" });
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("/acme/issues/uuid-2421");
+    // A sibling of the row's button, never inside it.
+    expect(link.closest("button")).toBeNull();
+
+    fireEvent.click(link);
+    expect(push).toHaveBeenCalledWith("/acme/issues/uuid-2421");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("links a system rule's waiting keys in its popover", async () => {
+    mockRules.system = [
+      {
+        id: "rule",
+        revision: 1,
+        default_instruction: "",
+        customized: false,
+        paused_reason: null,
+        rule: "child_done",
+        enabled: true,
+        instruction: "",
+        staged: false,
+        stage: null,
+        total: 2,
+        remaining: 2,
+        waiting: ["CTG-7", "CTG-8"],
+        target: { type: "agent", id: "a", name: "Grok" },
+        blocked: "",
+        workspace_default: true,
+      },
+    ];
+    renderUi(<WakeupsSection issueId="issue" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Grok/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("link", { name: "CTG-7" }).getAttribute("href")).toBe("/acme/issues/CTG-7");
+    expect(within(dialog).getByRole("link", { name: "CTG-8" }).getAttribute("href")).toBe("/acme/issues/CTG-8");
   });
 });
