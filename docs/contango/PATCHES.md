@@ -549,17 +549,20 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **Upstream status:** none. The signal key is ours (patch 14); the failed-lookup path is patch 20's.
 - **Drop when:** with patches 14 and 20.
 
-### 25. "Waiting on" line on board cards and list rows
+### 25. "Waiting on" line in the agent activity indicator
 
-- **What:** board cards (board and swimlane views) and list rows show the issue's "Waiting on" custom property as one
-  truncated line, with the full text on hover. The property is found by name in the workspace's property list. The
-  line is hidden while the value is empty or the issue has a running or queued task, the same test as the agent
-  activity badge. A line starting with `⚠` uses the warning colour and icon. Values arrive live through the existing
-  `issue_properties:changed` handling. Why: at a glance, why a card has nothing happening (owner 2026-11-08). The ops
-  job that writes the value is `team/waiting-on.py`. The table view is not covered.
+- **What:** `IssueAgentActivityIndicator` shows the issue's "Waiting on" custom property as the last step of its
+  ladder: running or queued task, then future wakeups, then paused wakeup, and only when all three are absent (and
+  loaded) the line. It sits in the indicator's slot with the wake label's look and `max-w-36` truncation, full text on
+  hover. Any wake or paused wakeup hides it, even if it says something different. A line starting with `⚠` uses the
+  warning colour and icon. Opt-in through the `waitingOnProperties` prop, passed only by board cards (board and
+  swimlane views) and list rows; Inbox, table and every other use are unchanged. The property is found by name in the
+  workspace's property list, and values arrive live through the existing `issue_properties:changed` handling. Why: at
+  a glance, why a card has nothing happening, without repeating Multica's own indicator (owner 2026-11-08). The ops
+  job that writes the value is `team/waiting-on.py`.
 - **Touches:** ours: `packages/views/issues/components/issue-waiting-on{,.test}.tsx`. Upstream files:
-  `packages/views/issues/components/board-card.tsx`, `packages/views/issues/components/list-row.tsx` (one line each,
-  plus the import).
+  `packages/views/issues/components/issue-agent-activity-indicator.tsx` (prop, `isPending` flags, the fallback),
+  `packages/views/issues/components/board-card.tsx`, `packages/views/issues/components/list-row.tsx` (pass the prop).
 - **Migrations:** none.
 - **Upstream status:** none.
 - **Drop when:** upstream shows a chosen custom property on idle cards, or the "Waiting on" job goes away.

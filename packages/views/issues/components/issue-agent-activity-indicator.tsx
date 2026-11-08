@@ -11,7 +11,7 @@ import {
 } from "@multica/ui/components/ui/hover-card";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { agentTaskSnapshotOptions } from "@multica/core/agents";
-import type { AgentTask, IssueWakeupSummaryRow, PausedWakeup } from "@multica/core/types";
+import type { AgentTask, IssuePropertyValues, IssueWakeupSummaryRow, PausedWakeup } from "@multica/core/types";
 import { pausedWakeupsOptions, workspaceWakeupSummariesOptions } from "@multica/core/issues/wakeups";
 import { cn } from "@multica/ui/lib/utils";
 import type { AvatarSize } from "@multica/ui/lib/avatar-size";
@@ -20,6 +20,7 @@ import { AgentActivityHoverContent } from "../../agents/components/agent-activit
 import { selectIssueTasks, type IssueTaskGroups } from "../surface/activity";
 import { useT } from "../../i18n";
 import { useWakeupText } from "./wakeup-presentation";
+import { IssueWaitingOn } from "./issue-waiting-on";
 
 const EMPTY_GROUPS: IssueTaskGroups = { running: [], queued: [] };
 
@@ -51,6 +52,9 @@ interface IssueAgentActivityIndicatorProps {
   // Whether hovering opens the activity card. Opt OUT where the card's only
   // incremental information is not worth a popup (Inbox — see below).
   hoverCard?: boolean;
+  // The issue's custom property values. Passing them turns on the "Waiting on"
+  // line as the last fallback; only board cards and list rows do.
+  waitingOnProperties?: IssuePropertyValues;
 }
 
 /**
@@ -61,6 +65,7 @@ interface IssueAgentActivityIndicatorProps {
  *   - has ≥1 running task  → tiny avatar stack + shimmering "Working"
  *   - 0 running, ≥1 queued → half-opacity stack + muted "Queued"
  *   - future wakeups only   → next time/event + remaining count
+ *   - nothing, opted in     → the issue's "Waiting on" line, if it has one
  *   - no tasks or wakeups   → return null (no chrome, no placeholder)
  *
  * The shimmer shares chat's ShimmerText component. Earlier iterations layered
@@ -95,6 +100,7 @@ export const IssueAgentActivityIndicator = memo(
     issueId,
     size = "xs",
     hoverCard = true,
+    waitingOnProperties,
   }: IssueAgentActivityIndicatorProps) {
     const { t } = useT("issues");
     const wsId = useWorkspaceId();
@@ -105,7 +111,7 @@ export const IssueAgentActivityIndicator = memo(
         rows.filter((row) => row.issue_id === issueId),
       [issueId],
     );
-    const { data: wakeups = [] } = useQuery({
+    const { data: wakeups = [], isPending: wakeupsPending } = useQuery({
       ...workspaceWakeupSummariesOptions(wsId),
       select: selectWakeups,
     });
@@ -113,7 +119,7 @@ export const IssueAgentActivityIndicator = memo(
       (rows: PausedWakeup[]) => rows.some((row) => row.issue_id === issueId),
       [issueId],
     );
-    const { data: paused = false } = useQuery({
+    const { data: paused = false, isPending: pausedPending } = useQuery({
       ...pausedWakeupsOptions(wsId),
       select: selectPaused,
     });
@@ -121,7 +127,7 @@ export const IssueAgentActivityIndicator = memo(
       (snapshot: AgentTask[]) => selectIssueTasks(snapshot, issueId),
       [issueId],
     );
-    const { data: groups = EMPTY_GROUPS } = useQuery({
+    const { data: groups = EMPTY_GROUPS, isPending: tasksPending } = useQuery({
       ...agentTaskSnapshotOptions(wsId),
       select,
     });
@@ -145,7 +151,11 @@ export const IssueAgentActivityIndicator = memo(
     const hasTasks = agentIds.length > 0;
     const hoverTasks = [...groups.running, ...groups.queued];
     const wakeupTriggered = hoverTasks.some((task) => !!task.wakeup_id);
-    if (!hasTasks && !wakeupCount && !paused) return null;
+    if (!hasTasks && !wakeupCount && !paused) {
+      // Wait for all three answers, so the line never flashes before a wakeup.
+      if (!waitingOnProperties || tasksPending || wakeupsPending || pausedPending) return null;
+      return <IssueWaitingOn properties={waitingOnProperties} />;
+    }
     const isRunning = opacity === "full";
     // One sentence of what the issue waits for; a paused rule speaks up only
     // when nothing else is waiting, because it needs someone to look.

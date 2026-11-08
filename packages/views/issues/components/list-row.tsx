@@ -26,7 +26,6 @@ import { CustomStatusChip } from "./custom-status-chip";
 import { IssueDuplicateOfMarker } from "./issue-duplicates";
 import { IssueDependencyMarker } from "./issue-dependencies";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
-import { IssueWaitingOn } from "./issue-waiting-on";
 import { useIssueSurfaceSelection } from "../surface/selection-context";
 import {
   PEEKED_ROW_CLASS,
@@ -130,7 +129,7 @@ function ListRowContent({
           <span className="min-w-16 shrink-0 text-caption text-muted-foreground">
             {issue.identifier}
           </span>
-          <IssueAgentActivityIndicator issueId={issue.id} />
+          <IssueAgentActivityIndicator issueId={issue.id} waitingOnProperties={issue.properties} />
 
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
             <span className="truncate">{issue.title}</span>
@@ -138,8 +137,6 @@ function ListRowContent({
             <CustomStatusChip status={issue.status} className="shrink-0" />
             <IssueDuplicateOfMarker issue={issue} insideLink />
             <IssueDependencyMarker issue={issue} />
-            {/* Gives way to the title first, so a long line never hides it. */}
-            <IssueWaitingOn issue={issue} className="ml-1.5 max-w-[40%] shrink-[3]" />
             {showChildProgress && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5">
                 <ProgressRing done={childProgress!.done} total={childProgress!.total} size={14} />
