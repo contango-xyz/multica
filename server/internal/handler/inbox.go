@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync"
+	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -223,7 +225,32 @@ func (h *Handler) ListArchivedInbox(w http.ResponseWriter, r *http.Request) {
 // MarkInboxRead reads the item and, when it belongs to an issue, every other
 // unread active item the caller has on that issue: selecting a row in the inbox
 // opens the whole issue (MUL-8618, see the query comment).
+// maxInboxReadsPerUser caps one person's mark-as-read requests in flight. The
+// requests are cheap until the database is busy, when each holds a connection
+// for seconds: one client retrying a folded row took the whole pool and failed
+// every agent's calls with it (2026-11-09).
+const maxInboxReadsPerUser = 4
+
+var inboxReadsInFlight sync.Map // user id -> *atomic.Int32
+
+func acquireInboxRead(userID string) (release func(), ok bool) {
+	v, _ := inboxReadsInFlight.LoadOrStore(userID, new(atomic.Int32))
+	n := v.(*atomic.Int32)
+	if n.Add(1) > maxInboxReadsPerUser {
+		n.Add(-1)
+		return nil, false
+	}
+	return func() { n.Add(-1) }, true
+}
+
 func (h *Handler) MarkInboxRead(w http.ResponseWriter, r *http.Request) {
+	release, ok := acquireInboxRead(requestUserID(r))
+	if !ok {
+		w.Header().Set("Retry-After", "2")
+		writeError(w, http.StatusTooManyRequests, "too many mark-as-read requests in flight")
+		return
+	}
+	defer release()
 	id := chi.URLParam(r, "id")
 	prev, ok := h.loadInboxItemForUser(w, r, id)
 	if !ok {

@@ -721,6 +721,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **What:** `isWaitingOnYou` is true for a mention or review request only while it's unread. It stays under Mentions; nothing else ended it, so read mentions counted as waiting until archived (151 older than 7 days across five people on 2026-11-09). `filterSmartSections` takes the open row's key so opening one under "Needs my action only" doesn't drop it from the list.
 - **Upstream conflict risk:** none expected, `packages/core/inbox/smart*.ts` are ours.
 
+### 33. Mark-as-read can't flood the server
+
+- **What:** opening a row tries each unread id once per opening (a failed read rolled the row back to unread, which re-ran the effect without end); "mark section read" goes four at a time; the server allows four `POST /api/inbox/{id}/read` in flight per person and answers 429 past that, so old clients still looping stay cheap.
+- **Upstream conflict risk:** the auto-read effect and `handleMarkSectionRead` in `inbox-page.tsx`, `MarkInboxRead` in `inbox.go`.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

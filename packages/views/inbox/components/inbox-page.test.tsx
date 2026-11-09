@@ -883,6 +883,23 @@ describe("InboxPage", () => {
     expect(replace).not.toHaveBeenCalledWith("/acme/inbox");
   });
 
+  it("tries a failed read once per opening, however often the row re-renders unread", () => {
+    // A failed read rolls the row back to unread, which used to fire it again
+    // for as long as the server stayed slow (2026-11-09).
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [item({ id: "inbox-a", issue_id: "issue-a", read: false })];
+
+    const { rerender } = render(<InboxPage />);
+    fireEvent.click(screen.getByTestId("row"));
+    for (let i = 0; i < 3; i++) {
+      listData.active = [item({ id: "inbox-a", issue_id: "issue-a", read: false })];
+      rerender(<InboxPage />);
+    }
+
+    expect(markReadMutate).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps an explicitly unread row unread while it stays open", () => {
     // Without the guard the auto-read effect fires on the very next commit and
     // silently undoes the user's "mark as unread" — the action looks like a

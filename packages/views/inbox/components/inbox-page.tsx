@@ -128,6 +128,8 @@ import { useT } from "../../i18n";
 import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade-prompt";
 
 
+const MARK_READ_BATCH = 4;
+
 export function InboxPage({
   headerAccessory,
   smart = false,
@@ -473,15 +475,18 @@ export function InboxPage({
   // arrivals while the row stays open. Track the opening separately from the
   // optimistic cache patch so a read row cannot cause a request loop.
   const openedItemIdRef = useRef<string | null>(null);
+  const readAttemptedIdsRef = useRef(new Set<string>());
   const markReadMutate = markReadMutation.mutate;
   const selectedId = selected?.id;
   const selectedRead = selected?.read;
   useEffect(() => {
     if (!selectedId) {
       openedItemIdRef.current = null;
+      readAttemptedIdsRef.current.clear();
       return;
     }
     const justOpened = openedItemIdRef.current !== selectedId;
+    if (justOpened) readAttemptedIdsRef.current.clear();
     openedItemIdRef.current = selectedId;
     if (!justOpened && selectedRead) return;
     if (manualUnreadIdRef.current === selectedId) return;
@@ -498,6 +503,11 @@ export function InboxPage({
     // A folded Smart row stands for several entries; opening it reads them all.
     const ids = smartRows && selected ? smartRowUnreadIds(smartRows, selected) : [selectedId];
     for (const id of ids) {
+      // Once per opening. A failed read rolls the row back to unread, which re-ran
+      // this effect: every id again, without end, for as long as the server was
+      // slow, which kept it slow for everyone.
+      if (readAttemptedIdsRef.current.has(id)) continue;
+      readAttemptedIdsRef.current.add(id);
       markReadMutate(id, {
         onError: (err) =>
           toast.error(
@@ -654,9 +664,17 @@ export function InboxPage({
     const unread = entries.flatMap((entry) =>
       smartRows ? smartRowUnreadIds(smartRows, entry.item) : entry.item.read ? [] : [entry.item.id],
     );
-    void Promise.allSettled(unread.map((id) => markReadMutateAsync(id))).then((results) => {
-      if (results.some((r) => r.status === "rejected")) toast.error(t(($) => $.errors.mark_read_failed));
-    });
+    // A few at a time: one request per row, and a section can hold hundreds.
+    void (async () => {
+      let failed = false;
+      for (let i = 0; i < unread.length; i += MARK_READ_BATCH) {
+        const results = await Promise.allSettled(
+          unread.slice(i, i + MARK_READ_BATCH).map((id) => markReadMutateAsync(id)),
+        );
+        failed ||= results.some((r) => r.status === "rejected");
+      }
+      if (failed) toast.error(t(($) => $.errors.mark_read_failed));
+    })();
   };
 
   // Keep the listener stable while using the latest selected-item action.
