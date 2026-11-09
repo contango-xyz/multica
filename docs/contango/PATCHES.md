@@ -711,6 +711,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
   existing table. Downs drop them.
 - **Upstream status:** none. **Drop when:** upstream has first-class asks; migrate the rows then.
 
+### 31. Drag to resize the inbox signal brief
+
+- **What:** the summary panel above the issue in the inbox (`ResizableSignalBrief`) gets a drag handle on its lower edge. Untouched, it keeps the automatic height (content, up to 40%). A drag pins a height, saved per browser in `multica_inbox_signal_brief_height`, between 56px and 80% of the space. Double-click returns to automatic; arrow keys resize.
+- **Upstream conflict risk:** the `detailContent` block in `packages/views/inbox/components/inbox-page.tsx`, plus one `smart.resize_brief` key in each `locales/*/inbox.json`.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

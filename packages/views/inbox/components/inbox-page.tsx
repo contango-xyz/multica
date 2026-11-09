@@ -120,6 +120,7 @@ import {
   useSmartInboxFilters,
 } from "@multica/core/inbox/smart-filter-store";
 import { SignalBrief, SmartFilterMenu } from "./smart-inbox";
+import { ResizableSignalBrief } from "./resizable-signal-brief";
 import { SmartInboxList } from "./smart-inbox-list";
 import { SmartDashboard } from "./smart-dashboard";
 import { buildSmartRows, smartRowUnreadIds } from "@multica/core/inbox/smart-fold";
@@ -1146,16 +1147,17 @@ export function InboxPage({
     smart && detailItem?.type === "signal" ? smartEntryById.get(detailItem.id) ?? null : null;
   const detailContent =
     detailSignalEntry && classicDetailContent ? (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="max-h-[40%] shrink-0 overflow-y-auto border-b px-6 py-3">
+      <ResizableSignalBrief
+        brief={
           <SignalBrief
             entry={detailSignalEntry}
             compact
             showTitleAndBody={!!detailItem?.issue_id}
           />
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col">{classicDetailContent}</div>
-      </div>
+        }
+      >
+        {classicDetailContent}
+      </ResizableSignalBrief>
     ) : (
       classicDetailContent
     );
