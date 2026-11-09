@@ -179,6 +179,18 @@ describe("buildSmartSections", () => {
     expect(needs.get(status.id)).toBe(false);
   });
 
+  it("stops asking once a mention is opened, but keeps it under Mentions", () => {
+    const unread = item({ type: "mentioned", read: false });
+    const read = item({ type: "mentioned", read: true });
+    const review = item({ type: "review_requested", read: true });
+    const sections = buildSmartSections([unread, read, review], NOW);
+    const needs = new Map(sections.flatMap((s) => s.entries).map((e) => [e.item.id, e.needsYou]));
+    expect(needs.get(unread.id)).toBe(true);
+    expect(needs.get(read.id)).toBe(false);
+    expect(needs.get(review.id)).toBe(false);
+    expect(sections.map((s) => s.id)).toEqual(["mentions"]);
+  });
+
   it("ranks within a group by score", () => {
     const a = signal("blocking", { priority: "medium", blocks: 1, since: hoursAgo(1) });
     const b = signal("blocking", { priority: "medium", blocks: 5, since: hoursAgo(1) });

@@ -716,6 +716,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **What:** the summary panel above the issue in the inbox (`ResizableSignalBrief`) gets a drag handle on its lower edge. Untouched, it keeps the automatic height (content, up to 40%). A drag pins a height, saved per browser in `multica_inbox_signal_brief_height`, between 56px and 80% of the space. Double-click returns to automatic; arrow keys resize.
 - **Upstream conflict risk:** the `detailContent` block in `packages/views/inbox/components/inbox-page.tsx`, plus one `smart.resize_brief` key in each `locales/*/inbox.json`.
 
+### 32. A read mention stops counting as "needs my action"
+
+- **What:** `isWaitingOnYou` is true for a mention or review request only while it's unread. It stays under Mentions; nothing else ended it, so read mentions counted as waiting until archived (151 older than 7 days across five people on 2026-11-09). `filterSmartSections` takes the open row's key so opening one under "Needs my action only" doesn't drop it from the list.
+- **Upstream conflict risk:** none expected, `packages/core/inbox/smart*.ts` are ours.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

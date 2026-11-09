@@ -27,6 +27,8 @@ export function smartInboxFilterCount(filters: SmartInboxFilters): number {
 export function filterSmartSections(
   sections: SmartSection[],
   filters: SmartInboxFilters,
+  /** The open row: opening a mention marks it read, which mustn't drop it from the list under the reader. */
+  openKey?: string | null,
 ): SmartSection[] {
   if (smartInboxFilterCount(filters) === 0) return sections;
   const out: SmartSection[] = [];
@@ -34,7 +36,9 @@ export function filterSmartSections(
     if (filters.groups.length > 0 && !filters.groups.includes(section.id)) continue;
     const entries = section.entries.filter(
       (e) =>
-        (!filters.needsYouOnly || e.needsYou) &&
+        (!filters.needsYouOnly ||
+          e.needsYou ||
+          (!!openKey && (e.item.id === openKey || e.item.issue_id === openKey))) &&
         (!filters.urgentOnly || e.reason.priority === "urgent"),
     );
     if (entries.length > 0) out.push(entries.length === section.entries.length ? section : { ...section, entries });

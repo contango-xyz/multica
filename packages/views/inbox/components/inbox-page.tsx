@@ -247,9 +247,9 @@ export function InboxPage({
   const smartSections = useMemo(
     () =>
       smart && !isArchivedView
-        ? filterSmartSections(buildSmartSections(classicFilteredItems, rankNow), smartFilters)
+        ? filterSmartSections(buildSmartSections(classicFilteredItems, rankNow), smartFilters, selectedKey)
         : null,
-    [smart, isArchivedView, classicFilteredItems, rankNow, smartFilters],
+    [smart, isArchivedView, classicFilteredItems, rankNow, smartFilters, selectedKey],
   );
   // Selection walks the rows in the order the list shows them.
   const filteredItems = useMemo(

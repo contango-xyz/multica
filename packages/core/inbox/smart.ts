@@ -156,7 +156,9 @@ export function rankReason(input: RankInput, now: number): RankReason {
 
 export function isWaitingOnYou(item: InboxItem): boolean {
   if (item.type === "signal") return item.severity === "action_required";
-  return ADDRESSED_TYPES.has(item.type);
+  // Once opened, a mention stays under Mentions but no longer asks for anything:
+  // nothing else ends it, so old read mentions counted as waiting until archived.
+  return ADDRESSED_TYPES.has(item.type) && !item.read;
 }
 
 export interface SmartEntry {
@@ -164,7 +166,7 @@ export interface SmartEntry {
   signal: SignalDetails | null;
   score: number;
   reason: RankReason;
-  /** Waits on the reader: an action_required signal, a mention or a review request. */
+  /** Waits on the reader: an action_required signal, or an unread mention or review request. */
   needsYou: boolean;
   /** Hours since the wait started (rank.since, else created_at). */
   waitedHours: number;

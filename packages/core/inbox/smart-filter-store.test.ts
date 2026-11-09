@@ -37,6 +37,14 @@ describe("filterSmartSections", () => {
     const out = filterSmartSections(sections, { groups: [], needsYouOnly: true, urgentOnly: false });
     expect(out.map((s) => [s.id, s.entries.map((e) => e.item.id)])).toEqual([["merge", ["m1"]]]);
   });
+
+  it("keeps the open row even though opening it stopped it needing you", () => {
+    const out = filterSmartSections(sections, { groups: [], needsYouOnly: true, urgentOnly: false }, "f1");
+    expect(out.map((s) => [s.id, s.entries.map((e) => e.item.id)])).toEqual([
+      ["merge", ["m1"]],
+      ["fyi", ["f1"]],
+    ]);
+  });
 });
 
 describe("urgent filter", () => {
