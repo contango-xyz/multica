@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/multica-ai/multica/server/internal/logger"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -138,6 +140,7 @@ func (h *Handler) ListArchivedInboxPage(w http.ResponseWriter, r *http.Request) 
 	p.PageLimit = int32(limit + 1)
 	rows, err := h.Queries.ListArchivedInboxPage(r.Context(), p)
 	if err != nil {
+		slog.Warn("inbox: archived page failed", append(logger.RequestAttrs(r), "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to load archived inbox page")
 		return
 	}

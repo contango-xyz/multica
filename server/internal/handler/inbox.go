@@ -3,12 +3,14 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/logger"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
@@ -243,6 +245,45 @@ func acquireInboxRead(userID string) (release func(), ok bool) {
 	return func() { n.Add(-1) }, true
 }
 
+// withInboxReadLock runs a mark-as-read write in a transaction that first takes
+// one advisory lock per recipient. Reading a row reads every unread row on its
+// issue, so two reads of the same person's rows on one issue update the same
+// rows in different orders and deadlocked: Postgres aborted one after its 1s
+// deadlock_timeout and the client got a 500 (2026-11-10, six a morning once the
+// inbox read sections in batches). One person's reads now queue behind each
+// other; other people's never wait. A deadlock with some other writer is
+// retried once.
+func (h *Handler) withInboxReadLock(ctx context.Context, recipientID string, fn func(q *db.Queries) error) error {
+	err := h.inboxReadTx(ctx, recipientID, fn)
+	if isDeadlock(err) {
+		err = h.inboxReadTx(ctx, recipientID, fn)
+	}
+	return err
+}
+
+func (h *Handler) inboxReadTx(ctx context.Context, recipientID string, fn func(q *db.Queries) error) error {
+	if h.TxStarter == nil {
+		return fn(h.Queries)
+	}
+	tx, err := h.TxStarter.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", "inbox-read:"+recipientID); err != nil {
+		return err
+	}
+	if err := fn(h.Queries.WithTx(tx)); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func isDeadlock(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "40P01"
+}
+
 func (h *Handler) MarkInboxRead(w http.ResponseWriter, r *http.Request) {
 	release, ok := acquireInboxRead(requestUserID(r))
 	if !ok {
@@ -256,8 +297,14 @@ func (h *Handler) MarkInboxRead(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	item, err := h.Queries.MarkInboxRead(r.Context(), prev.ID)
+	var item db.InboxItem
+	err := h.withInboxReadLock(r.Context(), uuidToString(prev.RecipientID), func(q *db.Queries) error {
+		var err error
+		item, err = q.MarkInboxRead(r.Context(), prev.ID)
+		return err
+	})
 	if err != nil {
+		slog.Warn("inbox: mark read failed", append(logger.RequestAttrs(r), "item_id", id, "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to mark read")
 		return
 	}
@@ -450,11 +497,17 @@ func (h *Handler) MarkAllInboxRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, err := h.Queries.MarkAllInboxRead(r.Context(), db.MarkAllInboxReadParams{
-		WorkspaceID: wsUUID,
-		RecipientID: parseUUID(userID),
+	var count int64
+	err := h.withInboxReadLock(r.Context(), userID, func(q *db.Queries) error {
+		var err error
+		count, err = q.MarkAllInboxRead(r.Context(), db.MarkAllInboxReadParams{
+			WorkspaceID: wsUUID,
+			RecipientID: parseUUID(userID),
+		})
+		return err
 	})
 	if err != nil {
+		slog.Warn("inbox: mark all read failed", append(logger.RequestAttrs(r), "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to mark all inbox read")
 		return
 	}
@@ -489,12 +542,18 @@ func (h *Handler) MarkIssueInboxRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, err := h.Queries.MarkInboxReadByIssue(r.Context(), db.MarkInboxReadByIssueParams{
-		WorkspaceID: wsUUID,
-		RecipientID: parseUUID(userID),
-		IssueID:     issueUUID,
+	var count int64
+	err := h.withInboxReadLock(r.Context(), userID, func(q *db.Queries) error {
+		var err error
+		count, err = q.MarkInboxReadByIssue(r.Context(), db.MarkInboxReadByIssueParams{
+			WorkspaceID: wsUUID,
+			RecipientID: parseUUID(userID),
+			IssueID:     issueUUID,
+		})
+		return err
 	})
 	if err != nil {
+		slog.Warn("inbox: mark issue read failed", append(logger.RequestAttrs(r), "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to mark issue inbox read")
 		return
 	}

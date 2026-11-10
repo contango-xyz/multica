@@ -726,6 +726,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **What:** opening a row tries each unread id once per opening (a failed read rolled the row back to unread, which re-ran the effect without end); "mark section read" goes four at a time; the server allows four `POST /api/inbox/{id}/read` in flight per person and answers 429 past that, so old clients still looping stay cheap.
 - **Upstream conflict risk:** the auto-read effect and `handleMarkSectionRead` in `inbox-page.tsx`, `MarkInboxRead` in `inbox.go`.
 
+### 34. One person's mark-as-read writes queue instead of deadlocking
+
+- **What:** `MarkInboxRead`, `MarkIssueInboxRead` and `MarkAllInboxRead` run in a transaction that first takes `pg_advisory_xact_lock(hashtext('inbox-read:' || recipient))`, and retry once on a deadlock (40P01). Reading a row reads every unread row on its issue, so two parallel reads on one issue locked the same rows in different orders: Postgres aborted one after `deadlock_timeout` (1s) and the client got a 500 (2026-11-10, about six a morning). The mark-read and archived-page 500 paths now log the error.
+- **Upstream conflict risk:** the three handlers in `inbox.go`; the `ListArchivedInboxPage` error branch in `inbox_archive.go`.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
