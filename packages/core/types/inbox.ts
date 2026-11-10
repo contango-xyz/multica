@@ -56,6 +56,11 @@ export interface InboxItem {
   actor_id: string | null;
   type: InboxItemType;
   severity: InboxSeverity;
+  /**
+   * Only on a realtime `inbox:new`: false when the recipient's notification levels say this item should not
+   * raise a desktop/web banner (contango patch 39). Absent means show it, as before.
+   */
+  notify?: boolean;
   issue_id: string | null;
   title: string;
   body: string | null;

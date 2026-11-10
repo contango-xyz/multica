@@ -794,6 +794,19 @@ describe("handleInboxNew", () => {
     delete (globalThis as Record<string, unknown>).desktopAPI;
   });
 
+  it("shows no banner for an item the server marked notify:false (notification levels)", async () => {
+    const qc = createQueryClient();
+    qc.setQueryData<Workspace[]>(workspaceKeys.list(), [workspace()]);
+    qc.setQueryData(notificationPreferenceKeys.all("ws-a"), {
+      preferences: { system_notifications: "all" },
+    });
+    const showNotification = stubDesktopAPI();
+
+    await handleInboxNew(qc, inboxItem({ notify: false }));
+
+    expect(showNotification).not.toHaveBeenCalled();
+  });
+
   it("still shows the banner when the slug can't be resolved, with an empty slug so the click is a no-op", async () => {
     const qc = createQueryClient();
     // Workspace list is cached but doesn't contain the item's workspace.

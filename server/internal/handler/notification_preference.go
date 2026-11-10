@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/multica-ai/multica/server/internal/logger"
+	"github.com/multica-ai/multica/server/internal/notiflevel"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -61,6 +62,7 @@ func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Requ
 			writeJSON(w, http.StatusOK, map[string]any{
 				"workspace_id": workspaceID,
 				"preferences":  map[string]any{},
+				"categories":   notiflevel.Categories,
 			})
 			return
 		}
@@ -77,6 +79,7 @@ func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, map[string]any{
 		"workspace_id": workspaceID,
 		"preferences":  prefs,
+		"categories":   notiflevel.Categories,
 	})
 }
 
@@ -97,6 +100,14 @@ func decodeNotificationPreferenceRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	for k, v := range req.Preferences {
+		// Notification levels (contango patch 39): per-category levels and per-surface push minimums.
+		if known, ok := notiflevel.ValidKey(k, v); known {
+			if !ok {
+				writeError(w, http.StatusBadRequest, "invalid value for "+k+": "+v)
+				return nil, false
+			}
+			continue
+		}
 		if !validNotifGroups[k] {
 			writeError(w, http.StatusBadRequest, "invalid preference group: "+k)
 			return nil, false
@@ -137,6 +148,7 @@ func writeNotificationPreferenceResponse(
 	writeJSON(w, http.StatusOK, map[string]any{
 		"workspace_id": workspaceID,
 		"preferences":  prefs,
+		"categories":   notiflevel.Categories,
 	})
 }
 

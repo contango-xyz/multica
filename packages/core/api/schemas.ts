@@ -1239,6 +1239,16 @@ export const EMPTY_APP_CONFIG: AppConfigResponse = {
 export const NotificationPreferenceResponseSchema = z.object({
   workspace_id: z.string(),
   preferences: z.record(z.string(), z.string()).default({}),
+  categories: z
+    .array(
+      z.object({
+        key: z.string(),
+        label: z.string(),
+        default: z.enum(["low", "normal", "high", "critical"]).catch("normal"),
+      }).loose(),
+    )
+    .optional()
+    .catch(undefined),
 }).loose();
 
 export const EMPTY_NOTIFICATION_PREFERENCE_RESPONSE: NotificationPreferenceResponse = {

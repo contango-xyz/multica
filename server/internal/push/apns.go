@@ -24,6 +24,7 @@ type Device struct {
 	Token       string
 	BundleID    string
 	Environment string // "sandbox" | "production"
+	Platform    string // "ios" | "macos": phone or desktop for notification levels
 }
 
 // Notification is what a user sees, plus routing data for the app.

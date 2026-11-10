@@ -687,6 +687,19 @@
       "save": "Guardar",
       "clear": "Borrar",
       "saved": "Horario laboral guardado"
+    },
+    "levels": {
+      "title": "Niveles de notificación",
+      "description": "Cada notificación tiene un nivel. Elige el nivel mínimo que llega a tu teléfono y a tu escritorio; la bandeja de entrada siempre lo muestra todo. Fuera de tu horario laboral solo pasa lo Crítico.",
+      "phone": "Avisos al teléfono desde",
+      "desktop": "Avisos de escritorio desde",
+      "names": {
+        "low": "Bajo",
+        "normal": "Normal",
+        "high": "Alto",
+        "critical": "Crítico",
+        "off": "Desactivado"
+      }
     }
   },
   "tokens": {

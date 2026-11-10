@@ -705,6 +705,19 @@
       "save": "Enregistrer",
       "clear": "Effacer",
       "saved": "Heures de travail enregistrées"
+    },
+    "levels": {
+      "title": "Niveaux de notification",
+      "description": "Chaque notification a un niveau. Choisissez le niveau minimum qui arrive sur votre téléphone et votre bureau ; la boîte de réception affiche toujours tout. En dehors de vos heures de travail, seul le Critique passe.",
+      "phone": "Notifications téléphone à partir de",
+      "desktop": "Alertes bureau à partir de",
+      "names": {
+        "low": "Faible",
+        "normal": "Normal",
+        "high": "Élevé",
+        "critical": "Critique",
+        "off": "Désactivé"
+      }
     }
   },
   "tokens": {

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useT } from "../../i18n";
 import { BrowserNotificationSetting } from "./browser-notification-setting";
 import { WorkHoursSetting } from "./work-hours-setting";
+import { NotificationLevelsSetting } from "./notification-levels-setting";
 import {
   SettingsCard,
   SettingsRow,
@@ -105,6 +106,15 @@ export function NotificationsTab() {
         {/* Web-only: the browser permission banners require. Renders nothing on
             desktop (OS-native delivery) or where the Notification API is absent. */}
         <BrowserNotificationSetting />
+      </SettingsSection>
+
+      {/* contango patch 39: which notifications reach the phone and the desktop */}
+      <SettingsSection
+        title={t(($) => $.notifications.levels.title)}
+        description={t(($) => $.notifications.levels.description)}
+        anchor="levels"
+      >
+        <NotificationLevelsSetting />
       </SettingsSection>
 
       {/* contango: reminders about waiting asks arrive only inside these hours */}

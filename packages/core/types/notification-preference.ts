@@ -14,7 +14,19 @@ export type NotificationPreferences = Partial<Record<NotificationGroupKey, Notif
   work_hours?: string;
 };
 
+/** Notification levels (contango patch 39). */
+export type NotificationLevel = "low" | "normal" | "high" | "critical";
+
+/** One notification category with its workspace-default level, as the server lists them. */
+export interface NotificationCategory {
+  key: string;
+  label: string;
+  default: NotificationLevel;
+}
+
 export interface NotificationPreferenceResponse {
   workspace_id: string;
   preferences: NotificationPreferences;
+  /** The categories notification levels apply to; absent from older servers. */
+  categories?: NotificationCategory[];
 }

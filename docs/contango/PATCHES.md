@@ -833,3 +833,22 @@ notification preference (patch 24); this adds:
 - The ops job `team/availability-import.py` (claude-sandbox) imports the shared company calendar and personal feeds
   every 30 min and writes `public/availability.json` for stall-watch, ask-defaults and the MVP driver.
 
+### 39. Notification levels per category
+
+Owner 2026-11-10: "a merge request is a low, but a tag on a prod issue is a critical … each person assigns the level
+to each, and then they define which level is the min they want to get a notif"; default levels approved ("levels fine").
+
+- `internal/notiflevel`: every inbox item falls in one category (its type, a smart-inbox signal's group, or a
+  production/security label on the card, which makes it Critical). Each category has a level (Low, Normal, High,
+  Critical) with a workspace default; a person overrides it with `level_<category>`, and picks the lowest level that
+  pushes to the phone (`push_min_mobile`) and the desktop (`push_min_desktop`), or `off`. Unset means Low: nothing
+  changes until someone sets it. Outside `work_hours` (and while `notiflevel.Away` says so, for the availability
+  calendar) only Critical pushes. The inbox itself is never filtered.
+- Push (`internal/push`): each device is a phone (`ios`) or a desktop (`macos`) and gets only allowed items; chat
+  replies are unchanged. Desktop/web banners: the realtime relay adds `notify:false` to an `inbox:new` item below the
+  recipient's desktop level, and the client skips the banner (`handleInboxNew`); the item still arrives.
+- `GET /api/notification-preferences` lists the categories with their defaults; the settings page shows the two
+  minimums and a level per category. Lookup failures always push.
+
+Rebase check: `push.Store` has `NotificationPrefs`/`IssueLabels`; `registerListeners`'s `inbox:new` handler keeps the
+`inboxDesktopNotify` copy; `decodeNotificationPreferenceRequest` asks `notiflevel.ValidKey` first.

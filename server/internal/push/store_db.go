@@ -28,7 +28,7 @@ func (s *DBStore) ListEnabledDevices(ctx context.Context, userID string) ([]Devi
 	}
 	out := make([]Device, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, Device{Token: r.Token, BundleID: r.BundleID, Environment: r.Environment})
+		out = append(out, Device{Token: r.Token, BundleID: r.BundleID, Environment: r.Environment, Platform: r.Platform})
 	}
 	return out, nil
 }
@@ -47,6 +47,49 @@ func (s *DBStore) WorkspaceSlug(ctx context.Context, workspaceID string) (string
 		return "", err
 	}
 	return ws.Slug, nil
+}
+
+// NotificationPrefs is the person's notification preference map in this workspace (empty when unset).
+func (s *DBStore) NotificationPrefs(ctx context.Context, workspaceID, userID string) (map[string]string, error) {
+	wid, err := util.ParseUUID(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	uid, err := util.ParseUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+	pref, err := s.q.GetNotificationPreference(ctx, db.GetNotificationPreferenceParams{WorkspaceID: wid, UserID: uid})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	prefs := map[string]string{}
+	_ = json.Unmarshal(pref.Preferences, &prefs)
+	return prefs, nil
+}
+
+// IssueLabels is the names of the card's labels (a production or security label makes it Critical).
+func (s *DBStore) IssueLabels(ctx context.Context, workspaceID, issueID string) ([]string, error) {
+	wid, err := util.ParseUUID(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	iid, err := util.ParseUUID(issueID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.q.ListLabelsByIssue(ctx, db.ListLabelsByIssueParams{IssueID: iid, WorkspaceID: wid})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Name)
+	}
+	return out, nil
 }
 
 // SystemNotificationsMuted mirrors desktop: the per-workspace

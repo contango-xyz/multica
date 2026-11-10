@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/multica-ai/multica/server/internal/events"
 	"github.com/multica-ai/multica/server/pkg/protocol"
@@ -17,7 +18,9 @@ type fakeStore struct {
 	disabled []string
 	owner    string
 	agent    string
-	lookups  []string // identifier/actor lookups, failing ones included
+	lookups  []string                     // identifier/actor lookups, failing ones included
+	prefs    map[string]map[string]string // userID -> notification preferences
+	labels   map[string][]string          // issueID -> label names
 }
 
 func (s *fakeStore) ListEnabledDevices(_ context.Context, userID string) ([]Device, error) {
@@ -32,6 +35,12 @@ func (s *fakeStore) WorkspaceSlug(_ context.Context, wsID string) (string, error
 }
 func (s *fakeStore) SystemNotificationsMuted(_ context.Context, wsID, userID string) (bool, error) {
 	return s.muted[wsID+"/"+userID], nil
+}
+func (s *fakeStore) NotificationPrefs(_ context.Context, _, userID string) (map[string]string, error) {
+	return s.prefs[userID], nil
+}
+func (s *fakeStore) IssueLabels(_ context.Context, _, issueID string) ([]string, error) {
+	return s.labels[issueID], nil
 }
 func (s *fakeStore) UnreadInboxCount(_ context.Context, userID string) (int, error) {
 	return s.unread[userID], nil
@@ -304,5 +313,46 @@ func TestRegisterSubscribesBothEvents(t *testing.T) {
 	NewDispatcher(&fakeStore{}, &fakeSender{}, 1).Register(bus)
 	if bus.SubscriberCount(protocol.EventInboxNew) != 1 || bus.SubscriberCount(protocol.EventChatDone) != 1 {
 		t.Fatal("dispatcher not subscribed")
+	}
+}
+
+// Notification levels (contango patch 39): the phone and the Mac each take only items at or above their minimum.
+func TestLevelsFilterPhoneAndDesktopSeparately(t *testing.T) {
+	devs := []Device{{Token: "phone", Platform: "ios"}, {Token: "mac", Platform: "macos"}}
+	store := &fakeStore{devices: map[string][]Device{"u1": devs},
+		prefs: map[string]map[string]string{"u1": {"push_min_mobile": "high", "push_min_desktop": "normal"}}}
+	sender := &fakeSender{}
+	d := newTestDispatcher(store, sender)
+	d.onInboxNew(inboxEvent(memberItem())) // a mention: Normal
+	drain(d)
+	if len(sender.got) != 1 || sender.got[0].d.Token != "mac" {
+		t.Fatalf("a normal mention should reach only the Mac, got %+v", sender.got)
+	}
+}
+
+func TestAProductionLabelMakesItCritical(t *testing.T) {
+	store := &fakeStore{devices: map[string][]Device{"u1": {{Token: "phone", Platform: "ios"}}},
+		prefs:  map[string]map[string]string{"u1": {"push_min_mobile": "critical"}},
+		labels: map[string][]string{"issue1": {"production"}}}
+	sender := &fakeSender{}
+	d := newTestDispatcher(store, sender)
+	d.onInboxNew(inboxEvent(memberItem()))
+	drain(d)
+	if len(sender.got) != 1 {
+		t.Fatalf("a mention on a production card is critical and should push, sent %d", len(sender.got))
+	}
+}
+
+func TestQuietHoursHoldNonCriticalPushes(t *testing.T) {
+	defer func(f func() time.Time) { now = f }(now)
+	now = func() time.Time { return time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC) } // Saturday
+	store := &fakeStore{devices: map[string][]Device{"u1": {{Token: "phone", Platform: "ios"}}},
+		prefs: map[string]map[string]string{"u1": {"work_hours": "UTC|Mon-Fri|09:00-18:00"}}}
+	sender := &fakeSender{}
+	d := newTestDispatcher(store, sender)
+	d.onInboxNew(inboxEvent(memberItem()))
+	drain(d)
+	if len(sender.got) != 0 {
+		t.Fatalf("a mention on Saturday should wait in the inbox, sent %d", len(sender.got))
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/multica-ai/multica/server/internal/events"
+	"github.com/multica-ai/multica/server/internal/notiflevel"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
@@ -20,6 +21,8 @@ type Store interface {
 	DisableToken(ctx context.Context, token string) error
 	WorkspaceSlug(ctx context.Context, workspaceID string) (string, error)
 	SystemNotificationsMuted(ctx context.Context, workspaceID, userID string) (bool, error)
+	NotificationPrefs(ctx context.Context, workspaceID, userID string) (map[string]string, error)
+	IssueLabels(ctx context.Context, workspaceID, issueID string) ([]string, error)
 	UnreadInboxCount(ctx context.Context, userID string) (int, error)
 	ChatSessionTarget(ctx context.Context, sessionID string) (ownerID, agentName string, err error)
 	IssueIdentifier(ctx context.Context, issueID string) (string, error)
@@ -40,6 +43,7 @@ type job struct {
 	issueID     string
 	actorType   string
 	actorID     string
+	signalGroup string // smart-inbox signal group, for the notification level
 }
 
 // Dispatcher turns inbox:new / chat:done bus events into pushes. Bus
@@ -117,6 +121,7 @@ func (d *Dispatcher) onInboxNew(e events.Event) {
 			CommentID string `json:"comment_id"`
 			To        string `json:"to"`
 			Summary   string `json:"summary"`
+			Group     string `json:"group"`
 		} `json:"details"`
 	}
 	if !decode(payload["item"], &item) || item.RecipientType != "member" || item.RecipientID == "" {
@@ -144,6 +149,7 @@ func (d *Dispatcher) onInboxNew(e events.Event) {
 	if item.IssueID != nil {
 		j.issueID = *item.IssueID
 	}
+	j.signalGroup = item.Details.Group
 	if item.ActorType != nil && item.ActorID != nil {
 		j.actorType, j.actorID = *item.ActorType, *item.ActorID
 	}
@@ -195,7 +201,11 @@ func (d *Dispatcher) process(ctx context.Context, j job) {
 	if count, err := d.store.UnreadInboxCount(ctx, j.userID); err == nil {
 		n.Badge = &count
 	}
+	allowed := d.levelGate(ctx, j)
 	for _, dev := range devices {
+		if !allowed(notiflevel.SurfaceForPlatform(dev.Platform)) {
+			continue
+		}
 		err := d.sender.Send(ctx, dev, n)
 		switch {
 		case err == nil:
@@ -206,6 +216,34 @@ func (d *Dispatcher) process(ctx context.Context, j job) {
 		default:
 			slog.Warn("push: send failed", "kind", j.kind, "error", err)
 		}
+	}
+}
+
+// now is the clock for quiet hours (tests replace it).
+var now = time.Now
+
+// levelGate answers, per surface, whether this inbox item pushes under the person's notification levels
+// (contango patch 39). Chat replies aren't inbox items: they keep pushing as before. A failed lookup pushes, so
+// a database hiccup never silences someone.
+func (d *Dispatcher) levelGate(ctx context.Context, j job) func(notiflevel.Surface) bool {
+	if j.kind != "inbox" {
+		return func(notiflevel.Surface) bool { return true }
+	}
+	prefs, err := d.store.NotificationPrefs(ctx, j.workspaceID, j.userID)
+	if err != nil {
+		slog.Warn("push: notification preferences lookup failed", "error", err)
+		return func(notiflevel.Surface) bool { return true }
+	}
+	var labels []string
+	if j.issueID != "" {
+		if labels, err = d.store.IssueLabels(ctx, j.workspaceID, j.issueID); err != nil {
+			slog.Warn("push: issue labels lookup failed", "issue_id", j.issueID, "error", err)
+		}
+	}
+	category := notiflevel.CategoryOf(j.inbox.typ, j.signalGroup, labels)
+	at := now()
+	return func(s notiflevel.Surface) bool {
+		return notiflevel.Allowed(prefs, category, s, j.workspaceID, j.userID, at)
 	}
 }
 

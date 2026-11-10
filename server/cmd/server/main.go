@@ -26,6 +26,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/logger"
 	"github.com/multica-ai/multica/server/internal/maintenance"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
+	"github.com/multica-ai/multica/server/internal/notiflevel"
 	"github.com/multica-ai/multica/server/internal/profiling"
 	"github.com/multica-ai/multica/server/internal/push"
 	"github.com/multica-ai/multica/server/internal/realtime"
@@ -609,6 +610,9 @@ func main() {
 	defer analyticsClient.Close()
 
 	queries := db.New(pool)
+	// The desktop-banner gate reads it at event time (notification levels, contango patch 39).
+	inboxDesktopNotify = desktopNotifyGate(push.NewDBStore(queries))
+	notiflevel.Away = awayFromTimeOff(queries)
 	hub.SetAuthorizer(newScopeAuthorizer(queries))
 	// Order matters: subscriber listeners must register BEFORE notification listeners.
 	// The notification listener queries the subscriber table to determine recipients,

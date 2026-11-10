@@ -98,6 +98,10 @@ var memberPrivateEvents = map[string]bool{
 // for a Redis-backed relay or a feature-flagged dual-write implementation
 // without touching any of the event listeners below. This is Phase 0 of the
 // horizontal-scaling plan tracked in MUL-1138.
+// inboxDesktopNotify decides whether a new inbox item may raise a desktop or web banner for its recipient
+// (notification levels, contango patch 39). Nil leaves every item as before; main.go sets it.
+var inboxDesktopNotify func(workspaceID, recipientID string, item map[string]any) bool
+
 func registerListeners(bus *events.Bus, b realtime.Broadcaster) {
 	// Personal events should NOT be broadcast to the whole workspace.
 	personalEvents := map[string]bool{
@@ -137,6 +141,21 @@ func registerListeners(bus *events.Bus, b realtime.Broadcaster) {
 			return
 		}
 		recipientID, _ := item["recipient_id"].(string)
+		if inboxDesktopNotify != nil {
+			// The desktop banner follows the person's notification levels (contango patch 39): the client shows
+			// one only when "notify" isn't false. Copies, so other subscribers see the event unchanged.
+			withFlag := make(map[string]any, len(item)+1)
+			for k, v := range item {
+				withFlag[k] = v
+			}
+			withFlag["notify"] = inboxDesktopNotify(e.WorkspaceID, recipientID, item)
+			out := make(map[string]any, len(payload))
+			for k, v := range payload {
+				out[k] = v
+			}
+			out["item"] = withFlag
+			e.Payload = out
+		}
 		sendToRecipient(b, e, recipientID)
 	})
 

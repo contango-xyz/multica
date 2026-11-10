@@ -696,7 +696,7 @@
     },
     "work_hours": {
       "label": "Working hours",
-      "description": "Reminders about asks still waiting on you only arrive inside these hours. New asks still notify you at once.",
+      "description": "Outside these hours only Critical notifications reach your phone and desktop, and reminders about asks still waiting on you wait too. Everything still lands in your inbox.",
       "not_set": "Not set: reminders use the team default (07:00–22:00 UTC, every day). New asks still notify you at once.",
       "zone": "Time zone",
       "days": "Working days",
@@ -705,6 +705,19 @@
       "save": "Save",
       "clear": "Clear",
       "saved": "Working hours saved"
+    },
+    "levels": {
+      "title": "Notification levels",
+      "description": "Every notification has a level. Pick the lowest level that reaches your phone and your desktop; the inbox always shows everything. Outside your working hours only Critical gets through.",
+      "phone": "Phone pushes from",
+      "desktop": "Desktop pop-ups from",
+      "names": {
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High",
+        "critical": "Critical",
+        "off": "Off"
+      }
     }
   },
   "tokens": {

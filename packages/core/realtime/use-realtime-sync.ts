@@ -582,6 +582,9 @@ export async function handleInboxNew(
   // styling is enough — no need to interrupt with a banner. `desktopAPI`
   // is injected by the preload script; its absence (web app) skips silently.
   if (typeof document !== "undefined" && document.hasFocus()) return;
+  // The server marks items below the person's desktop notification level (or held for their quiet hours)
+  // with notify:false; they still land in the inbox, just without a banner.
+  if (item.notify === false) return;
   // Resolve the source workspace's slug once: it pins BOTH the mute check
   // and the deep link to the workspace the inbox item BELONGS to, never the
   // currently active one. Reading `getCurrentSlug()` here was the source of
