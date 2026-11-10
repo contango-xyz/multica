@@ -731,6 +731,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **What:** `MarkInboxRead`, `MarkIssueInboxRead` and `MarkAllInboxRead` run in a transaction that first takes `pg_advisory_xact_lock(hashtext('inbox-read:' || recipient))`, and retry once on a deadlock (40P01). Reading a row reads every unread row on its issue, so two parallel reads on one issue locked the same rows in different orders: Postgres aborted one after `deadlock_timeout` (1s) and the client got a 500 (2026-11-10, about six a morning). The mark-read and archived-page 500 paths now log the error.
 - **Upstream conflict risk:** the three handlers in `inbox.go`; the `ListArchivedInboxPage` error branch in `inbox_archive.go`.
 
+### 35. The workspace sweeper leaves a folder a live process is using
+
+- **What:** before any GC mutation of a task directory (`applyGCAction`: clean, orphan, artifact cleanup), the daemon checks whether a process other than itself has its working directory or an open file inside it (`dirInUse`; Linux scans `/proc/*/cwd` and `/proc/*/fd`, macOS asks `lsof -F pn` once, other platforms skip the check). A busy directory is logged (`gc: skipping task dir in use by a live process`) and counted as skipped; the next pass tries again. CTG-2260, 2026-11-10: an agent resumed inside another task's completed folder, the completed-task TTL expired, and the sweeper removed it under the running pass.
+- **Upstream conflict risk:** the ownership re-check block in `applyGCAction` (`server/internal/daemon/gc.go`); `gc_inuse*.go` are ours.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
