@@ -13,7 +13,8 @@
     "runtimes": "Runtimes",
     "skills": "Skills",
     "settings": "Paramètres",
-    "views": "Vues"
+    "views": "Vues",
+    "availability": "Disponibilités"
   },
   "tab": {
     "issue": "Tâche",
@@ -213,5 +214,30 @@
     "go_to_slide": "Aller à la diapositive {{index}}",
     "previous": "Précédent",
     "next": "Suivant"
+  },
+  "availability": {
+    "page_title": "Disponibilités",
+    "person": "Personne",
+    "hours": "Heures de travail",
+    "today": "Aujourd'hui",
+    "upcoming": "Absences, 30 prochains jours",
+    "away": "Absent",
+    "working": "Disponible",
+    "not_set": "Non défini",
+    "none": "Aucun",
+    "half_day": "demi-journée",
+    "mine": "Vos absences",
+    "from": "Du",
+    "to": "Au",
+    "note": "Note",
+    "add": "Ajouter",
+    "remove": "Supprimer",
+    "backup": "Votre remplaçant",
+    "ical": "Votre calendrier (adresse iCal secrète)",
+    "ical_connected": "Connecté",
+    "save": "Enregistrer",
+    "source_manual": "ajouté ici",
+    "source_shared": "calendrier de l'entreprise",
+    "source_personal": "votre calendrier"
   }
 }

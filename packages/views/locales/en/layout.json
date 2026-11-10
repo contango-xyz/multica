@@ -13,7 +13,8 @@
     "runtimes": "Runtimes",
     "skills": "Skills",
     "settings": "Settings",
-    "views": "Views"
+    "views": "Views",
+    "availability": "Availability"
   },
   "tab": {
     "issue": "Issue",
@@ -213,5 +214,30 @@
     "go_to_slide": "Go to slide {{index}}",
     "previous": "Previous",
     "next": "Next"
+  },
+  "availability": {
+    "page_title": "Availability",
+    "person": "Person",
+    "hours": "Working hours",
+    "today": "Today",
+    "upcoming": "Time off, next 30 days",
+    "away": "Away",
+    "working": "Working",
+    "not_set": "Not set",
+    "none": "None",
+    "half_day": "half day",
+    "mine": "Your time off",
+    "from": "From",
+    "to": "To",
+    "note": "Note",
+    "add": "Add",
+    "remove": "Remove",
+    "backup": "Your backup",
+    "ical": "Your calendar (iCal secret address)",
+    "ical_connected": "Connected",
+    "save": "Save",
+    "source_manual": "added here",
+    "source_shared": "company calendar",
+    "source_personal": "your calendar"
   }
 }

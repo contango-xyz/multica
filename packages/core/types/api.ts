@@ -721,3 +721,34 @@ export interface PaginationParams {
   limit?: number;
   offset?: number;
 }
+
+/** One time-off entry (Contango fork, availability). Dates are YYYY-MM-DD, end inclusive. */
+export interface TimeOffEntry {
+  id: string;
+  starts_on: string;
+  ends_on: string;
+  half_day: boolean;
+  label: string;
+  source: "manual" | "shared-ical" | "personal-ical" | string;
+}
+
+/** One member's availability: working hours ("<zone>|<days>|<HH:MM-HH:MM>"), backup and time off. */
+export interface MemberAvailability {
+  user_id: string;
+  name: string;
+  email: string;
+  role: string;
+  work_hours: string;
+  backup_user_id: string | null;
+  personal_ical: boolean;
+  away_today: boolean;
+  time_off: TimeOffEntry[];
+}
+
+/** GET /api/availability. */
+export interface AvailabilityResponse {
+  from: string;
+  to: string;
+  today: string;
+  members: MemberAvailability[];
+}

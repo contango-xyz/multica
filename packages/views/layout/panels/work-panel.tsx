@@ -163,6 +163,8 @@ export function WorkPanel() {
 
           {/* contango: the issue dependency graph (patch 10). */}
           <DependenciesLink href={p.dependencies()} pathname={pathname} label={t(($) => $.nav.dependencies)} />
+          {/* contango: who works when and who is away (patch 38). */}
+          <DependenciesLink href={p.availability()} pathname={pathname} label={t(($) => $.nav.availability)} />
         </PanelBody>
       </IssueContextMenuProvider>
     </>

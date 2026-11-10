@@ -15,6 +15,7 @@ import type {
   UpdateIssueRequest,
   IssueDuplicates,
   DependencyGraph,
+  AvailabilityResponse,
   GroupedIssuesResponse,
   ListIssuesResponse,
   SearchIssuesResponse,
@@ -282,6 +283,7 @@ import {
   ChildIssuesResponseSchema,
   IssueDuplicatesResponseSchema,
   DependencyGraphResponseSchema,
+  AvailabilityResponseSchema,
   ChildIssueProgressResponseSchema,
   CommentsListSchema,
   CommentTriggerPreviewSchema,
@@ -1621,6 +1623,26 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  // Contango fork (patch 38): who works when and who is away.
+  async getAvailability(days = 30): Promise<AvailabilityResponse> {
+    const raw = await this.fetch<unknown>(`/api/availability?days=${days}`);
+    return parseWithFallback(raw, AvailabilityResponseSchema, { from: "", to: "", today: "", members: [] }, {
+      endpoint: "GET /api/availability",
+    }) as AvailabilityResponse;
+  }
+
+  async updateMyAvailability(input: { backup_user_id?: string; personal_ical_url?: string }): Promise<void> {
+    await this.fetch("/api/availability/me", { method: "PUT", body: JSON.stringify(input) });
+  }
+
+  async addMyTimeOff(input: { starts_on: string; ends_on?: string; half_day?: boolean; label?: string }): Promise<void> {
+    await this.fetch("/api/availability/me/time-off", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  async deleteMyTimeOff(id: string): Promise<void> {
+    await this.fetch(`/api/availability/me/time-off/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   async getDependencyGraph(): Promise<DependencyGraph> {

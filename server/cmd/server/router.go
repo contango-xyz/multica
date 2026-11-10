@@ -2621,6 +2621,16 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.With(handler.RequireHumanActor).Post("/{id}/signal-reply", h.ReplyToInboxSignal)
 			})
 
+			// Availability: working hours, time off, backups (contango patch 38).
+			r.Route("/api/availability", func(r chi.Router) {
+				r.Get("/", h.GetAvailability)
+				r.With(handler.RequireHumanActor).Put("/me", h.UpdateMyAvailability)
+				r.With(handler.RequireHumanActor).Post("/me/time-off", h.CreateMyTimeOff)
+				r.With(handler.RequireHumanActor).Delete("/me/time-off/{id}", h.DeleteMyTimeOff)
+				r.With(handler.RequireHumanActor).Put("/import", h.ImportTimeOff)
+				r.With(handler.RequireHumanActor).Get("/ical-sources", h.ListICalSources)
+			})
+
 			// Notification preferences
 			r.Route("/api/notification-preferences", func(r chi.Router) {
 				r.Get("/", h.GetNotificationPreferences)

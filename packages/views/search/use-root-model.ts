@@ -44,6 +44,7 @@ const PAGE_KEYWORDS: Record<WorkspacePageKey, string[]> = {
   squads: ["squads", "teams", "小队", "团队"],
   usage: ["usage", "analytics", "stats", "metrics", "统计", "分析", "用量"],
   dependencies: ["dependencies", "blocked", "blockers", "graph", "critical path", "依赖", "阻塞"],
+  availability: ["availability", "time off", "holiday", "away", "working hours", "out of office", "OOO"],
   runtimes: ["runtimes", "environments", "machines", "运行时"],
   skills: ["skills", "library", "技能"],
   settings: ["settings", "config", "preferences", "设置", "配置"],

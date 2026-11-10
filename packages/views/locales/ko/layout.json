@@ -13,7 +13,8 @@
     "runtimes": "런타임",
     "skills": "스킬",
     "settings": "설정",
-    "views": "뷰"
+    "views": "뷰",
+    "availability": "근무 가능 여부"
   },
   "tab": {
     "issue": "태스크",
@@ -206,5 +207,30 @@
     "go_to_slide": "{{index}}번째 슬라이드로 이동",
     "previous": "이전",
     "next": "다음"
+  },
+  "availability": {
+    "page_title": "근무 가능 여부",
+    "person": "구성원",
+    "hours": "근무 시간",
+    "today": "오늘",
+    "upcoming": "향후 30일 휴무",
+    "away": "부재",
+    "working": "근무 중",
+    "not_set": "설정 안 됨",
+    "none": "없음",
+    "half_day": "반차",
+    "mine": "내 휴무",
+    "from": "시작",
+    "to": "종료",
+    "note": "메모",
+    "add": "추가",
+    "remove": "삭제",
+    "backup": "대리 담당자",
+    "ical": "내 캘린더 (iCal 비공개 주소)",
+    "ical_connected": "연결됨",
+    "save": "저장",
+    "source_manual": "여기서 추가",
+    "source_shared": "회사 캘린더",
+    "source_personal": "내 캘린더"
   }
 }

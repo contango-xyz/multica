@@ -80,6 +80,7 @@ func init() {
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(workflowCmd)
 	rootCmd.AddCommand(labelCmd)
+	rootCmd.AddCommand(availabilityCmd)
 	rootCmd.AddCommand(propertyCmd)
 	rootCmd.AddCommand(viewCmd)
 	rootCmd.AddCommand(agentCmd)

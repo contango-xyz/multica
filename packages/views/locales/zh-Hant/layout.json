@@ -13,7 +13,8 @@
     "skills": "Skills",
     "settings": "設定",
     "views": "檢視",
-    "dependencies": "依賴關係"
+    "dependencies": "依賴關係",
+    "availability": "可用時間"
   },
   "tab": {
     "issue": "任務",
@@ -206,5 +207,30 @@
     "go_to_slide": "前往第 {{index}} 張",
     "previous": "上一張",
     "next": "下一張"
+  },
+  "availability": {
+    "page_title": "可用時間",
+    "person": "成員",
+    "hours": "工作時間",
+    "today": "今天",
+    "upcoming": "未來 30 天的休假",
+    "away": "休假",
+    "working": "在崗",
+    "not_set": "未設定",
+    "none": "無",
+    "half_day": "半天",
+    "mine": "你的休假",
+    "from": "開始",
+    "to": "結束",
+    "note": "備註",
+    "add": "新增",
+    "remove": "刪除",
+    "backup": "你的代理人",
+    "ical": "你的日曆（iCal 私密地址）",
+    "ical_connected": "已連接",
+    "save": "儲存",
+    "source_manual": "在此新增",
+    "source_shared": "公司日曆",
+    "source_personal": "你的日曆"
   }
 }

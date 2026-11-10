@@ -13,7 +13,8 @@
     "runtimes": "ランタイム",
     "skills": "スキル",
     "settings": "設定",
-    "views": "ビュー"
+    "views": "ビュー",
+    "availability": "稼働状況"
   },
   "tab": {
     "issue": "タスク",
@@ -206,5 +207,30 @@
     "go_to_slide": "{{index}} 枚目に移動",
     "previous": "前へ",
     "next": "次へ"
+  },
+  "availability": {
+    "page_title": "稼働状況",
+    "person": "メンバー",
+    "hours": "勤務時間",
+    "today": "今日",
+    "upcoming": "今後30日間の休み",
+    "away": "不在",
+    "working": "勤務中",
+    "not_set": "未設定",
+    "none": "なし",
+    "half_day": "半日",
+    "mine": "あなたの休み",
+    "from": "開始",
+    "to": "終了",
+    "note": "メモ",
+    "add": "追加",
+    "remove": "削除",
+    "backup": "代理担当者",
+    "ical": "あなたのカレンダー（iCal 非公開アドレス）",
+    "ical_connected": "接続済み",
+    "save": "保存",
+    "source_manual": "ここで追加",
+    "source_shared": "会社カレンダー",
+    "source_personal": "あなたのカレンダー"
   }
 }

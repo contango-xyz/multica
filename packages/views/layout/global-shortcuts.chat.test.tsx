@@ -40,6 +40,7 @@ vi.mock("@multica/core/paths", () => ({
     squads: () => "/acme/squads",
     usage: () => "/acme/usage",
     dependencies: () => "/acme/dependencies",
+    availability: () => "/acme/availability",
     runtimes: () => "/acme/runtimes",
     skills: () => "/acme/skills",
     settings: () => "/acme/settings",

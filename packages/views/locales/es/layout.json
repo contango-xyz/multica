@@ -13,7 +13,8 @@
     "skills": "Skills",
     "settings": "Ajustes",
     "views": "Vistas",
-    "dependencies": "Dependencias"
+    "dependencies": "Dependencias",
+    "availability": "Disponibilidad"
   },
   "tab": {
     "issue": "Tarea",
@@ -213,5 +214,30 @@
     "go_to_slide": "Ir a la diapositiva {{index}}",
     "previous": "Anterior",
     "next": "Siguiente"
+  },
+  "availability": {
+    "page_title": "Disponibilidad",
+    "person": "Persona",
+    "hours": "Horario",
+    "today": "Hoy",
+    "upcoming": "Ausencias, próximos 30 días",
+    "away": "Ausente",
+    "working": "Disponible",
+    "not_set": "Sin definir",
+    "none": "Ninguno",
+    "half_day": "media jornada",
+    "mine": "Tus ausencias",
+    "from": "Desde",
+    "to": "Hasta",
+    "note": "Nota",
+    "add": "Añadir",
+    "remove": "Quitar",
+    "backup": "Tu suplente",
+    "ical": "Tu calendario (dirección iCal secreta)",
+    "ical_connected": "Conectado",
+    "save": "Guardar",
+    "source_manual": "añadido aquí",
+    "source_shared": "calendario de la empresa",
+    "source_personal": "tu calendario"
   }
 }

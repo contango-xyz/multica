@@ -1284,9 +1284,31 @@ type Member struct {
 	PinnedAt    pgtype.Timestamptz `json:"pinned_at"`
 }
 
+type MemberAvailability struct {
+	WorkspaceID     pgtype.UUID        `json:"workspace_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	BackupUserID    pgtype.UUID        `json:"backup_user_id"`
+	PersonalIcalUrl pgtype.Text        `json:"personal_ical_url"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type MemberDelegationDay struct {
 	UserID       pgtype.UUID `json:"user_id"`
 	ActivityDate pgtype.Date `json:"activity_date"`
+}
+
+type MemberTimeOff struct {
+	ID          pgtype.UUID        `json:"id"`
+	WorkspaceID pgtype.UUID        `json:"workspace_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	StartsOn    pgtype.Date        `json:"starts_on"`
+	EndsOn      pgtype.Date        `json:"ends_on"`
+	HalfDay     bool               `json:"half_day"`
+	Label       string             `json:"label"`
+	Source      string             `json:"source"`
+	ExternalUid pgtype.Text        `json:"external_uid"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type NotificationPreference struct {

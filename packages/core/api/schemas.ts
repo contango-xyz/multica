@@ -4112,3 +4112,40 @@ export const WorkspaceListItemSchema = z.object({
 export const WorkspacePinnedSchema = z.object({
   pinned_at: z.iso.datetime({ offset: true }).nullable().catch(null),
 });
+
+// Contango fork: GET /api/availability (patch 38).
+const TimeOffEntrySchema = z
+  .object({
+    id: z.string(),
+    starts_on: z.string(),
+    ends_on: z.string(),
+    half_day: z.boolean().default(false),
+    label: z.string().default(""),
+    source: z.string().default("manual"),
+  })
+  .loose();
+
+export const AvailabilityResponseSchema = z
+  .object({
+    from: z.string().default(""),
+    to: z.string().default(""),
+    today: z.string().default(""),
+    members: z
+      .array(
+        z
+          .object({
+            user_id: z.string(),
+            name: z.string().default(""),
+            email: z.string().default(""),
+            role: z.string().default("member"),
+            work_hours: z.string().default(""),
+            backup_user_id: z.string().nullable().default(null),
+            personal_ical: z.boolean().default(false),
+            away_today: z.boolean().default(false),
+            time_off: z.array(TimeOffEntrySchema).default([]),
+          })
+          .loose(),
+      )
+      .default([]),
+  })
+  .loose();

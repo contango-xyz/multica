@@ -75,6 +75,14 @@ WITH
 deleted_members AS (
     DELETE FROM member WHERE member.workspace_id = $1
 ),
+deleted_member_time_off AS (
+    DELETE FROM member_time_off
+    WHERE member_time_off.workspace_id = $1
+),
+deleted_member_availability AS (
+    DELETE FROM member_availability
+    WHERE member_availability.workspace_id = $1
+),
 deleted_notification_preferences AS (
     DELETE FROM notification_preference
     WHERE notification_preference.workspace_id = $1

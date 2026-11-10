@@ -814,3 +814,22 @@ leader ran 1,437 times; 907 runs posted nothing. Three server-side sources are c
 Files: `server/internal/handler/comment.go`, `server/internal/service/issue.go`, tests
 `contango_lead_wakes_test.go`, `contango_scheduled_squad_test.go`.
 
+### 38. Availability: working hours, time off and backups
+
+Owner 2026-11-10: a simple availability page inside Multica becomes the source of truth for who works when, so
+agents and the ops tools never wait on, or nudge, someone who is away. Working hours stay the `work_hours`
+notification preference (patch 24); this adds:
+
+- Tables `member_availability` (backup person, personal iCal secret address) and `member_time_off` (day ranges, end
+  inclusive, half-day flag, label, source `manual` | `shared-ical` | `personal-ical`, external uid). Migrations 625
+  (tables, no foreign keys; workspace deletion cleans them) and 626/627 (one concurrent index each).
+- API: `GET /api/availability?days=N` (any member or agent: every member's working hours, backup, away today and time
+  off), `PUT /api/availability/me`, `POST/DELETE /api/availability/me/time-off` (humans only, their own manual
+  entries), and for workspace admins `PUT /api/availability/import` (replaces one calendar source's entries for the
+  users it covers) and `GET /api/availability/ical-sources`. The iCal address is a secret: only admins read it back.
+- CLI `multica availability list|get|set|off|import|ical-sources`.
+- Web/desktop page `/{ws}/availability`: one row per person (hours, today, time off for 30 days) and the viewer's own
+  time off, backup and calendar link.
+- The ops job `team/availability-import.py` (claude-sandbox) imports the shared company calendar and personal feeds
+  every 30 min and writes `public/availability.json` for stall-watch, ask-defaults and the MVP driver.
+
