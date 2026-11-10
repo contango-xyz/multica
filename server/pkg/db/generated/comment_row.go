@@ -24,6 +24,7 @@ func (r CreateCommentRow) Comment() Comment {
 		Revision:           r.Revision,
 		DeletedAt:          r.DeletedAt,
 		SuppressedAgentIds: r.SuppressedAgentIds,
+		TargetsParent:      r.TargetsParent,
 	}
 }
 

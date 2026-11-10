@@ -736,6 +736,15 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **What:** before any GC mutation of a task directory (`applyGCAction`: clean, orphan, artifact cleanup), the daemon checks whether a process other than itself has its working directory or an open file inside it (`dirInUse`; Linux scans `/proc/*/cwd` and `/proc/*/fd`, macOS asks `lsof -F pn` once, other platforms skip the check). A busy directory is logged (`gc: skipping task dir in use by a live process`) and counted as skipped; the next pass tries again. CTG-2260, 2026-11-10: an agent resumed inside another task's completed folder, the completed-task TTL expired, and the sweeper removed it under the running pass.
 - **Upstream conflict risk:** the ownership re-check block in `applyGCAction` (`server/internal/daemon/gc.go`); `gc_inuse*.go` are ours.
 
+### 36. Thread replies wake the last agent; Reply to this comment
+
+A person's untagged reply from a thread's reply box wakes only the last agent to speak in that thread (`routeUntaggedThreadReply`, `ListThreadAgentComments`), resolved as of the comment's `created_at` so replays and edits agree. Skips agents that are archived, blocked or not invocable, and automatic notes; a thread where no agent has spoken keeps the older routes, including root owners for a run in flight. Automation (`isBotMember`) and any non-root parent keep the older routes too.
+
+`comment.targets_parent` (migration 624) stores "Reply to this comment", from a new button on each comment once a thread has replies. An agent answering the person whose thread reply started its run does not fall back to the squad leader (`agentAnswersMemberInThread`).
+
+Rebase check: `computeCommentAgentTriggers` member path, `comment_row.go` copies `TargetsParent`, and every caller passes `TargetsParent`.
+
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

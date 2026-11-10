@@ -446,3 +446,39 @@ describe("reply annotations", () => {
   });
 
 });
+
+describe("reply to one comment", () => {
+  const key = "reply:issue-1:root" as const;
+  const target = { commentId: "c-2", actorName: "Kim", pinned: true };
+
+  beforeEach(() => {
+    useCommentDraftStore.setState({ drafts: {} });
+  });
+
+  it("keeps the picked comment while typing", () => {
+    useCommentDraftStore.getState().setReplyTarget(key, target);
+    useCommentDraftStore.getState().setDraft(key, "hello");
+    useCommentDraftStore.getState().setDraft(key, "hello there");
+    expect(useCommentDraftStore.getState().drafts[key]?.replyTarget).toEqual(target);
+  });
+
+  it("holds an empty draft open until cleared", () => {
+    useCommentDraftStore.getState().setReplyTarget(key, target);
+    expect(useCommentDraftStore.getState().drafts[key]?.replyTarget).toEqual(target);
+    useCommentDraftStore.getState().setReplyTarget(key, null);
+    expect(useCommentDraftStore.getState().drafts[key]).toBeUndefined();
+  });
+
+  it("clearing keeps the text and goes back to the whole thread", () => {
+    useCommentDraftStore.getState().setReplyTarget(key, target);
+    useCommentDraftStore.getState().setDraft(key, "hello");
+    useCommentDraftStore.getState().setReplyTarget(key, null);
+    expect(useCommentDraftStore.getState().drafts[key]?.content).toBe("hello");
+    expect(useCommentDraftStore.getState().drafts[key]?.replyTarget).toBeUndefined();
+  });
+
+  it("does not aim new top-level comments", () => {
+    useCommentDraftStore.getState().setReplyTarget("new:issue-1", target);
+    expect(useCommentDraftStore.getState().drafts["new:issue-1"]).toBeUndefined();
+  });
+});

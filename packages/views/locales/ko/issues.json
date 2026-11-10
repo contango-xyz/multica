@@ -645,6 +645,7 @@
     "cancel_edit": "취소",
     "copy_action": "복사",
     "copy_link_action": "링크 복사",
+    "reply_to_action": "이 댓글에 답글",
     "link_copied": "링크를 복사했습니다",
     "link_copy_failed": "링크를 복사하지 못했습니다",
     "copied_toast": "복사했습니다",
@@ -728,6 +729,9 @@
   },
   "reply": {
     "placeholder": "답글 남기기...",
+    "replying_to_comment": "{{name}}님의 댓글에 답글 작성 중",
+    "clear_reply_target": "스레드 전체에 답글",
+    "reply_target_deleted": "이 댓글은 삭제되었습니다. 해제하면 스레드에 답글을 달 수 있습니다.",
     "annotations": {
       "confirm_add": "주석 추가",
       "save": "주석 저장",

@@ -515,8 +515,8 @@ WITH touched_issue AS (
     WHERE issue.id = sqlc.arg(issue_id) AND issue.workspace_id = sqlc.arg(workspace_id)
     RETURNING issue.id, issue.workspace_id, issue.revision
 ), inserted_comment AS (
-    INSERT INTO comment (issue_id, workspace_id, author_type, author_id, content, type, parent_id, source_task_id, quick_action_id, via_plugin_id, suppressed_agent_ids, id)
-    SELECT ti.id, ti.workspace_id, sqlc.arg(author_type), sqlc.arg(author_id), sqlc.arg(content), sqlc.arg(type), sqlc.narg(parent_id), sqlc.narg(source_task_id), sqlc.narg(quick_action_id), sqlc.narg(via_plugin_id), sqlc.narg(suppressed_agent_ids)::uuid[], COALESCE(sqlc.narg('id')::uuid, gen_random_uuid())
+    INSERT INTO comment (issue_id, workspace_id, author_type, author_id, content, type, parent_id, source_task_id, quick_action_id, via_plugin_id, suppressed_agent_ids, id, targets_parent)
+    SELECT ti.id, ti.workspace_id, sqlc.arg(author_type), sqlc.arg(author_id), sqlc.arg(content), sqlc.arg(type), sqlc.narg(parent_id), sqlc.narg(source_task_id), sqlc.narg(quick_action_id), sqlc.narg(via_plugin_id), sqlc.narg(suppressed_agent_ids)::uuid[], COALESCE(sqlc.narg('id')::uuid, gen_random_uuid()), sqlc.arg(targets_parent)
     FROM touched_issue ti
     RETURNING *
 )
@@ -643,6 +643,26 @@ SELECT EXISTS (
       AND created_at >= @since
       AND deleted_at IS NULL
 ) AS commented;
+
+-- name: ListThreadAgentComments :many
+-- Contango: the agents' ordinary comments anywhere in the thread rooted at
+-- @root_id, newest first. With a before_comment_id, only those older than that
+-- comment, so a replay or edit resolves the same answer as when it was posted.
+-- Automatic notes (type 'system' and the like) are not someone speaking.
+WITH RECURSIVE thread AS (
+    SELECT c.id FROM comment c WHERE c.id = sqlc.arg(root_id)
+    UNION ALL
+    SELECT r.id FROM comment r JOIN thread t ON r.parent_id = t.id
+)
+SELECT c.* FROM comment c
+JOIN thread ON thread.id = c.id
+WHERE c.issue_id = sqlc.arg(issue_id)
+  AND c.author_type = 'agent'
+  AND c.type = 'comment'
+  AND c.deleted_at IS NULL
+  AND (sqlc.narg(before_comment_id)::uuid IS NULL
+       OR c.created_at < (SELECT b.created_at FROM comment b WHERE b.id = sqlc.narg(before_comment_id)::uuid))
+ORDER BY c.created_at DESC, c.id DESC;
 
 -- name: HasAgentRepliedInThread :one
 -- Returns true if the given agent has posted a reply in the thread rooted at

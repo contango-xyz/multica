@@ -39,12 +39,19 @@ export type CommentDraftKey =
   | `reply:${string}:${string}`  // ReplyInput inside a thread, key = `reply:${issueId}:${rootCommentId}`
   | `edit:${string}:${string}`;  // inline edit on existing comment, key = `edit:${issueId}:${commentId}`
 
+export interface ReplyTarget {
+  commentId: string;
+  actorName: string;
+  /** Picked with "Reply to this comment", so it holds without annotations. */
+  pinned?: boolean;
+}
+
 interface CommentDraft {
   content: string;
   /** Uploads (placeholders + completed) for this composer session. */
   attachments: DraftUpload[];
   annotations?: ReplyAnnotation[];
-  replyTarget?: { commentId: string; actorName: string };
+  replyTarget?: ReplyTarget;
   updatedAt: number;
 }
 
@@ -56,6 +63,8 @@ interface CommentDraftStore {
   /** Every upload for this draft (placeholders included) — for status chips. */
   getUploads: (key: CommentDraftKey) => DraftUpload[];
   setDraft: (key: CommentDraftKey, content: string) => void;
+  /** Aim a thread's reply box at one comment; null goes back to the whole thread. */
+  setReplyTarget: (key: CommentDraftKey, target: ReplyTarget | null) => void;
   /**
    * Append a markdown fragment to the draft body (upload write-back,
    * MUL-5181): an upload that finished after its composer unmounted has no
@@ -123,9 +132,10 @@ function writeDraft(
   content: string,
   uploads: DraftUpload[],
   annotations = drafts[key]?.annotations ?? EMPTY_REPLY_ANNOTATIONS,
-  replyTarget = key.startsWith("reply:") && annotations.length ? drafts[key]?.replyTarget : undefined,
+  replyTarget: ReplyTarget | null | undefined = key.startsWith("reply:") && (annotations.length || drafts[key]?.replyTarget?.pinned) ? drafts[key]?.replyTarget : undefined,
 ): Record<string, CommentDraft> {
-  if (!isMeaningful(content, uploads, annotations)) {
+  const target = replyTarget ?? undefined;
+  if (!isMeaningful(content, uploads, annotations) && !target?.pinned) {
     if (!(key in drafts)) return drafts;
     const next = { ...drafts };
     delete next[key];
@@ -136,10 +146,10 @@ function writeDraft(
   // guard compares entry identity — a fresh-but-equal entry would read as "the
   // user edited during the request" and wrongly keep a submitted draft alive.
   const existing = drafts[key];
-  if (existing && existing.content === content && existing.replyTarget === replyTarget && (existing.annotations ?? EMPTY_REPLY_ANNOTATIONS) === annotations && existing.attachments === uploads) {
+  if (existing && existing.content === content && existing.replyTarget === target && (existing.annotations ?? EMPTY_REPLY_ANNOTATIONS) === annotations && existing.attachments === uploads) {
     return drafts;
   }
-  return { ...drafts, [key]: { content, attachments: uploads, annotations, replyTarget, updatedAt: Date.now() } };
+  return { ...drafts, [key]: { content, attachments: uploads, annotations, replyTarget: target, updatedAt: Date.now() } };
 }
 
 function uploadsOf(drafts: Record<string, CommentDraft>, key: string): DraftUpload[] {
@@ -155,10 +165,11 @@ function pruneStaleDrafts(drafts: Record<string, CommentDraft>): Record<string, 
     // were never persisted, so the upload cannot resume).
     const uploads = normalizeStoredUploads(v.attachments);
     const annotations = normalizeReplyAnnotations(v.annotations);
-    if (v.updatedAt >= cutoff && isMeaningful(v.content, uploads, annotations)) {
+    const pinned = k.startsWith("reply:") && v.replyTarget?.pinned && typeof v.replyTarget.commentId === "string" && typeof v.replyTarget.actorName === "string" ? v.replyTarget : undefined;
+    if (v.updatedAt >= cutoff && (isMeaningful(v.content, uploads, annotations) || pinned)) {
       const first = annotations[0];
-      const replyTarget = k.startsWith("reply:") && first ? (v.replyTarget && typeof v.replyTarget.commentId === "string" && typeof v.replyTarget.actorName === "string"
-        ? v.replyTarget : { commentId: first.sourceCommentId, actorName: first.sourceActorName }) : undefined;
+      const replyTarget = pinned ?? (k.startsWith("reply:") && first ? (v.replyTarget && typeof v.replyTarget.commentId === "string" && typeof v.replyTarget.actorName === "string"
+        ? v.replyTarget : { commentId: first.sourceCommentId, actorName: first.sourceActorName }) : undefined);
       out[k] = { ...v, attachments: uploads, annotations, replyTarget };
     }
   }
@@ -172,6 +183,13 @@ export const useCommentDraftStore = create<CommentDraftStore>()(
       getDraft: (key) => get().drafts[key]?.content,
       getAttachments: (key) => deriveUploaded(uploadsOf(get().drafts, key)),
       getUploads: (key) => uploadsOf(get().drafts, key),
+      setReplyTarget: (key, target) => set((s) => {
+        if (!key.startsWith("reply:")) return s;
+        const annotations = s.drafts[key]?.annotations ?? EMPTY_REPLY_ANNOTATIONS;
+        const first = annotations[0];
+        const next = target ?? (first ? { commentId: first.sourceCommentId, actorName: first.sourceActorName } : null);
+        return { drafts: writeDraft(s.drafts, key, s.drafts[key]?.content ?? "", uploadsOf(s.drafts, key), annotations, next) };
+      }),
       setDraft: (key, content) =>
         set((s) => ({
           drafts: writeDraft(s.drafts, key, content, uploadsOf(s.drafts, key)),

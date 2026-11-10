@@ -643,6 +643,7 @@
     "cancel_edit": "Cancelar",
     "copy_action": "Copiar",
     "copy_link_action": "Copiar enlace",
+    "reply_to_action": "Responder a este comentario",
     "link_copied": "Enlace copiado",
     "link_copy_failed": "No se ha podido copiar el enlace",
     "copied_toast": "Copiado",
@@ -733,6 +734,9 @@
   },
   "reply": {
     "placeholder": "Deja una respuesta...",
+    "replying_to_comment": "Respondiendo al comentario de {{name}}",
+    "clear_reply_target": "Responder a todo el hilo",
+    "reply_target_deleted": "Ese comentario se eliminó. Quítalo para responder al hilo.",
     "annotations": {
       "confirm_add": "Añadir anotación",
       "save": "Guardar anotación",

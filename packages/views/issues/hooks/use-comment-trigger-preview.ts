@@ -86,11 +86,13 @@ export function useCommentTriggerPreview({
   parentId,
   editingCommentId,
   content,
+  targetsParent = false,
 }: {
   issueId: string;
   parentId?: string;
   editingCommentId?: string;
   content: string;
+  targetsParent?: boolean;
 }): UseCommentTriggerPreviewResult {
   const signature = useMemo(() => commentTriggerPreviewSignature(content), [content]);
   const hasAllMembersMention = useMemo(
@@ -99,7 +101,7 @@ export function useCommentTriggerPreview({
   );
   const debouncedSignature = useDebouncedSignature(signature);
   const contentRef = useRef(content);
-  const parentKey = parentId ?? "";
+  const parentKey = `${parentId ?? ""}${targetsParent ? ":targeted" : ""}`;
   const editingKey = editingCommentId ?? "";
 
   useEffect(() => {
@@ -108,7 +110,9 @@ export function useCommentTriggerPreview({
 
   const previewQuery = useQuery({
     queryKey: [...issueKeys.commentTriggerPreview(issueId), parentKey, editingKey, debouncedSignature],
-    queryFn: () => api.previewCommentTriggers(issueId, contentRef.current, parentId, editingCommentId),
+    queryFn: () => targetsParent
+      ? api.previewCommentTriggers(issueId, contentRef.current, parentId, editingCommentId, true)
+      : api.previewCommentTriggers(issueId, contentRef.current, parentId, editingCommentId),
     enabled: signature !== "empty" && debouncedSignature !== "empty",
     retry: false,
     // The answer depends on live queue state (pending-task dedup), not just

@@ -660,6 +660,7 @@
     "cancel_edit": "Annuler",
     "copy_action": "Copier",
     "copy_link_action": "Copier le lien",
+    "reply_to_action": "Répondre à ce commentaire",
     "link_copied": "Lien copié",
     "link_copy_failed": "Échec de la copie du lien",
     "copied_toast": "Copié",
@@ -750,6 +751,9 @@
   },
   "reply": {
     "placeholder": "Laisser une réponse...",
+    "replying_to_comment": "Réponse au commentaire de {{name}}",
+    "clear_reply_target": "Répondre à tout le fil",
+    "reply_target_deleted": "Ce commentaire a été supprimé. Retirez-le pour répondre au fil.",
     "annotations": {
       "confirm_add": "Ajouter une annotation",
       "save": "Enregistrer l'annotation",

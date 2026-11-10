@@ -374,13 +374,14 @@ export function useIssueTimeline(issueId: string, userId?: string) {
   );
 
   const submitReply = useCallback(
-    async (parentId: string, content: string, attachmentIds?: string[], suppressAgentIds?: string[], steerTaskIds?: string[]): Promise<string | false> => {
+    async (parentId: string, content: string, attachmentIds?: string[], suppressAgentIds?: string[], steerTaskIds?: string[], targetsParent?: boolean): Promise<string | false> => {
       if (!content.trim() || !userId) return false;
       try {
         const comment = await createComment({
           content,
           type: "comment",
           parentId,
+          targetsParent,
           attachmentIds,
           suppressAgentIds,
           steerTaskIds,

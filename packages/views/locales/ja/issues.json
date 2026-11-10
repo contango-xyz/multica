@@ -645,6 +645,7 @@
     "cancel_edit": "キャンセル",
     "copy_action": "コピー",
     "copy_link_action": "リンクをコピー",
+    "reply_to_action": "このコメントに返信",
     "link_copied": "リンクをコピーしました",
     "link_copy_failed": "リンクをコピーできませんでした",
     "copied_toast": "コピーしました",
@@ -728,6 +729,9 @@
   },
   "reply": {
     "placeholder": "返信を残す...",
+    "replying_to_comment": "{{name}} さんのコメントに返信中",
+    "clear_reply_target": "スレッド全体に返信する",
+    "reply_target_deleted": "このコメントは削除されました。解除するとスレッドに返信できます。",
     "annotations": {
       "confirm_add": "注釈を追加",
       "save": "注釈を保存",

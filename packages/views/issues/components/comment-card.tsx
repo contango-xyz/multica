@@ -133,7 +133,9 @@ interface CommentCardProps {
    * `CommentRow` has to rerun the rule per row.
    */
   canModerate?: boolean;
-  onReply: (parentId: string, content: string, attachmentIds?: string[], suppressAgentIds?: string[], steerTaskIds?: string[]) => Promise<string | boolean>;
+  /** Aims this thread's reply box at one comment; absent when that adds nothing. */
+  onReplyTo?: (entry: TimelineEntry) => void;
+  onReply: (parentId: string, content: string, attachmentIds?: string[], suppressAgentIds?: string[], steerTaskIds?: string[], targetsParent?: boolean) => Promise<string | boolean>;
   onReplyAccepted?: (commentId: string) => void;
   onEdit: (commentId: string, content: string, attachmentIds: string[], suppressAgentIds?: string[], contentBase?: string) => Promise<void>;
   onDelete: (commentId: string) => void;
@@ -640,7 +642,9 @@ function CommentRow({
   onCreateSubIssue,
   onResolveToggle,
   onCopyLink,
+  onReplyTo,
 }: {
+  onReplyTo?: (entry: TimelineEntry) => void;
   runHeader?: ReactNode;
   runMetadata?: ReactNode;
   replyTo?: ReactNode;
@@ -736,6 +740,17 @@ function CommentRow({
         )}
 
         <div data-comment-actions className="ml-auto flex shrink-0 items-center gap-0.5">
+          {!edit.editing && onReplyTo && entry.comment_type === "comment" && (
+            <DeferredTooltip
+              content={t(($) => $.comment.reply_to_action)}
+              trigger={
+                <Button variant="ghost" size="icon-sm" className={commentActionClassName}
+                  aria-label={t(($) => $.comment.reply_to_action)} onClick={() => onReplyTo(entry)}>
+                  <CornerUpLeft className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              }
+            />
+          )}
           {!edit.editing && <QuickEmojiPicker
             onSelect={(emoji) => onToggleReaction(entry.id, emoji)}
             ariaLabel={t(($) => $.comment.add_reaction)}
@@ -1094,7 +1109,7 @@ function CommentCardImpl({
       replyTo={row.replyTo && <ReplyToQuote entry={row.replyTo} onJump={onJumpToComment} />}
       commentProps={row.reply ? {
         issueId, entry: row.reply, replies: [], currentUserId, canModerate, onReply, onEdit, onDelete,
-        onToggleReaction, onCreateSubIssue, onResolveToggle, onCopyLink, highlightedCommentId, enteringRunIds,
+        onToggleReaction, onCreateSubIssue, onResolveToggle, onCopyLink, highlightedCommentId, enteringRunIds, onReplyTo,
       } : undefined} />
   ) : renderReply(row);
 
@@ -1126,6 +1141,7 @@ function CommentCardImpl({
             onCreateSubIssue={onCreateSubIssue}
             onResolveToggle={onResolveToggle}
             onCopyLink={onCopyLink}
+            onReplyTo={onReplyTo}
           />
         </div>
       )}
@@ -1133,6 +1149,15 @@ function CommentCardImpl({
   );
 
   const replyCount = visibleReplies.length;
+  const setReplyTarget = useCommentDraftStore((s) => s.setReplyTarget);
+  // Only useful once others have spoken, and only where the reply box is showing.
+  const onReplyTo = replyCount > 0 && !(deriveThreadResolution(entry, allNestedReplies).kind === "reply" && !expandedResolvedIds?.has(entry.id))
+    ? (target: TimelineEntry) => setReplyTarget(`reply:${issueId}:${entry.id}`, {
+        commentId: target.id,
+        actorName: target.actor_name || getActorName(target.actor_type, target.actor_id),
+        pinned: true,
+      })
+    : undefined;
   const repliedToIds = new Set(allNestedReplies.map((reply) => reply.parent_id));
   const deleted = isDeletedComment(entry);
   const contentPreview = (entry.content ?? "").replace(/\n/g, " ").slice(0, 80);
@@ -1278,6 +1303,17 @@ function CommentCardImpl({
                   }
                 />
                 {open && !deleted && <>
+                  {!edit.editing && onReplyTo && entry.comment_type === "comment" && (
+            <DeferredTooltip
+              content={t(($) => $.comment.reply_to_action)}
+              trigger={
+                <Button variant="ghost" size="icon-sm" className={commentActionClassName}
+                  aria-label={t(($) => $.comment.reply_to_action)} onClick={() => onReplyTo(entry)}>
+                  <CornerUpLeft className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              }
+            />
+          )}
                   {!edit.editing && <QuickEmojiPicker
                     onSelect={(emoji) => onToggleReaction(entry.id, emoji)}
                     ariaLabel={t(($) => $.comment.add_reaction)}
@@ -1526,6 +1562,7 @@ function CommentCardImpl({
                   issueId={issueId}
                   parentId={replyTargetId}
                   targetMissing={replyTargetMissing}
+                  targetsParent={!!replyTarget}
                   placeholder={t(($) => $.reply.placeholder)}
                   size="sm"
                   avatarType="member"
@@ -1533,7 +1570,7 @@ function CommentCardImpl({
                   draftKey={`reply:${issueId}:${entry.id}`}
                   onEditAnnotation={(id) => annotation.editAnnotation(id, true)}
                   steerByDefault={steerThreadRunByDefault}
-                  onSubmit={(content, attachmentIds, suppressAgentIds, steerTaskIds) => replyTargetMissing ? Promise.resolve(false) : onReply(replyTargetId, content, attachmentIds, suppressAgentIds, steerTaskIds)}
+                  onSubmit={(content, attachmentIds, suppressAgentIds, steerTaskIds) => replyTargetMissing ? Promise.resolve(false) : onReply(replyTargetId, content, attachmentIds, suppressAgentIds, steerTaskIds, !!replyTarget)}
                   onAccepted={onReplyAccepted}
                 />
               </div>

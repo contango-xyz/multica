@@ -845,6 +845,7 @@ export function useCreateComment(issueId: string) {
       content,
       type,
       parentId,
+      targetsParent,
       attachmentIds,
       suppressAgentIds,
       steerTaskIds,
@@ -852,11 +853,14 @@ export function useCreateComment(issueId: string) {
       content: string;
       type?: string;
       parentId?: string;
+      targetsParent?: boolean;
       attachmentIds?: string[];
       suppressAgentIds?: string[];
       /** Running turns this comment goes into instead of a follow-up run. */
       steerTaskIds?: string[];
-    }) => api.createComment(issueId, content, type, parentId, attachmentIds, suppressAgentIds, steerTaskIds),
+    }) => targetsParent
+      ? api.createComment(issueId, content, type, parentId, attachmentIds, suppressAgentIds, steerTaskIds, true)
+      : api.createComment(issueId, content, type, parentId, attachmentIds, suppressAgentIds, steerTaskIds),
     onSuccess: (comment) => {
       if (comment.issue_revision) {
         onIssueAuxiliaryRevision(qc, wsId, issueId, comment.issue_revision);

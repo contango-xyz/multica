@@ -645,6 +645,7 @@
     "cancel_edit": "取消",
     "copy_action": "复制",
     "copy_link_action": "复制链接",
+    "reply_to_action": "回复此评论",
     "link_copied": "链接已复制",
     "link_copy_failed": "复制链接失败",
     "copied_toast": "已复制",
@@ -728,6 +729,9 @@
   },
   "reply": {
     "placeholder": "回复...",
+    "replying_to_comment": "正在回复 {{name}} 的评论",
+    "clear_reply_target": "改为回复整个线程",
+    "reply_target_deleted": "该评论已删除。取消后可回复线程。",
     "annotations": {
       "confirm_add": "添加批注",
       "save": "保存批注",

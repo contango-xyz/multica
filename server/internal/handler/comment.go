@@ -1449,6 +1449,8 @@ type CreateCommentRequest struct {
 	// has ended, or cannot take additional input, is never swapped for another
 	// one: its agent keeps the normal trigger.
 	SteerTaskIDs []string `json:"steer_task_ids"`
+	// TargetsParent records that the author picked this exact parent comment.
+	TargetsParent bool `json:"targets_parent"`
 	// Steer adds the comment to the current running turn of every recipient
 	// that has no turn in SteerTaskIDs, with the same fallback.
 	Steer bool `json:"steer"`
@@ -1458,6 +1460,7 @@ type CommentTriggerPreviewRequest struct {
 	Content          string  `json:"content"`
 	ParentID         *string `json:"parent_id"`
 	EditingCommentID *string `json:"editing_comment_id"`
+	TargetsParent    bool    `json:"targets_parent"`
 }
 
 type CommentTriggerPreviewResponse struct {
@@ -1484,6 +1487,7 @@ const (
 	commentTriggerSourceMentionAgent       commentAgentTriggerSource = "mention_agent"
 	commentTriggerSourceMentionSquadLeader commentAgentTriggerSource = "mention_squad_leader"
 	commentTriggerSourceThreadParent       commentAgentTriggerSource = "thread_parent"
+	commentTriggerSourceThreadLastAgent    commentAgentTriggerSource = "thread_last_agent"
 	commentTriggerSourceConversation       commentAgentTriggerSource = "conversation_continuation"
 )
 
@@ -1510,6 +1514,8 @@ type commentTriggerComputeOptions struct {
 	// by the originator, not the immediate agent principal. Members are their
 	// own originator so this may be empty for member-authored triggers.
 	OriginatorUserID string
+	// TargetsParent is the comment's stored "reply to this exact comment" choice.
+	TargetsParent bool
 }
 
 func commentAgentTriggerReason(trigger commentAgentTrigger) string {
@@ -1522,6 +1528,8 @@ func commentAgentTriggerReason(trigger commentAgentTrigger) string {
 		return "A mentioned squad will trigger its leader."
 	case commentTriggerSourceThreadParent:
 		return "This reply will trigger the parent comment's author."
+	case commentTriggerSourceThreadLastAgent:
+		return "This reply will trigger the last agent to speak in this thread."
 	case commentTriggerSourceConversation:
 		return "This follow-up will continue the recent agent conversation."
 	default:
@@ -1558,7 +1566,7 @@ func (h *Handler) PreviewCommentTriggers(w http.ResponseWriter, r *http.Request)
 	}
 
 	var editingComment *db.Comment
-	var opts commentTriggerComputeOptions
+	opts := commentTriggerComputeOptions{TargetsParent: req.TargetsParent}
 	if req.EditingCommentID != nil {
 		editingID, ok := parseUUIDOrBadRequest(w, *req.EditingCommentID, "editing_comment_id")
 		if !ok {
@@ -1573,6 +1581,7 @@ func (h *Handler) PreviewCommentTriggers(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		editingComment = &comment
+		opts.TargetsParent = comment.TargetsParent
 		opts.ExcludeTriggerCommentID = editingID
 	}
 
@@ -1855,6 +1864,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		// The author's "don't start" choices outlive this call: completion
 		// replay skips the agents it names.
 		SuppressedAgentIds: suppressAgentIDs,
+		TargetsParent:      req.TargetsParent && parentID.Valid,
 	}
 	var created db.CreateCommentRow
 	var err error
@@ -2017,6 +2027,7 @@ func (h *Handler) triggerTasksForComment(ctx context.Context, issue db.Issue, co
 		ExcludeTriggerCommentID: comment.ID,
 		AuthoringTaskID:         comment.SourceTaskID,
 		OriginatorUserID:        originatorUserID,
+		TargetsParent:           comment.TargetsParent,
 	})
 	triggers = filterSuppressedCommentAgentTriggers(triggers, suppressAgentIDs)
 	h.noteBlockedRuntimeTargets(ctx, issue, targets)
@@ -2652,7 +2663,7 @@ func (h *Handler) enqueueSingleCommentTrigger(ctx context.Context, issue db.Issu
 				"agent_id", uuidToString(trigger.Agent.ID))
 			return err
 		}
-	case commentTriggerSourceThreadParent, commentTriggerSourceConversation:
+	case commentTriggerSourceThreadParent, commentTriggerSourceConversation, commentTriggerSourceThreadLastAgent:
 		var err error
 		// Squad is set on these two sources only when the routing already
 		// proved a leader role to continue: the thread root's prior task for
@@ -2726,7 +2737,8 @@ func (h *Handler) computeCommentAgentTriggers(ctx context.Context, issue db.Issu
 		// gave a person woke the orchestrator for nothing (CTG-839). A worker's
 		// reply under a human's comment that did not name it (the leader delegated
 		// it) still wakes the leader: that is the worker→leader loop.
-		if actorType == "agent" && agentAnswersMemberWhoNamedIt(parentComment, actorID) {
+		if actorType == "agent" && (agentAnswersMemberWhoNamedIt(parentComment, actorID) ||
+			h.agentAnswersMemberInThread(ctx, issue, parentComment, actorID, opts.AuthoringTaskID)) {
 			return nil, nil
 		}
 		// Agent-authored comments do not participate in the member-driven
@@ -2749,6 +2761,16 @@ func (h *Handler) computeCommentAgentTriggers(ctx context.Context, issue db.Issu
 			}
 		}
 		return nil, nil
+	}
+
+	if parentComment != nil && !parentComment.DeletedAt.Valid {
+		// "Reply to this comment" on a person's comment is addressed to that person.
+		if opts.TargetsParent && parentComment.AuthorType == "member" {
+			return nil, nil
+		}
+		if triggers, ok := h.routeUntaggedThreadReply(ctx, issue, parentComment, actorID, opts); ok {
+			return triggers, nil
+		}
 	}
 
 	// A deleted parent no longer speaks for its agent author (#8296).
@@ -2799,6 +2821,87 @@ func hasMemberMention(mentions []util.Mention) bool {
 		}
 	}
 	return false
+}
+
+// routeUntaggedThreadReply is Contango's rule for a person's untagged reply from
+// the thread's reply box: it wakes the last agent to speak in that thread and
+// nobody else. Handled is false when the rule does not apply, leaving the
+// routes below untouched: a reply aimed at one comment (the explicit flag, or
+// any non-root parent, which the reply box never sends), automation, a thread
+// where no agent has spoken yet (a run still in flight keeps the follow-up
+// through the conversation owners), and a thread with no eligible agent left.
+func (h *Handler) routeUntaggedThreadReply(ctx context.Context, issue db.Issue, parent *db.Comment, memberID string, opts commentTriggerComputeOptions) ([]commentAgentTrigger, bool) {
+	if opts.TargetsParent || parent.ParentID.Valid {
+		return nil, false
+	}
+	if member, err := util.ParseUUID(memberID); err != nil || isBotMember(member) {
+		return nil, false
+	}
+	spoken, err := h.Queries.ListThreadAgentComments(ctx, db.ListThreadAgentCommentsParams{
+		RootID:          parent.ID,
+		IssueID:         issue.ID,
+		BeforeCommentID: opts.ExcludeTriggerCommentID,
+	})
+	if err != nil || len(spoken) == 0 {
+		return nil, false
+	}
+	// A person-rooted thread remembers which squad role each agent answered in.
+	ownerSquad := map[string]pgtype.UUID{}
+	if parent.AuthorType == "member" {
+		if owners, err := h.Queries.ListConversationRootOwners(ctx, db.ListConversationRootOwnersParams{
+			IssueID: issue.ID, TriggerCommentID: parent.ID,
+		}); err == nil {
+			for _, owner := range owners {
+				ownerSquad[uuidToString(owner.AgentID)] = owner.SquadID
+			}
+		}
+	}
+	tried := map[string]bool{}
+	for _, comment := range spoken {
+		agentID := uuidToString(comment.AuthorID)
+		if tried[agentID] {
+			continue
+		}
+		tried[agentID] = true
+		trigger, ok := h.routeConversationContinuationToAgent(ctx, issue, comment.AuthorID, ownerSquad[agentID], memberID, opts)
+		if !ok {
+			continue
+		}
+		if verdict, err := service.AgentReadiness(ctx, h.runtimeLookup(obsmetrics.RuntimeLookupSourceComment), trigger.Agent); err == nil && verdict.Blocked() {
+			continue
+		}
+		if squad, ok := h.squadLeaderRoleOfAuthoringTask(ctx, issue, comment, trigger.Agent); ok {
+			trigger.Squad = squad
+		}
+		trigger.Source = commentTriggerSourceThreadLastAgent
+		return []commentAgentTrigger{trigger}, true
+	}
+	return nil, false
+}
+
+// agentAnswersMemberInThread reports whether this comment is an agent's answer
+// to the person whose thread reply started its run (Contango). The turn is that
+// person's, so it does not fall back to the squad leader, whose comment would
+// also make it the thread's last agent. A run started by another agent or by
+// automation is a worker result and keeps the leader loop.
+func (h *Handler) agentAnswersMemberInThread(ctx context.Context, issue db.Issue, parent *db.Comment, agentID string, taskID pgtype.UUID) bool {
+	if parent == nil || !taskID.Valid {
+		return false
+	}
+	task, err := h.Queries.GetAgentTask(ctx, taskID)
+	if err != nil || !task.TriggerCommentID.Valid || uuidToString(task.AgentID) != agentID {
+		return false
+	}
+	trigger, err := h.Queries.GetComment(ctx, task.TriggerCommentID)
+	if err != nil || trigger.AuthorType != "member" || trigger.DeletedAt.Valid || !trigger.ParentID.Valid || isBotMember(trigger.AuthorID) {
+		return false
+	}
+	replyRoot, err := h.Queries.GetThreadRoot(ctx, db.GetThreadRootParams{CommentID: parent.ID, WorkspaceID: issue.WorkspaceID})
+	if err != nil {
+		return false
+	}
+	triggerRoot, err := h.Queries.GetThreadRoot(ctx, db.GetThreadRootParams{CommentID: trigger.ID, WorkspaceID: issue.WorkspaceID})
+	return err == nil && replyRoot.ID == triggerRoot.ID
 }
 
 func (h *Handler) routeReplyToParentAuthor(ctx context.Context, issue db.Issue, parent *db.Comment, authorType, authorID string, opts commentTriggerComputeOptions) (commentAgentTrigger, bool) {
@@ -4030,6 +4133,7 @@ func (h *Handler) retriggerCancelledTaskSurvivors(ctx context.Context, issue db.
 			ExcludeTriggerCommentID: comment.ID,
 			AuthoringTaskID:         comment.SourceTaskID,
 			OriginatorUserID:        originatorUserID,
+			TargetsParent:           comment.TargetsParent,
 		})
 		targets := targetsByComment[uuidToString(comment.ID)]
 		scoped := make([]commentAgentTrigger, 0, len(targets))

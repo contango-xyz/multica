@@ -42,8 +42,10 @@ func TestCompleteTask_CancelledCommentDoesNotReplayQueuedInput(t *testing.T) {
 				"created_at": testutil.Raw("now() - interval '1 minute'"),
 				"parent_id":  triggerCommentID,
 			}
+			nextRecipient := agentID
 			if inputType == "agent" {
 				reviewerID := createHandlerTestAgent(t, "Cancellation reviewer", nil)
+				nextRecipient = reviewerID // it spoke last in the thread (Contango)
 				queuedCols["author_type"] = "agent"
 				queuedCols["author_id"] = reviewerID
 				queuedContent = "[@owner](mention://agent/" + agentID + ") review result"
@@ -93,7 +95,7 @@ func TestCompleteTask_CancelledCommentDoesNotReplayQueuedInput(t *testing.T) {
 					"content":   "new input after cancel",
 					"parent_id": triggerCommentID,
 				}), "id", issueID)).Want(http.StatusCreated)
-			if n := pendingTaskCountForAgentIssue(t, issueID, agentID); n != 1 {
+			if n := pendingTaskCountForAgentIssue(t, issueID, nextRecipient); n != 1 {
 				t.Fatalf("new comment after cancellation created %d pending task(s), want 1", n)
 			}
 

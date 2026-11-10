@@ -645,6 +645,7 @@
     "cancel_edit": "取消",
     "copy_action": "複製",
     "copy_link_action": "複製連結",
+    "reply_to_action": "回覆此留言",
     "link_copied": "連結已複製",
     "link_copy_failed": "複製連結失敗",
     "copied_toast": "已複製",
@@ -728,6 +729,9 @@
   },
   "reply": {
     "placeholder": "回覆...",
+    "replying_to_comment": "正在回覆 {{name}} 的留言",
+    "clear_reply_target": "改為回覆整個討論串",
+    "reply_target_deleted": "該留言已刪除。取消後可回覆討論串。",
     "annotations": {
       "confirm_add": "新增批註",
       "save": "儲存批註",

@@ -5158,6 +5158,7 @@ func (h *Handler) reconcileCommentsOnCompletion(ctx context.Context, task *db.Ag
 			ExcludeTriggerCommentID: c.ID,
 			AuthoringTaskID:         c.SourceTaskID,
 			OriginatorUserID:        originatorUserID,
+			TargetsParent:           c.TargetsParent,
 		})
 		// Agent replies discovered only by timestamp must not start a new
 		// conversation. Replay explicit mentions, or a worker reply that the

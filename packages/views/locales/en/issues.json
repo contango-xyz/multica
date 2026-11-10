@@ -660,6 +660,7 @@
     "cancel_edit": "Cancel",
     "copy_action": "Copy",
     "copy_link_action": "Copy link",
+    "reply_to_action": "Reply to this comment",
     "link_copied": "Link copied",
     "link_copy_failed": "Failed to copy link",
     "copied_toast": "Copied",
@@ -750,6 +751,9 @@
   },
   "reply": {
     "placeholder": "Leave a reply...",
+    "replying_to_comment": "Replying to {{name}}'s comment",
+    "clear_reply_target": "Reply to the whole thread instead",
+    "reply_target_deleted": "That comment was deleted. Clear it to reply to the thread.",
     "annotations": {
       "confirm_add": "Add annotation",
       "save": "Save annotation",

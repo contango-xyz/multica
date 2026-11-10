@@ -367,6 +367,22 @@ describe("comment edit — upload submit gate", () => {
 
 // Keep the real card, annotation hook, reply composer and submit wiring together.
 // Source parsing and persistence boundary matrices live in their own suites.
+describe("comment thread — reply to one comment", () => {
+  it("aims the thread's reply box at the picked comment", () => {
+    const child: TimelineEntry = { ...entry, id: "agent-child", parent_id: entry.id, comment_type: "comment" };
+    renderCard(undefined, { replies: [child] });
+    const buttons = screen.getAllByRole("button", { name: "Reply to this comment" });
+    fireEvent.click(buttons[buttons.length - 1]!);
+    expect(useCommentDraftStore.getState().drafts[`reply:issue-1:${entry.id}`]?.replyTarget)
+      .toMatchObject({ commentId: "agent-child", pinned: true });
+  });
+
+  it("offers no target when the thread has no replies yet", () => {
+    renderCard(undefined, { replies: [] });
+    expect(screen.queryByRole("button", { name: "Reply to this comment" })).toBeNull();
+  });
+});
+
 describe("comment thread — selection reply", () => {
   it.each([[false, "agent", "agent-1", "comment"], [true, "agent", "agent-1", "comment"], [false, "member", "user-1", "comment"], [false, "member", "other-user", "comment"], [false, "member", "user-1", "note"]] as const)("sends quotes in the source thread and clears overlays (open: %s, author: %s %s, type: %s)", async (keepNoteOpen, actorType, actorId, commentType) => {
     Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: 1024 });
@@ -406,7 +422,7 @@ describe("comment thread — selection reply", () => {
     expect(screen.queryByRole("button", { name: "Preview reply" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(onReply).toHaveBeenCalledTimes(1));
-    expect(onReply).toHaveBeenCalledWith("agent-child", "> Selected agent text\n\nReply-specific note", undefined, undefined, undefined);
+    expect(onReply).toHaveBeenCalledWith("agent-child", "> Selected agent text\n\nReply-specific note", undefined, undefined, undefined, true);
     await waitFor(() => {
       expect(useCommentDraftStore.getState().getAnnotations("reply:issue-1:comment-1")).toHaveLength(0);
       expect(document.querySelector("[data-reply-annotation-overlay]")).not.toBeInTheDocument();

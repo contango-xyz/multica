@@ -3242,7 +3242,7 @@ func TestRootMentionOwnerRoutesMemberReplyButNotAgentReply(t *testing.T) {
 	cancelTasks(agentB)
 
 	// 5. Member posts a reply in the same thread with NO mentions.
-	// The member-authored root @mention owns the thread, so this routes to B.
+	// Agent A spoke last in the thread, so it answers (Contango), not root owner B.
 	w = postComment(issueID, map[string]any{
 		"content":   "Thanks for the review.",
 		"parent_id": parentComment.ID,
@@ -3250,8 +3250,11 @@ func TestRootMentionOwnerRoutesMemberReplyButNotAgentReply(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("member reply: expected 201, got %d: %s", w.Code, w.Body.String())
 	}
-	if countTasks(agentB) != 1 {
-		t.Fatalf("expected 1 task for Agent B after member reply (root owner), got %d", countTasks(agentB))
+	if countTasks(agentB) != 0 {
+		t.Fatalf("expected 0 tasks for Agent B after member reply (A spoke last), got %d", countTasks(agentB))
+	}
+	if countTasks(agentA) != 1 {
+		t.Fatalf("expected 1 task for Agent A after member reply (last agent), got %d", countTasks(agentA))
 	}
 }
 

@@ -3,6 +3,7 @@
 import { composeAnnotatedReply, EMPTY_REPLY_ANNOTATIONS, hasReplyIntent } from "@multica/core/drafts/reply-annotation";
 import { ReplyAnnotations } from "./reply-annotations";
 import { useRef, useState, useEffect, useMemo } from "react";
+import { CornerUpLeft, X } from "@multica/ui/icons";
 import { ContentEditor, type ContentEditorRef, useFileDropZone, FileDropOverlay, useLazyEditor, useUploadGate, useComposerSubmit } from "../../editor";
 import { FileUploadButton } from "@multica/ui/components/common/file-upload-button";
 import { SubmitButton } from "@multica/ui/components/common/submit-button";
@@ -42,6 +43,8 @@ interface ReplyInputProps {
    *  enclosing CommentCard may unmount on scroll-out. */
   draftKey?: CommentDraftKey;
   targetMissing?: boolean;
+  /** The author aimed this reply at one comment, not the whole thread. */
+  targetsParent?: boolean;
   onEditAnnotation?: (id: string) => boolean;
   /** Whether a running turn takes this reply by default: true for the turn
    *  that belongs to this thread. Other recipients' turns can still be chosen. */
@@ -64,6 +67,7 @@ function ReplyInput({
   draftKey,
   onEditAnnotation,
   targetMissing = false,
+  targetsParent = false,
   steerByDefault = NEVER_STEER_BY_DEFAULT,
 }: ReplyInputProps) {
   const { t } = useT("issues");
@@ -72,6 +76,18 @@ function ReplyInput({
   const placeholderText = placeholder ?? t(($) => $.reply.placeholder);
   const editorRef = useRef<ContentEditorRef>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const replyTarget = useCommentDraftStore((s) => draftKey ? s.drafts[draftKey]?.replyTarget : undefined);
+  const setReplyTarget = useCommentDraftStore((s) => s.setReplyTarget);
+  const pinnedTargetId = replyTarget?.pinned ? replyTarget.commentId : undefined;
+  const seenPinnedTarget = useRef(pinnedTargetId);
+  // Picking a comment moves you to the box. A draft restored on mount does not.
+  useEffect(() => {
+    if (pinnedTargetId && pinnedTargetId !== seenPinnedTarget.current) {
+      editorRef.current?.focus();
+      composerRef.current?.scrollIntoView?.({ block: "nearest" });
+    }
+    seenPinnedTarget.current = pinnedTargetId;
+  }, [pinnedTargetId]);
   // See CommentInput — replying mid-upload posts without the file.
   const uploadGate = useUploadGate(editorRef);
   // Quick actions in the `/` menu — same catalog and same insert-don't-run
@@ -89,7 +105,7 @@ function ReplyInput({
   const annotations = useCommentDraftStore((s) => draftKey ? s.getAnnotations(draftKey) : EMPTY_REPLY_ANNOTATIONS);
   const composedContent = useMemo(() => composeAnnotatedReply(content, annotations), [content, annotations]);
   const canSend = !targetMissing && (annotations.length ? hasReplyIntent(content, annotations) : !isEmpty);
-  const triggerPreview = useCommentTriggerPreview({ issueId, parentId, content: canSend ? composedContent : "" });
+  const triggerPreview = useCommentTriggerPreview({ issueId, parentId, content: canSend ? composedContent : "", targetsParent });
   // Uploads for this reply session (MUL-5181) — owned by the coordinator. With
   // a draftKey they persist in the draft store so scroll-out/close no longer
   // drops an in-flight upload; without one (no persistence context) they fall
@@ -242,6 +258,20 @@ function ReplyInput({
         )}
       >
         {attachmentsBlockSteer && <SteerAttachmentNotice />}
+        {draftKey && replyTarget?.pinned && (
+          <div className="mb-2 flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
+            <CornerUpLeft aria-hidden className="size-3 shrink-0" />
+            <span className="min-w-0 truncate">{t(($) => $.reply.replying_to_comment, { name: replyTarget.actorName })}</span>
+            <button type="button" disabled={submitting} aria-label={t(($) => $.reply.clear_reply_target)} title={t(($) => $.reply.clear_reply_target)}
+              className="shrink-0 rounded-xs hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              onClick={() => setReplyTarget(draftKey, null)}>
+              <X aria-hidden className="size-3" />
+            </button>
+          </div>
+        )}
+        {draftKey && replyTarget?.pinned && targetMissing && annotations.length === 0 && (
+          <p role="alert" className="mb-2 text-caption text-destructive">{t(($) => $.reply.reply_target_deleted)}</p>
+        )}
         {draftKey && annotations.length > 0 && <>
           {targetMissing && <p role="alert" className="mb-2 text-caption text-destructive">{t(($) => $.reply.annotations.target_deleted)}</p>}
           <ReplyAnnotations draftKey={draftKey} annotations={annotations}
