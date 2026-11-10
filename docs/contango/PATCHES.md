@@ -726,6 +726,11 @@ Commits are named by subject, not hash: hashes change on every rebase. Find one 
 - **What:** opening a row tries each unread id once per opening (a failed read rolled the row back to unread, which re-ran the effect without end); "mark section read" goes four at a time; the server allows four `POST /api/inbox/{id}/read` in flight per person and answers 429 past that, so old clients still looping stay cheap.
 - **Upstream conflict risk:** the auto-read effect and `handleMarkSectionRead` in `inbox-page.tsx`, `MarkInboxRead` in `inbox.go`.
 
+### 34. The workspace sweeper leaves a folder a live process is using
+
+- **What:** before any GC mutation of a task directory (`applyGCAction`: clean, orphan, artifact cleanup), the daemon checks whether a process other than itself has its working directory or an open file inside it (`dirInUse`; Linux scans `/proc/*/cwd` and `/proc/*/fd`, macOS asks `lsof -F pn` once, other platforms skip the check). A busy directory is logged (`gc: skipping task dir in use by a live process`) and counted as skipped; the next pass tries again. CTG-2260, 2026-11-10: an agent resumed inside another task's completed folder, the completed-task TTL expired, and the sweeper removed it under the running pass.
+- **Upstream conflict risk:** the ownership re-check block in `applyGCAction` (`server/internal/daemon/gc.go`); `gc_inuse*.go` are ours.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

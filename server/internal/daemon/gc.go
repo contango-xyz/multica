@@ -341,6 +341,13 @@ func (d *Daemon) applyGCAction(ctx context.Context, taskDir string, action gcAct
 			stats.skipped++
 			return 0
 		}
+		// A live process working inside the directory (its cwd or an open file)
+		// keeps it, whatever the metadata says; the next pass tries again.
+		if pid, busy := dirInUse(taskDir); busy {
+			d.logger.Info("gc: skipping task dir in use by a live process; retrying next pass", "dir", taskDir, "pid", pid)
+			stats.skipped++
+			return 0
+		}
 	}
 	switch action {
 	case gcActionClean:
