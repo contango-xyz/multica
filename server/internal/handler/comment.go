@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -2011,6 +2012,41 @@ func agentAnswersMemberWhoNamedIt(parent *db.Comment, agentID string) bool {
 	return false
 }
 
+// agentRunAnswersMemberWhoNamedIt reports whether the agent run that wrote a comment was started by a live human
+// comment that names that agent (Contango patch 37): its untagged comment answers that human, even top-level.
+func (h *Handler) agentRunAnswersMemberWhoNamedIt(ctx context.Context, taskID pgtype.UUID, agentID string) bool {
+	if !taskID.Valid {
+		return false
+	}
+	task, err := h.Queries.GetAgentTask(ctx, taskID)
+	if err != nil || !task.TriggerCommentID.Valid || uuidToString(task.AgentID) != agentID {
+		return false
+	}
+	trigger, err := h.Queries.GetComment(ctx, task.TriggerCommentID)
+	if err != nil {
+		return false
+	}
+	return agentAnswersMemberWhoNamedIt(&trigger, agentID)
+}
+
+// isOperatorAskComment: a [NEEDS OPERATOR] ask is for the admin session's ask watcher, not the squad leader
+// (Contango patch 37; 52 of 61 leader wakes on one were empty, 2026-11-08..10).
+func isOperatorAskComment(content string) bool {
+	return operatorAskRE.MatchString(content)
+}
+
+var operatorAskRE = regexp.MustCompile(`^\s*(?:/note\s+)?(?:\*\*)?\[NEEDS OPERATOR\]`)
+
+// isStatusOnlyAgentComment: an agent comment that only says it is waiting, withdrew an ask or already did what was
+// asked gives the leader nothing to route (Contango patch 37: every one of 47 such leader wakes, 2026-11-08..10, ended
+// without a comment). Conservative on purpose: only openers that were always empty.
+func isStatusOnlyAgentComment(content string) bool {
+	return statusOnlyRE.MatchString(content)
+}
+
+var statusOnlyRE = regexp.MustCompile(`(?i)^\s*(?:\*\*)?(?:still waiting|waiting for|waiting on|i'm waiting|i am waiting|ask withdrawn|` +
+	`watch is armed|nothing is needed|nothing to do|nothing else from|there's nothing|recorded your|already done:|already posted:|no action needed)\b`)
+
 // triggerTasksForComment resolves and enqueues the comment's agent triggers and
 // returns the per-target outcomes for explicit @agent / @squad mentions
 // (MUL-4525 §2): blocked mentions from resolution plus queued / coalesced /
@@ -2741,6 +2777,13 @@ func (h *Handler) computeCommentAgentTriggers(ctx context.Context, issue db.Issu
 			h.agentAnswersMemberInThread(ctx, issue, parentComment, actorID, opts.AuthoringTaskID)) {
 			return nil, nil
 		}
+		// Contango patch 37 (owner 2026-11-10: "I'm asking the last agent, don't also wake the lead for no
+		// reason"): the same holds for a top-level answer, when the run that wrote it was started by a human's
+		// comment naming this agent. And an operator ask or a status-only note asks the leader nothing.
+		if actorType == "agent" && (h.agentRunAnswersMemberWhoNamedIt(ctx, opts.AuthoringTaskID, actorID) ||
+			isOperatorAskComment(content) || isStatusOnlyAgentComment(content)) {
+			return nil, nil
+		}
 		// Agent-authored comments do not participate in the member-driven
 		// conversation routing (parent-author / thread-root continuation) or
 		// the member assignee fallback. Worker-result comments retain the
@@ -2799,6 +2842,9 @@ func (h *Handler) computeCommentAgentTriggers(ctx context.Context, issue db.Issu
 		}
 	}
 
+	// Owner 2026-11-10: "if you type at the bottom of the ticket you create a new thread within the ticket, so if
+	// you don't tag anyone there the lead is the natural default". A reply inside a thread goes to the agent that
+	// thread is with (routeUntaggedThreadReply, patch 36); a new top-level comment keeps the assignee / leader.
 	if trigger, ok := h.routeAssigneeFallback(ctx, issue, actorType, actorID, opts); ok {
 		return []commentAgentTrigger{trigger}, nil
 	}

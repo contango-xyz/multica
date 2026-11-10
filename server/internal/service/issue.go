@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"github.com/multica-ai/multica/server/internal/attribution"
 	"log/slog"
+	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -938,7 +940,14 @@ func agentAssigneeVerdict(ctx context.Context, lookup RuntimeLookup, issue db.Is
 }
 
 func (s *IssueService) shouldEnqueueSquadLeaderOnAssign(ctx context.Context, issue db.Issue) bool {
-	if issue.TriageState.Valid || issuestatus.Effective(ctx, s.Queries, issue.WorkspaceID, issue.Status) == "backlog" {
+	effective := issuestatus.Effective(ctx, s.Queries, issue.WorkspaceID, issue.Status)
+	if issue.TriageState.Valid || effective == "backlog" {
+		return false
+	}
+	// Contango patch 37: a squad whose Todo column is a scheduler's queue never routes a Todo card itself, so
+	// waking its leader on a Todo assignment is a run with nothing to do (65 of 73 such Engineering wakes were
+	// empty, 2026-11-08..10). Squads listed in MULTICA_SCHEDULED_SQUAD_IDS; the scheduler's release wakes it.
+	if effective == "todo" && scheduledSquad(util.UUIDToString(issue.AssigneeID)) {
 		return false
 	}
 	return s.isSquadLeaderReady(ctx, issue)
@@ -997,4 +1006,15 @@ func (s *IssueService) enqueueSquadLeaderTask(ctx context.Context, issue db.Issu
 	if !triggerCommentID.Valid && authorType == "member" {
 		s.TaskService.RecordHumanDelegation(ctx, attribution.DirectHumanRun(issue.CreatorID, attribution.EvidenceIssueAssignment, issue.ID))
 	}
+}
+
+// scheduledSquad reports whether squadID's Todo column is run by a scheduler (MULTICA_SCHEDULED_SQUAD_IDS,
+// comma-separated squad ids; Contango patch 37).
+func scheduledSquad(squadID string) bool {
+	for _, id := range strings.Split(os.Getenv("MULTICA_SCHEDULED_SQUAD_IDS"), ",") {
+		if id = strings.TrimSpace(id); id != "" && strings.EqualFold(id, squadID) {
+			return true
+		}
+	}
+	return false
 }

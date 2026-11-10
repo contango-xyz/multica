@@ -795,3 +795,22 @@ owner, so the test now uses `newOwnerDaemonRequest` like upstream's own tests.
   and `expo-notifications` to `~57.0.23` (57.0.24 was under the 4-day release age).
 - `handler.go`, `task.go` (patch 5): both sides added a line/field; kept both.
 - `codex.go` (patch 8): both sides added `codexClient` fields; kept both.
+
+### 37. Fewer empty squad-leader wakes
+
+Owner 2026-11-10: "I'm asking the last agent, don't also wake the lead for no reason". In 48 h the Engineering
+leader ran 1,437 times; 907 runs posted nothing. Three server-side sources are cut:
+
+- An agent's untagged comment no longer falls back to the squad leader when the run that wrote it was started by a
+  human comment naming that agent (patch extends CTG-839's thread-reply rule to top-level answers), when it is a
+  `[NEEDS OPERATOR]` ask (the admin session's watcher takes those), or when it only says it is waiting, withdrew an
+  ask or already did it (a short, always-empty list of openers).
+- Not changed, by the owner's ruling: a person's new top-level comment with no tag still goes to the leader ("if you
+  type at the bottom of the ticket you create a new thread within the ticket, so if you don't tag anyone there the
+  lead is the natural default"). An untagged reply inside a thread goes to the agent that thread is with (patch 36).
+- Assigning a Todo card to a squad listed in `MULTICA_SCHEDULED_SQUAD_IDS` no longer wakes its leader: that squad's
+  scheduler owns Todo and wakes it on release (65 of 73 such wakes were empty).
+
+Files: `server/internal/handler/comment.go`, `server/internal/service/issue.go`, tests
+`contango_lead_wakes_test.go`, `contango_scheduled_squad_test.go`.
+
