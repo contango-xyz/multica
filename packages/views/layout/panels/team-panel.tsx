@@ -28,8 +28,10 @@ import {
   PanelSection,
   isPathWithin,
 } from "../panel-nav";
+import { routeIconForPath } from "../route-icon-components";
 import { useTeamAgentStatus } from "./team-status";
 
+const AvailabilityIcon = routeIconForPath("/_/availability");
 const EMPTY_TASKS: AgentTask[] = [];
 const MEMBER_AVATAR_LIMIT = 4;
 
@@ -251,6 +253,13 @@ export function TeamPanel() {
                   ))}
                 </span>
               }
+            />
+            {/* contango: who works when and who is away (patch 38); under Team, not Work (owner 2026-11-11). */}
+            <PanelLink
+              href={p.availability()}
+              icon={<AvailabilityIcon />}
+              label={t(($) => $.nav.availability)}
+              active={isPathWithin(pathname, p.availability())}
             />
           </PanelList>
         </PanelSection>

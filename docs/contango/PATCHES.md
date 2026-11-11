@@ -829,7 +829,8 @@ notification preference (patch 24); this adds:
   users it covers) and `GET /api/availability/ical-sources`. The iCal address is a secret: only admins read it back.
 - CLI `multica availability list|get|set|off|import|ical-sources`.
 - Web/desktop page `/{ws}/availability`: one row per person (hours, today, time off for 30 days) and the viewer's own
-  time off, backup and calendar link.
+  time off, backup and calendar link. Linked from the Team panel and part of the Team space (owner 2026-11-11: "I
+  thought it'd be under team, not work"; `core/paths/spaces.ts`, `layout/panels/team-panel.tsx`).
 - The ops job `team/availability-import.py` (claude-sandbox) imports the shared company calendar and personal feeds
   every 30 min and writes `public/availability.json` for stall-watch, ask-defaults and the MVP driver.
 
