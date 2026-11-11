@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/service"
+	"github.com/multica-ai/multica/server/internal/util"
 	"github.com/multica-ai/multica/server/pkg/agent"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
@@ -216,7 +217,7 @@ func (h *Handler) CreateIssueWakeup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	member := parseUUID(originator)
-	svc := service.IssueWakeupService{Tasks: h.TaskService}
+	svc := service.IssueWakeupService{Tasks: h.TaskService, ActingAgent: wakeupActingAgent(actorType, actorID)}
 	existingID := pgtype.UUID{}
 	if rawID := chi.URLParam(r, "wakeupID"); rawID != "" {
 		var valid bool
@@ -428,13 +429,26 @@ func (h *Handler) DisableIssueWakeup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	member := parseUUID(originator)
-	svc := service.IssueWakeupService{Tasks: h.TaskService}
+	svc := service.IssueWakeupService{Tasks: h.TaskService, ActingAgent: wakeupActingAgent(actorType, actorID)}
 	result, err := svc.Disable(r.Context(), issue.ID, id, member)
 	if err != nil {
 		wakeupError(w, err)
 		return
 	}
 	writeJSON(w, 200, result)
+}
+
+// wakeupActingAgent is the calling agent for a trusted agent run (resolveActor
+// only returns "agent" for one), else invalid (contango patch 40).
+func wakeupActingAgent(actorType, actorID string) pgtype.UUID {
+	if actorType != "agent" {
+		return pgtype.UUID{}
+	}
+	id, err := util.ParseUUID(actorID)
+	if err != nil {
+		return pgtype.UUID{}
+	}
+	return id
 }
 
 func (h *Handler) wakeupSourceTaskID(r *http.Request) pgtype.UUID {
@@ -467,7 +481,7 @@ func (h *Handler) EnableIssueWakeup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 403, "a human originator is required")
 		return
 	}
-	svc := service.IssueWakeupService{Tasks: h.TaskService}
+	svc := service.IssueWakeupService{Tasks: h.TaskService, ActingAgent: wakeupActingAgent(actorType, actorID)}
 	result, err := svc.Enable(r.Context(), issue.ID, parseUUID(originator), h.wakeupSourceTaskID(r), id, in)
 	if err != nil {
 		wakeupError(w, err)
@@ -498,7 +512,7 @@ func (h *Handler) EditIssueWakeupInstruction(w http.ResponseWriter, r *http.Requ
 		writeError(w, 403, "a human originator is required")
 		return
 	}
-	svc := service.IssueWakeupService{Tasks: h.TaskService}
+	svc := service.IssueWakeupService{Tasks: h.TaskService, ActingAgent: wakeupActingAgent(actorType, actorID)}
 	if err := svc.EditInstruction(r.Context(), issue.ID, id, parseUUID(originator), in); err != nil {
 		wakeupError(w, err)
 		return

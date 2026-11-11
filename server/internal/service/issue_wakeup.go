@@ -108,7 +108,12 @@ func (s *IssueWakeupService) Expiry(in *WakeupInput, now time.Time) (pgtype.Time
 	return pgtype.Timestamptz{Time: at, Valid: true}, pgtype.Int8{}, nil
 }
 
-type IssueWakeupService struct{ Tasks *TaskService }
+type IssueWakeupService struct {
+	Tasks *TaskService
+	// ActingAgent is the agent whose run made the request, if any (contango
+	// patch 40); it widens who may manage an existing rule (mayManageWakeup).
+	ActingAgent pgtype.UUID
+}
 
 func (s *IssueWakeupService) Validate(in *WakeupInput, now time.Time) (pgtype.Timestamptz, error) {
 	bad := func(msg string) (pgtype.Timestamptz, error) {
@@ -321,7 +326,12 @@ func (s *IssueWakeupService) EditInstruction(ctx context.Context, issueID, id, m
 	if w.IssueID != issue.ID || w.WorkspaceID != issue.WorkspaceID {
 		return pgx.ErrNoRows
 	}
-	if w.SystemRule.Valid || (w.CreatedBy != member && membership.Role != "owner" && membership.Role != "admin") {
+	if w.SystemRule.Valid {
+		return ErrWakeupForbidden
+	}
+	if ok, e := s.mayManageWakeup(ctx, tx, w, member, membership.Role); e != nil {
+		return e
+	} else if !ok {
 		return ErrWakeupForbidden
 	}
 	agent, err := q.GetAgentInWorkspace(ctx, db.GetAgentInWorkspaceParams{ID: w.AgentID, WorkspaceID: issue.WorkspaceID})
@@ -559,7 +569,9 @@ func (s *IssueWakeupService) save(ctx context.Context, issueID, member, source, 
 		if e != nil {
 			return out, ErrWakeupForbidden
 		}
-		if old.CreatedBy != member && membership.Role != "owner" && membership.Role != "admin" {
+		if ok, e := s.mayManageWakeup(ctx, tx, old, member, membership.Role); e != nil {
+			return out, e
+		} else if !ok {
 			return out, ErrWakeupForbidden
 		}
 		if enable != nil && old.Enabled {
@@ -1473,7 +1485,12 @@ func (s *IssueWakeupService) Disable(ctx context.Context, issueID, id, member pg
 	if out.IssueID != issue.ID || out.WorkspaceID != issue.WorkspaceID {
 		return db.IssueWakeup{}, pgx.ErrNoRows
 	}
-	if out.SystemRule.Valid || (out.CreatedBy != member && membership.Role != "owner" && membership.Role != "admin") {
+	if out.SystemRule.Valid {
+		return db.IssueWakeup{}, ErrWakeupForbidden
+	}
+	if ok, e := s.mayManageWakeup(ctx, tx, out, member, membership.Role); e != nil {
+		return db.IssueWakeup{}, e
+	} else if !ok {
 		return db.IssueWakeup{}, ErrWakeupForbidden
 	}
 	_, err = tx.Exec(ctx, "UPDATE issue_wakeup SET enabled=false,disabled_at=COALESCE(disabled_at,now()),updated_at=now() WHERE id=$1", id)

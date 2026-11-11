@@ -853,3 +853,21 @@ to each, and then they define which level is the min they want to get a notif"; 
 
 Rebase check: `push.Store` has `NotificationPrefs`/`IssueLabels`; `registerListeners`'s `inbox:new` handler keeps the
 `inboxDesktopNotify` copy; `decodeNotificationPreferenceRequest` asks `notiflevel.ValidKey` first.
+
+### 40. Squad agents may manage a wakeup on their own card
+
+Owner 2026-11-11 (after the operator disabled two by hand, CTG-1505 and CTG-2435): an agent's run acts for the
+human who started it, so a wakeup another principal registered (the bot, or a teammate acting for another human)
+could not be disabled by the squad working the card ("wakeup permission denied").
+
+- Disable, re-enable, replace (`PUT`) and instruction edits now also allow a trusted agent run when the agent
+  registered the wakeup (owns its `source_task_id` run), leads or belongs to the squad the issue is assigned to, or
+  acts for the issue's "Responsible human" (actor property matched by name, case-insensitive). On that issue only.
+- Unchanged: creator, owners/admins (the bot is an admin), plain members, system rules, delete and wake-now. Re-enable
+  and edit still check that the acting human may invoke the target agent; re-enable/replace still re-stamps
+  `created_by` to that human, as for an admin. The list's `can_manage` flag is not widened (UI only).
+
+Files: `server/internal/service/contango_wakeup_manage.go` (`mayManageWakeup`), `IssueWakeupService.ActingAgent`
+in `issue_wakeup.go`, handler `wakeupActingAgent`; test `handler/contango_wakeup_manage_test.go`.
+Rebase check: the three creator/admin checks in `issue_wakeup.go` (EditInstruction, save, Disable) call
+`mayManageWakeup`.
