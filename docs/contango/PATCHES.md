@@ -871,3 +871,16 @@ Files: `server/internal/service/contango_wakeup_manage.go` (`mayManageWakeup`), 
 in `issue_wakeup.go`, handler `wakeupActingAgent`; test `handler/contango_wakeup_manage_test.go`.
 Rebase check: the three creator/admin checks in `issue_wakeup.go` (EditInstruction, save, Disable) call
 `mayManageWakeup`.
+
+### 41. An agent's @all notifies nobody
+
+Owner 2026-11-11: the PM agent posted the same rules on 28 cards in 7 s, each starting with
+`[@all](mention://all/all)` — 252 inbox notifications for 9 people. Agents must never broadcast.
+
+- `notifyMentionedMembers` (comments and issue descriptions, created and edited) drops the `@all` fan-out when the
+  event's actor is not a member, and logs `dropping @all mention from non-member author`. The comment is kept; its
+  direct `@member` / `@squad` mentions still notify, and `@agent` mentions still wake agents (the trigger path in
+  `comment.go` is unchanged). Members keep `@all`.
+
+Files: `server/cmd/server/notification_listeners.go`; test `cmd/server/contango_agent_all_mention_test.go`.
+Drop when: upstream restricts `@all` to human authors.

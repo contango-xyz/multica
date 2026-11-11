@@ -552,8 +552,9 @@ func notifyDirect(
 }
 
 // notifyMentionedMembers creates inbox items for each @mentioned member,
-// excluding the actor and any IDs in the skip set. When an @all mention is
-// present, all workspace members are notified (excluding agents).
+// excluding the actor and any IDs in the skip set. When a member's @all mention
+// is present, all workspace members are notified (excluding agents); an agent's
+// @all notifies nobody (contango patch 41).
 func notifyMentionedMembers(
 	bus *events.Bus,
 	queries *db.Queries,
@@ -605,6 +606,17 @@ func notifyMentionedMembers(
 				recipientIDs[util.UUIDToString(sm.MemberID)] = true
 			}
 		}
+	}
+
+	// Contango patch 41 (owner 2026-11-11: an agent's 28 @all comments made 252
+	// inbox notifications): only a member may broadcast. An agent's (or any
+	// non-member's) @all is dropped here — the comment is kept, and its direct
+	// @member / @squad mentions above still notify.
+	if hasAll && e.ActorType != "member" {
+		slog.Warn("dropping @all mention from non-member author",
+			"actor_type", e.ActorType, "actor_id", e.ActorID,
+			"workspace_id", e.WorkspaceID, "issue_id", issueID)
+		hasAll = false
 	}
 
 	// If @all is present, expand to all workspace members.
