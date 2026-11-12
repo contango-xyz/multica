@@ -787,6 +787,26 @@ Files: ours: `server/internal/handler/inbox_tabs{,_test}.go`, `packages/core/inb
 Rebase check: `InboxPage`'s smart list branch and `smartSections` memo; `UserResponse.InboxTabs`.
 Drop when: never on its own (ours); fold into patch 14 when the tabs replace the sections for everyone.
 
+### 44. The inbox opens nothing on its own
+
+Owner 2026-11-12: "inbox, when nothing is selected, should show nothing, not whatever it wants (on the content
+pane)". The content pane holds a card only while the user picked one (click, arrow key, deep link / `?issue=`);
+otherwise it shows the existing empty state ("Select a notification to view details"). Tabs, Smart and Classic.
+
+- Archive / restore of the open row clears the selection (`clearSelectionIfOn`) instead of upstream's
+  `advanceSelectionPast`, which opened the next (or previous) row.
+- Tabs: switching tabs clears the selection (`InboxTabsView` `onClearSelection`); so does the open row leaving the
+  tab in view (re-ranked out of Today, a finished merge ask). A selection the tab never listed (a deep link to a card
+  on another tab) stays open.
+- Unchanged: mark read never moves the selection; a row that leaves the list already cleared it; the first arrow
+  press with nothing selected opens the first row; compact widths show the list until a tap; a click still scrolls
+  to the tagging comment.
+
+Files: `packages/views/inbox/components/{inbox-page,smart-tabs}.tsx`; tests `inbox-page.test.tsx` ("empty content
+pane"), `smart-tabs.test.tsx` ("selection"), `smart-inbox-list.test.tsx`, `inbox-page-query.test.tsx` (restore).
+Rebase check: upstream's archive handler in `InboxPage` (`advanceSelectionPast` must not come back).
+Drop when: never on its own (ours).
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

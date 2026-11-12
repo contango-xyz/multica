@@ -253,7 +253,9 @@ it("restores a pinned notification without keeping it in the archived list", asy
   await act(async () => fixture.lookup.resolve(page([{ ...fixture.a, read: true }])));
   act(() => rowActions.onAction("inbox-a"));
   await waitFor(() => expect(fixture.unarchiveInbox).toHaveBeenCalledOnce());
-  await waitFor(() => expect(screen.getByTestId("detail")).toHaveTextContent("issue-b"));
+  // contango (owner 2026-11-12): the pane empties; it does not open the next row.
+  await waitFor(() => expect(screen.queryByTestId("detail")).not.toBeInTheDocument());
+  expect(replace).toHaveBeenLastCalledWith("/acme/inbox?view=archived");
   expect(screen.queryByText("inbox-a")).not.toBeInTheDocument();
 });
 

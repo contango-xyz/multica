@@ -84,6 +84,14 @@ describe("SmartInboxList", () => {
     expect(props.onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ id: "m" }));
   });
 
+  it("selects nothing until asked, then the first arrow press opens the first row", () => {
+    const props = renderList("");
+    expect(props.onSelect).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole("button", { name: "a" }), { key: "ArrowDown" });
+    expect(props.onSelect).toHaveBeenCalledTimes(1);
+    expect(props.onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ id: "a" }));
+  });
+
   it("offers the archive entry below the sections", () => {
     const props = renderList();
     fireEvent.click(screen.getByRole("button", { name: /list\.archived_title/ }));

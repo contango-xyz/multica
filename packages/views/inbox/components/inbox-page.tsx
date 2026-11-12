@@ -378,6 +378,9 @@ export function InboxPage({
   }, [replace, buildInboxUrl]);
   // contango: the smart list's empty state links to the archive.
   const openArchived = useCallback(() => setView("archived"), [setView]);
+  // contango: the tabs drop the selection on a tab switch and when the open row
+  // leaves the tab; the content pane then shows its empty state.
+  const clearSelection = useCallback(() => setSelectedKey(""), [setSelectedKey]);
 
   // Applying a filter can remove the open row from the list. Clear that local
   // selection instead of treating it as a broken deep link and redirecting to
@@ -618,24 +621,17 @@ export function InboxPage({
   };
 
   // Both archive and unarchive remove the row from the list it was actioned
-  // from, so both have to move the selection off it first. `list` is whichever
-  // list the row came from — the main one for archive, the archived one for
-  // unarchive.
-  const advanceSelectionPast = (id: string, list: InboxItem[]) => {
-    const idx = list.findIndex((i) => i.id === id);
-    const target = idx >= 0 ? list[idx] : null;
-    const wasSelected = !!target && inboxRowKey(target) === selectedKey;
-    if (!wasSelected) return;
-    // List is sorted newest-first; prefer the next (older) item, fall back
-    // to the previous (newer) one when actioning at the bottom, and only
-    // clear the selection when nothing else is left.
-    const next = list[idx + 1] ?? list[idx - 1] ?? null;
-    setSelectedKey(next ? inboxRowKey(next) : "");
+  // from, so both have to drop the selection first. contango (owner
+  // 2026-11-12): the pane goes back to its empty state instead of opening the
+  // next row; only the user picks what the content pane shows.
+  const clearSelectionIfOn = (id: string, list: InboxItem[]) => {
+    const target = list.find((i) => i.id === id);
+    if (target && inboxRowKey(target) === selectedKey) setSelectedKey("");
   };
 
   // Toasts live in these shared handlers so every archive surface confirms alike.
   const handleArchive = (id: string) => {
-    advanceSelectionPast(id, selectionItems);
+    clearSelectionIfOn(id, selectionItems);
     archiveMutation.mutate(id, {
       onSuccess: () => toast.success(t(($) => $.toasts.archived)),
       onError: (err) =>
@@ -648,7 +644,7 @@ export function InboxPage({
   };
 
   const handleUnarchive = (id: string) => {
-    advanceSelectionPast(id, selectionItems);
+    clearSelectionIfOn(id, selectionItems);
     unarchiveMutation.mutate(id, {
       onSuccess: () => toast.success(t(($) => $.toasts.unarchived)),
       onError: (err) =>
@@ -916,6 +912,7 @@ export function InboxPage({
           now={rankNow}
           selectedKey={selectedKey}
           onSelect={handleSelect}
+          onClearSelection={clearSelection}
           onArchive={handleArchive}
           onArchiveEntries={handleArchiveSection}
           onMarkEntriesRead={handleMarkSectionRead}

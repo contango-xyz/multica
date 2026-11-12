@@ -10,7 +10,7 @@
 // on touch, the row menu on right-click; `e` archives the open card), and each
 // list's "…" menu marks read or archives all of it, asking first above 3 cards.
 
-import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Archive, CheckCheck, ChevronRight, ExternalLink, MoreHorizontal } from "@multica/ui/icons";
 import { inboxRowKey } from "@multica/core/inbox/filter-store";
@@ -811,12 +811,28 @@ function ElsePanel({
 
 // --- The tab strip -----------------------------------------------------------
 
+/** The selection keys of the rows a tab lists. */
+function tabRowKeys(model: ReturnType<typeof buildInboxTabs>, tab: InboxTab): Set<string> {
+  const entries: SmartEntry[] =
+    tab === "today"
+      ? [...model.today.alerts, ...model.today.rows.map((r) => r.entry)]
+      : tab === "decisions"
+        ? model.decisions.map((r) => r.entry)
+        : tab === "merges"
+          ? [...model.merges.approval, ...model.merges.postMerge].map((r) => r.entry)
+          : tab === "else"
+            ? model.else
+            : [];
+  return new Set(entries.map((e) => inboxRowKey(e.item)));
+}
+
 export function InboxTabsView({
   wsId,
   items,
   now,
   selectedKey,
   onSelect,
+  onClearSelection,
   onArchive,
   onArchiveEntries,
   onMarkEntriesRead,
@@ -827,15 +843,36 @@ export function InboxTabsView({
   now: number;
   selectedKey: string;
   onSelect: (item: InboxItem) => void;
+  /** Empties the content pane: on a tab switch, and when the open row leaves the tab. */
+  onClearSelection: () => void;
 } & TabArchive) {
   const { t } = useT("inbox");
   const actions: TabArchive = { onArchive, onArchiveEntries, onMarkEntriesRead };
   const [tab, setTab] = useState<InboxTab>(readStoredTab);
   const model = useMemo(() => buildInboxTabs(items, now), [items, now]);
+  // Only the user picks what the content pane shows (owner 2026-11-12): a new
+  // tab starts with nothing open, never the card the last tab had open.
   const choose = (next: InboxTab) => {
+    if (next !== tab && selectedKey) {
+      shownKeyRef.current = "";
+      onClearSelection();
+    }
     setTab(next);
     writeStoredTab(next);
   };
+  // A row that was on this tab and left it (re-ranked out of Today, a merge
+  // that finished) closes with it. A selection the tab never showed, such as a
+  // deep link to a card on another tab, stays open.
+  const tabKeys = useMemo(() => tabRowKeys(model, tab), [model, tab]);
+  const shownKeyRef = useRef("");
+  useEffect(() => {
+    if (!selectedKey) return;
+    if (tabKeys.has(selectedKey)) shownKeyRef.current = selectedKey;
+    else if (shownKeyRef.current === selectedKey) {
+      shownKeyRef.current = "";
+      onClearSelection();
+    }
+  }, [selectedKey, tabKeys, onClearSelection]);
   const badge = (id: InboxTab): ReactNode => {
     const n = id === "today" ? model.badges.today : id === "decisions" ? model.badges.decisions : id === "merges" ? model.badges.merges : id === "else" ? model.badges.elseUnread : 0;
     if (!n) return null;

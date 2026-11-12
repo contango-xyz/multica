@@ -50,13 +50,29 @@ function signal(group: string, details: Record<string, unknown> = {}, over: Part
 const archive = { onArchive: vi.fn(), onArchiveEntries: vi.fn(), onMarkEntriesRead: vi.fn() };
 
 function renderTabs(items: InboxItem[]) {
+  return renderTabsWith(items).onSelect;
+}
+
+function renderTabsWith(items: InboxItem[], selectedKey = "") {
   const onSelect = vi.fn();
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <InboxTabsView wsId="ws" items={items} now={NOW} selectedKey="" onSelect={onSelect} {...archive} />
-    </QueryClientProvider>,
+  const onClearSelection = vi.fn();
+  const client = new QueryClient();
+  const view = (rows: InboxItem[], key: string) => (
+    <QueryClientProvider client={client}>
+      <InboxTabsView
+        wsId="ws"
+        items={rows}
+        now={NOW}
+        selectedKey={key}
+        onSelect={onSelect}
+        onClearSelection={onClearSelection}
+        {...archive}
+      />
+    </QueryClientProvider>
   );
-  return onSelect;
+  const utils = render(view(items, selectedKey));
+  const rerender = (rows: InboxItem[], key: string) => utils.rerender(view(rows, key));
+  return { onSelect, onClearSelection, rerender };
 }
 
 /** The row (card) that holds `title`, found by its row key. */
@@ -266,5 +282,55 @@ describe("SquadScreen", () => {
   it("says when there is no data yet", () => {
     render(<SquadScreen data={{ snapshot: null, received_at: null, inbox_load: [] }} />);
     expect(screen.getByText("smart.tabs.squad_empty")).toBeInTheDocument();
+  });
+});
+
+// Owner 2026-11-12: with nothing selected the content pane is empty; the tabs
+// never leave a card open that the user did not pick on the tab in view.
+describe("InboxTabsView selection", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("selects nothing on its own when it first renders", () => {
+    const { onSelect, onClearSelection } = renderTabsWith([signal("decision"), signal("merge")]);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onClearSelection).not.toHaveBeenCalled();
+  });
+
+  it("empties the content pane on a tab switch", () => {
+    const ask = signal("decision", {}, { title: "Ask" });
+    const { onClearSelection } = renderTabsWith([ask, signal("merge")], ask.id);
+    fireEvent.click(tab(/merges/));
+    expect(onClearSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves an empty pane alone on a tab switch", () => {
+    const ask = signal("decision", {}, { title: "Ask" });
+    const empty = renderTabsWith([ask]);
+    fireEvent.click(tab(/merges/));
+    expect(empty.onClearSelection).not.toHaveBeenCalled();
+  });
+
+  it("keeps the card open when the tab in view is clicked again", () => {
+    const ask = signal("decision", {}, { title: "Ask" });
+    const { onClearSelection } = renderTabsWith([ask], ask.id);
+    fireEvent.click(tab(/today/));
+    expect(onClearSelection).not.toHaveBeenCalled();
+  });
+
+  it("closes the open card when its row leaves the tab", () => {
+    const ask = signal("decision", {}, { title: "Ask" });
+    const other = signal("decision", {}, { title: "Other" });
+    const { onClearSelection, rerender } = renderTabsWith([ask, other], ask.id);
+    expect(onClearSelection).not.toHaveBeenCalled();
+    // The merge ask finished, say: the row is gone from Today but the item is not.
+    rerender([other, { ...ask, details: { ...(ask.details as object), group: "fyi" } as InboxItem["details"], severity: "info" }], ask.id);
+    expect(onClearSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a deep-linked card open although the tab in view does not list it", () => {
+    const merge = signal("merge", {}, { title: "PR" });
+    const { onClearSelection, rerender } = renderTabsWith([signal("decision"), merge], "issue-elsewhere");
+    rerender([signal("decision"), merge], "issue-elsewhere");
+    expect(onClearSelection).not.toHaveBeenCalled();
   });
 });

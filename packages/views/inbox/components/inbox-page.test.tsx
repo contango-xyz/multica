@@ -126,7 +126,7 @@ const issueDetailProps = vi.hoisted(
 vi.mock("../../issues/components/issue-detail", () => ({
   IssueDetail: (props: Record<string, unknown>) => {
     issueDetailProps.push(props);
-    return null;
+    return <div data-testid="issue-detail" data-issue={String(props.issueId)} />;
   },
   issueHighlightMementoKey: (issueId: string) => `highlight:${issueId}`,
 }));
@@ -219,15 +219,18 @@ vi.mock("./smart-tabs", () => ({
   InboxTabsView: ({
     items,
     onSelect,
+    onClearSelection,
     onArchive,
     onArchiveEntries,
   }: {
     items: InboxItem[];
     onSelect: (item: InboxItem) => void;
+    onClearSelection: () => void;
     onArchive: (id: string) => void;
     onArchiveEntries: (entries: Array<{ item: InboxItem }>) => void;
   }) => (
     <div data-testid="inbox-tabs">
+      <button type="button" aria-label="tabs switch tab" onClick={onClearSelection} />
       {items.map((i) => (
         <span key={i.id}>
           <button type="button" aria-label={`tabs open ${i.id}`} onClick={() => onSelect(i)} />
@@ -1043,7 +1046,8 @@ describe("InboxPage", () => {
       expect(archiveMutate).not.toHaveBeenCalled();
     });
 
-    it("leaves the selection on the next notification", () => {
+    // contango (owner 2026-11-12): archiving empties the pane, it never opens the next row.
+    it("empties the content pane instead of opening the next notification", () => {
       reset();
       layout.width = DESKTOP;
       listData.active = [
@@ -1056,7 +1060,9 @@ describe("InboxPage", () => {
       replace.mockClear();
       pressArchiveKey();
 
-      expect(replace).toHaveBeenCalledWith("/acme/inbox?issue=issue-b");
+      expect(replace).toHaveBeenCalledWith("/acme/inbox");
+      expect(replace).not.toHaveBeenCalledWith("/acme/inbox?issue=issue-b");
+      expect(screen.queryByTestId("issue-detail")).toBeNull();
     });
 
     it("does not fire while typing in an editable control", () => {
@@ -1452,5 +1458,153 @@ describe("InboxPage smart two-pane (contango)", () => {
     render(<InboxPage smart />);
     expect(screen.getByTestId("list")).toHaveAttribute("data-view", "archived");
     expect(screen.queryByTestId("smart-list")).toBeNull();
+  });
+});
+
+// contango (owner 2026-11-12): "inbox, when nothing is selected, should show
+// nothing, not whatever it wants". The content pane holds a card only while the
+// user (a click, a key, a deep link) has picked one.
+describe("InboxPage empty content pane (contango)", () => {
+  const signal = (id: string, group: string, over: Partial<InboxItem> = {}) =>
+    item({
+      id,
+      type: "signal",
+      severity: "action_required",
+      actor_type: "system",
+      actor_id: null,
+      read: false,
+      details: { key: id, group, summary: "why", actions: [], rank: { priority: "high", blocks: 1 } } as unknown as InboxItem["details"],
+      ...over,
+    });
+  const MODES = [
+    ["classic", {}],
+    ["smart", { smart: true }],
+    ["tabs", { smart: true, tabs: true }],
+  ] as const;
+  // How each mode's list opens a row: Classic and Smart click it, the tabs stub has an Open button per row.
+  function open(mode: string, id: string) {
+    if (mode === "tabs") fireEvent.click(screen.getByRole("button", { name: `tabs open ${id}` }));
+    else fireEvent.click(screen.getByRole("button", { name: id }));
+  }
+  const opened = (): string | null => screen.queryByTestId("issue-detail")?.getAttribute("data-issue") ?? null;
+  function stock() {
+    reset();
+    layout.width = DESKTOP;
+    listData.active = [
+      signal("ask-a", "decision", { issue_id: "issue-a" }),
+      signal("ask-b", "decision", { issue_id: "issue-b" }),
+      signal("ask-c", "decision", { issue_id: "issue-c" }),
+    ];
+  }
+
+  it.each(MODES)("%s: opens no card on first load", (_mode, props) => {
+    stock();
+    render(<InboxPage {...props} />);
+    expect(opened()).toBeNull();
+    expect(issueDetailProps).toHaveLength(0);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it.each(MODES)("%s: archiving the open card empties the pane", (mode, props) => {
+    stock();
+    render(<InboxPage {...props} />);
+    open(mode, "ask-b");
+    expect(opened()).toBe("issue-b");
+    replace.mockClear();
+    act(() => rowActions?.onAction("ask-b"));
+    expect(opened()).toBeNull();
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+    expect(replace).not.toHaveBeenCalledWith(expect.stringContaining("?issue="));
+  });
+
+  it.each(MODES)("%s: archiving another row keeps the open card", (mode, props) => {
+    stock();
+    render(<InboxPage {...props} />);
+    open(mode, "ask-b");
+    replace.mockClear();
+    act(() => rowActions?.onAction("ask-c"));
+    expect(opened()).toBe("issue-b");
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("restoring the open card from the archive empties the pane", () => {
+    reset();
+    layout.width = DESKTOP;
+    searchParams = new URLSearchParams("view=archived");
+    listData.archived = [
+      item({ id: "old-a", issue_id: "issue-a", archived: true }),
+      item({ id: "old-b", issue_id: "issue-b", archived: true }),
+    ];
+    render(<InboxPage />);
+    fireEvent.click(screen.getAllByTestId("row")[0]!);
+    replace.mockClear();
+    act(() => rowActions?.onAction("old-a"));
+    expect(replace).toHaveBeenCalledWith("/acme/inbox?view=archived");
+    expect(opened()).toBeNull();
+  });
+
+  it("tabs: switching tabs empties the pane", () => {
+    stock();
+    render(<InboxPage smart tabs />);
+    open("tabs", "ask-a");
+    expect(opened()).toBe("issue-a");
+    replace.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "tabs switch tab" }));
+    expect(opened()).toBeNull();
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+  });
+
+  it.each(MODES)("%s: marking a row read with nothing open opens nothing", (_mode, props) => {
+    stock();
+    render(<InboxPage {...props} />);
+    act(() => rowActions?.onMarkRead("ask-a"));
+    expect(markReadMutate).toHaveBeenCalledWith("ask-a", expect.anything());
+    expect(opened()).toBeNull();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it.each(MODES)("%s: marking the open card read keeps it open", (mode, props) => {
+    stock();
+    render(<InboxPage {...props} />);
+    open(mode, "ask-b");
+    replace.mockClear();
+    act(() => rowActions?.onMarkRead("ask-b"));
+    expect(opened()).toBe("issue-b");
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it.each(MODES)("%s: a card that leaves the inbox empties the pane, never the next row", (_mode, props) => {
+    stock();
+    searchParams = new URLSearchParams("issue=ask-b");
+    listData.lookup = [];
+    const { rerender } = render(<InboxPage {...props} />);
+    expect(opened()).toBe("issue-b");
+
+    listData.active = listData.active.filter((i) => i.id !== "ask-b");
+    listData.lookup = [signal("ask-b", "decision", { issue_id: "issue-b", archived: true })];
+    rerender(<InboxPage {...props} />);
+
+    expect(replace).toHaveBeenCalledWith("/acme/inbox");
+    expect(replace).not.toHaveBeenCalledWith(expect.stringMatching(/issue=ask-[ac]|issues\//));
+    expect(opened()).toBeNull();
+  });
+
+  it.each(MODES)("%s: a deep link still opens its card", (_mode, props) => {
+    stock();
+    searchParams = new URLSearchParams("issue=ask-c");
+    render(<InboxPage {...props} />);
+    expect(opened()).toBe("issue-c");
+  });
+
+  it.each(MODES)("%s: a click still opens its card and lands on the tagging comment", (mode, props) => {
+    stock();
+    listData.active = [
+      ...listData.active,
+      item({ id: "mention", type: "mentioned", issue_id: "issue-m", details: { comment_id: "c-tag" } }),
+    ];
+    render(<InboxPage {...props} />);
+    open(mode, "mention");
+    expect(opened()).toBe("issue-m");
+    expect(issueDetailProps.at(-1)?.highlightCommentId).toBe("c-tag");
   });
 });
