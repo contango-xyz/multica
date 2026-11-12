@@ -744,6 +744,21 @@ A person's untagged reply from a thread's reply box wakes only the last agent to
 
 Rebase check: `computeCommentAgentTriggers` member path, `comment_row.go` copies `TargetsParent`, and every caller passes `TargetsParent`.
 
+### 42. Issue search skips comments on closed issues
+
+CTG ops, 2026-11-12: `GET /api/issues/search` hit its 8 s statement timeout (503) 16 times in 40 min, and the
+product-review job failed on it. Upstream's candidate-first query lowercases and aggregates **every** comment in the
+workspace (97k on ops, 118 MB) before joining to the eligible issues, even when closed issues are excluded and only
+12k of those comments can match. EXPLAIN ANALYZE on ops: 4.9 s idle, 9–12 s under load, with a 126 MB on-disk sort.
+
+- `buildSearchQuery`: when closed issues are excluded (the default), the comment scan is limited to
+  `c.issue_id IN (open issues of the workspace)`, the same predicate as `issue_matches`. Results are unchanged
+  (comments on other issues could never reach `ranked_candidates`); `include_closed=true` still scans every comment.
+  Ops: 1.3–2.6 s under load, sort in memory.
+
+Files: `server/internal/handler/issue.go`; tests `search_test.go`, `search_candidate_parity_test.go` (closed issue
+matched only by a comment).
+Drop when: upstream filters the comment scan by the eligible issues, or indexes it.
 
 ## Last rebase
 

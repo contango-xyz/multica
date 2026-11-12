@@ -96,6 +96,15 @@ func TestBuildSearchQuery_CandidateFirstParity(t *testing.T) {
 		"status":     "cancelled",
 		"updated_at": baseTime.Add(15 * time.Minute),
 	})
+	// A closed issue matched only through its comment: the comment scan skips
+	// closed issues when they are excluded, and must still find it otherwise.
+	closedCommentID := dbfx.Issue(t, "closed-comment source", testutil.Cols{
+		"status":     "done",
+		"updated_at": baseTime.Add(15*time.Minute + 30*time.Second),
+	})
+	dbfx.Comment(t, closedCommentID, token+" same all closed", testutil.Cols{
+		"created_at": baseTime.Add(15*time.Minute + 30*time.Second),
+	})
 	phraseDoubleMatch := token + " overlap phrase"
 	phraseDoubleMatchID := dbfx.Issue(t, "title "+phraseDoubleMatch, testutil.Cols{
 		"description": "description also contains " + phraseDoubleMatch,
@@ -214,6 +223,17 @@ func TestBuildSearchQuery_CandidateFirstParity(t *testing.T) {
 		t.Fatal("same-comment all-terms match is missing")
 	} else if row.matchedCommentContent == "" {
 		t.Fatalf("same-comment all-terms match has no snippet: %#v", row)
+	}
+
+	if _, ok := findSearchParityRow(splitRows, closedCommentID); !ok {
+		t.Fatal("closed issue matched by its comment is missing with include_closed")
+	}
+	openRows := runBuiltSearchForParity(t, token+" same all", false, []string{"done", "cancelled", "custom_done"}, 50, 0)
+	if _, ok := findSearchParityRow(openRows, closedCommentID); ok {
+		t.Fatal("closed issue matched by its comment appears although closed issues are excluded")
+	}
+	if _, ok := findSearchParityRow(openRows, sameCommentID); !ok {
+		t.Fatal("open same-comment match is missing when closed issues are excluded")
 	}
 
 	crossRows := runBuiltSearchForParity(t, token+" cross-part fields-part", true, nil, 50, 0)

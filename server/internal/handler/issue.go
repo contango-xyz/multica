@@ -960,6 +960,19 @@ func buildSearchQuery(phrase string, terms []string, queryNum int, hasNum bool, 
 	// that keeps the long comment body lowercased once per row. Future indexable
 	// text predicates must stay outside this projection-only fence so an index on
 	// LOWER(c.content) can still match them.
+	//
+	// When closed issues are excluded, only comments on the eligible issues
+	// can ever reach ranked_candidates (it joins issue_matches), so the scan is
+	// limited to those issues before any comment body is lowercased. Most
+	// comments sit on done/cancelled issues; scanning them all was the bulk of
+	// the query's time (contango patch 42).
+	commentWhere := "c.workspace_id = " + wsParam
+	if terminalStatusesParam != "" {
+		commentWhere += fmt.Sprintf(
+			" AND c.issue_id IN (SELECT oi.id FROM issue oi WHERE oi.workspace_id = %s AND NOT (oi.status = ANY(%s::text[])))",
+			wsParam, terminalStatusesParam,
+		)
+	}
 	commentMatchesCTE := fmt.Sprintf(`comment_matches AS MATERIALIZED (
 		SELECT *
 		FROM (
@@ -969,13 +982,13 @@ func buildSearchQuery(phrase string, terms []string, queryNum int, hasNum bool, 
 				SELECT LOWER(c.content) AS lowered
 				OFFSET 0
 			) lowered_comment
-			WHERE c.workspace_id = %s
+			WHERE %s
 			GROUP BY c.issue_id
 		) aggregated_comments
 		WHERE %s
 	)`,
 		strings.Join(commentFlagColumns, ",\n\t\t\t\t"),
-		wsParam,
+		commentWhere,
 		strings.Join(commentCandidateFlags, " OR "),
 	)
 

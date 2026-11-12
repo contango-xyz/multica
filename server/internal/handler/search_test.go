@@ -201,6 +201,18 @@ func TestBuildSearchQuery_IncludeClosed(t *testing.T) {
 	if strings.Contains(query, "i.status = ANY(") {
 		t.Error("query should not exclude done/cancelled when includeClosed=true")
 	}
+	if strings.Contains(query, "c.issue_id IN (") {
+		t.Error("comment scan should cover every issue when includeClosed=true")
+	}
+}
+
+func TestBuildSearchQuery_CommentScanSkipsClosedIssues(t *testing.T) {
+	query, _ := buildSearchQuery("foo bar", []string{"foo", "bar"}, 0, false, false, []string{"done", "cancelled"})
+
+	want := "c.issue_id IN (SELECT oi.id FROM issue oi WHERE oi.workspace_id = $4 AND NOT (oi.status = ANY($7::text[])))"
+	if !strings.Contains(query, want) {
+		t.Fatalf("comment scan is not limited to open issues; want %q in:\n%s", want, query)
+	}
 }
 
 func TestBuildSearchQuery_SpecialChars(t *testing.T) {
