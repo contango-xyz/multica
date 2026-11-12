@@ -14,10 +14,15 @@ import {
   smartInboxModeFromParam,
   type SmartInboxMode,
 } from "@multica/core/inbox/smart";
+import {
+  INBOX_TABS_URL_PARAM,
+  inboxTabsModeFromParam,
+  type InboxTabsMode,
+} from "@multica/core/inbox/smart-tabs";
 import { Button } from "@multica/ui/components/ui/button";
 import { useIsCompact } from "@multica/ui/hooks/use-mobile";
 import { IconButton } from "@multica/ui/components/common/icon-button";
-import { Sparkles } from "@multica/ui/icons";
+import { LayoutTemplate, Sparkles } from "@multica/ui/icons";
 import { useNavigation } from "../../navigation";
 import { useT } from "../../i18n";
 import { InboxPage as ClassicInboxPage } from "./inbox-page";
@@ -25,6 +30,59 @@ import { SmartInboxPage } from "./smart-inbox";
 import { ARCHIVED_VIEW_PARAM } from "./inbox-view";
 
 const STORAGE_KEY = "multica:smart-inbox";
+// contango inbox tabs (patch 43): "tabs" or "sections", for users on the tabs flag.
+const TABS_STORAGE_KEY = "multica:inbox-tabs";
+
+function readStoredTabsMode(): InboxTabsMode | null {
+  try {
+    const v = globalThis.localStorage?.getItem(TABS_STORAGE_KEY);
+    return v === "tabs" || v === "sections" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredTabsMode(mode: InboxTabsMode) {
+  try {
+    globalThis.localStorage?.setItem(TABS_STORAGE_KEY, mode);
+  } catch {
+    // Storage blocked: the choice lasts this visit.
+  }
+}
+
+/** Tabs or Smart's sections; `?inbox-tabs=0|1` picks and is remembered, as is the header toggle. */
+export function useInboxTabsMode(): [InboxTabsMode, (m: InboxTabsMode) => void] {
+  const { searchParams } = useNavigation();
+  const param = searchParams.get(INBOX_TABS_URL_PARAM);
+  const [mode, setMode] = useState<InboxTabsMode>(() => inboxTabsModeFromParam(param, readStoredTabsMode()));
+  useEffect(() => {
+    const next = inboxTabsModeFromParam(param, readStoredTabsMode());
+    if (param === "0" || param === "1") writeStoredTabsMode(next);
+    setMode(next);
+  }, [param]);
+  const choose = (m: InboxTabsMode) => {
+    writeStoredTabsMode(m);
+    setMode(m);
+  };
+  return [mode, choose];
+}
+
+function InboxTabsToggle({ mode, onChange }: { mode: InboxTabsMode; onChange: (m: InboxTabsMode) => void }) {
+  const { t } = useT("inbox");
+  const next = mode === "tabs" ? "sections" : "tabs";
+  return (
+    <IconButton
+      label={next === "sections" ? t(($) => $.smart.tabs.switch_to_sections) : t(($) => $.smart.tabs.switch_to_tabs)}
+      tooltipSide="bottom"
+      variant={mode === "tabs" ? "secondary" : "ghost"}
+      aria-pressed={mode === "tabs"}
+      className="min-h-11 min-w-11 text-muted-foreground md:min-h-0 md:min-w-0"
+      onClick={() => onChange(next)}
+    >
+      <LayoutTemplate className="size-4" />
+    </IconButton>
+  );
+}
 
 function readStoredMode(): SmartInboxMode | null {
   try {
@@ -110,7 +168,9 @@ function InboxModeToggle({
 
 export function InboxEntryPage() {
   const enabledForUser = useAuthStore((s) => s.user?.smart_inbox === true);
+  const tabsForUser = useAuthStore((s) => s.user?.inbox_tabs === true);
   const [mode, setMode] = useSmartInboxMode();
+  const [tabsMode, setTabsMode] = useInboxTabsMode();
   const { searchParams } = useNavigation();
   const archived = searchParams.get("view") === ARCHIVED_VIEW_PARAM;
   const isCompact = useIsCompact();
@@ -118,6 +178,18 @@ export function InboxEntryPage() {
   if (!enabledForUser) return <ClassicInboxPage />;
   const toggle = <InboxModeToggle mode={mode} onChange={setMode} />;
   if (mode === "classic") return <ClassicInboxPage headerAccessory={toggle} />;
+  // contango inbox tabs: phones and desktop alike use the two-pane page (one pane on phones).
+  if (tabsForUser && !archived) {
+    const tabsToggle = (
+      <>
+        {toggle}
+        <InboxTabsToggle mode={tabsMode} onChange={setTabsMode} />
+      </>
+    );
+    if (tabsMode === "tabs") return <ClassicInboxPage headerAccessory={tabsToggle} smart tabs />;
+    if (isCompact) return <SmartInboxPage headerAccessory={tabsToggle} />;
+    return <ClassicInboxPage headerAccessory={tabsToggle} smart />;
+  }
   // Phones: the single-column list -> focused detail -> back flow. The archive
   // sub-view only exists in the classic layout.
   if (isCompact && !archived) return <SmartInboxPage headerAccessory={toggle} />;

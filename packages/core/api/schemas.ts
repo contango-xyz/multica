@@ -2816,6 +2816,8 @@ export const UserSchema = z.object({
   updated_at: z.string().default(""),
   // contango smart inbox; absent on servers without the patch.
   smart_inbox: z.boolean().optional().catch(undefined),
+  // contango inbox tabs (patch 43); absent on servers without the patch.
+  inbox_tabs: z.boolean().optional().catch(undefined),
 }).loose();
 
 export const EMPTY_USER: User = {

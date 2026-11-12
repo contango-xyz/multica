@@ -2615,7 +2615,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Use(middleware.RequireWorkspaceRole(queries, "owner", "admin"))
 					r.Post("/signals", h.UpsertInboxSignal)
 					r.Post("/signals/resolve", h.ResolveInboxSignal)
+					// Inbox tabs' Squad snapshot (contango patch 43).
+					r.Put("/squad", h.PutInboxSquad)
 				})
+				r.Get("/squad", h.GetInboxSquad)
 				// One-tap answer on the caller's own signal (contango patch 18):
 				// posts the reply as the caller through CreateComment.
 				r.With(handler.RequireHumanActor).Post("/{id}/signal-reply", h.ReplyToInboxSignal)

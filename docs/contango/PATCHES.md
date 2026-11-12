@@ -760,6 +760,27 @@ Files: `server/internal/handler/issue.go`; tests `search_test.go`, `search_candi
 matched only by a comment).
 Drop when: upstream filters the comment scan by the eligible issues, or indexes it.
 
+### 43. Smart inbox tabs (flagged)
+
+Owner 2026-11-12: the smart inbox as five tabs (Today, Decisions, Merges, Squad, Everything else), owner first.
+Spec: [SMART-INBOX.md](SMART-INBOX.md) "Tabs".
+
+- Flag `MULTICA_INBOX_TABS_EMAILS` (`Handler.InboxTabsEmails`, needs the smart flag too); `/api/me` `inbox_tabs`.
+- Signals take optional `brief` and `merge` objects (validated, stored in details, never push on their own).
+- `PUT /api/inbox/squad` (owner/admin) keeps the feeder's snapshot in memory; `GET /api/inbox/squad` adds the inbox
+  load per person (raw SQL over `inbox_item`, no migration).
+- Web: `InboxPage` `tabs` prop swaps the smart sections for `InboxTabsView`; `inbox-entry.tsx` chooses it and adds a
+  tabs/sections toggle.
+
+Files: ours: `server/internal/handler/inbox_tabs{,_test}.go`, `packages/core/inbox/{smart-tabs,squad}.ts`,
+`packages/core/inbox/smart-tabs.test.ts`, `packages/views/inbox/components/smart-tabs{,.test}.tsx`. Upstream, small hooks:
+`handler/{handler,auth}.go` (flag, `inbox_tabs`), `cmd/server/router.go` (two routes), `handler/inbox_signal.go`
+(brief/merge), `packages/core/{types/workspace,api/schemas,api/client}.ts`, `packages/core/inbox/{smart,queries}.ts`,
+`packages/core/package.json` (exports), `packages/views/inbox/components/{inbox-page,inbox-entry}.tsx`,
+`packages/views/locales/*/inbox.json` (`smart.tabs`), `apps/mobile/data/inbox-schema.test.ts` (expected shape only).
+Rebase check: `InboxPage`'s smart list branch and `smartSections` memo; `UserResponse.InboxTabs`.
+Drop when: never on its own (ours); fold into patch 14 when the tabs replace the sections for everyone.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

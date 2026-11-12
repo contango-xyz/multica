@@ -18,6 +18,15 @@ export const inboxKeys = {
   unreadSummary: () => ["inbox", "unread-summary"] as const,
 };
 
+/** Inbox tabs' Squad screen (contango patch 43). Refreshed every 2 minutes, the feeder's pace. */
+export function inboxSquadOptions(wsId: string) {
+  return queryOptions({
+    queryKey: [...inboxKeys.all(wsId), "squad"] as const,
+    queryFn: () => api.getInboxSquad(),
+    refetchInterval: 120_000,
+  });
+}
+
 export function inboxListOptions(wsId: string) {
   return queryOptions({
     queryKey: inboxKeys.list(wsId),

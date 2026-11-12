@@ -4,6 +4,7 @@ import type { IssueWakeup, IssueWakeupInput, IssueWakeupSummaryRow, PausedWakeup
 import type { WorkspaceWakeupPage, WorkspaceWakeupFilters } from "../types/issue-wakeup";
 import { WorkspaceWakeupPageSchema, IssueWakeupSchema, IssueWakeupSummaryRowSchema, PausedWakeupSchema, SystemWakeupSchema, WakeupRunSchema, WorkspaceSystemWakeupSchema } from "./schemas";
 import type { ArchivedInboxFilters } from "../inbox/filter-store";
+import { EMPTY_INBOX_SQUAD, InboxSquadSchema, type InboxSquad } from "../inbox/squad";
 import type { ArchivedInboxPage, ArchivedInboxFacets } from "../types/inbox";
 import { parseQoderConnection, parseQoderCatalog, type QoderInput } from "../runtimes/qoder-schema";
 import { configStore } from "../config";
@@ -3068,6 +3069,13 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify({ index, content }),
     });
+  }
+
+  // Inbox tabs' Squad screen (contango patch 43): the feeder's snapshot plus
+  // the inbox load per person. 404 for users without the tabs flag.
+  async getInboxSquad(): Promise<InboxSquad> {
+    const raw = await this.fetch<unknown>("/api/inbox/squad");
+    return parseWithFallback(raw, InboxSquadSchema, EMPTY_INBOX_SQUAD, { endpoint: "GET /api/inbox/squad" });
   }
 
   // Archived notifications, backing the inbox's "Archived" sub-view. Capped

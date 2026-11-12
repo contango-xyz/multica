@@ -73,6 +73,8 @@
     "./inbox/smart": "./inbox/smart.ts",
     "./inbox/smart-filter-store": "./inbox/smart-filter-store.ts",
     "./inbox/smart-fold": "./inbox/smart-fold.ts",
+    "./inbox/smart-tabs": "./inbox/smart-tabs.ts",
+    "./inbox/squad": "./inbox/squad.ts",
     "./notification-preferences": "./notification-preferences/index.ts",
     "./notification-preferences/queries": "./notification-preferences/queries.ts",
     "./notification-preferences/mutations": "./notification-preferences/mutations.ts",

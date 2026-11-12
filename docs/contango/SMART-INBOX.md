@@ -235,3 +235,40 @@ themselves: "Approve: agree" posts `agree` on the card, as a reply to the ask, f
 - **alert** (owner only at first): main red, CD red, spend alert.
 - Re-raise: a waiting entry older than 4 h (urgent: 1 h) gets its summary refreshed with push.
 - Resolve: when the ask is answered, Needs human cleared, card done, PR merged, stall gone.
+
+## Tabs (fork patch 43, owner 2026-11-12)
+The owner approved a tabbed Smart inbox (mockup: five tabs). Behind its own flag, owner first.
+
+- **Flag:** `MULTICA_INBOX_TABS_EMAILS` (backend env, comma-separated; needs `MULTICA_SMART_INBOX_EMAILS` too).
+  `GET /api/me` returns `inbox_tabs: true` for users on it. Everyone else keeps the Smart sections.
+- **Web/desktop:** for a flagged user in Smart mode the list pane is a tab strip instead of the sections (phones too, in the
+  one-pane layout); the dashboard above the panes and the group filter are left out. The right pane is unchanged
+  (selecting a row opens the card with its signal brief). A header icon (layout) switches tabs ↔ sections, remembered in
+  `multica:inbox-tabs`; `?inbox-tabs=0` picks sections, `?inbox-tabs=1` tabs. The open tab is remembered
+  (`multica:inbox-tab`). Logic: `packages/core/inbox/smart-tabs.ts`; view: `packages/views/inbox/components/smart-tabs.tsx`.
+  - **Today:** the top 5 rows of Decisions and Merges' approvals by the smart score (priority × (1 + blocks) × wait),
+    one per card, never a Held card; each with frees N (rank.blocks), card-hours lost (blocks × hours waited), the
+    why (brief.situation, else the merge risk, else the body's first line after "Why now"), its one-tap reply or
+    "Approve on GitHub", and Open card. Alert signals are a banner on top. Badge: the rows shown (max 5).
+  - **Decisions:** signals in decision, access, blocking; one row per card (an agent's re-ask folds in: "N asks
+    folded"); tapping expands the brief: What's going on / We recommend / If you say nothing (the default, or "Nothing
+    happens.") and the one-tap replies.
+  - **Merges:** merge signals, one card per PR (details.merge.pr, else the card): "needs your approval" with why it needs
+    a human (merge.risk), CI, agent review, size, and **Approve on GitHub** (opens `<pr>/files`; no in-inbox approve,
+    owner: people look at the code); then "Merged without you" (post-merge reviews, Review on GitHub). A merge ask whose
+    `merge.state` is not `open`, or whose card is done / merged_but_not_approved / cancelled / in_merge_queue, is
+    hidden on screen only: never archived.
+  - **Squad:** no badge, no notifications. Where card time goes, card-hours held per person, the 5 biggest single holds
+    (from the feeder's snapshot of the capacity report) and inbox load per person (counted by the server).
+  - **Everything else:** every other row (mentions, fyi, stalled, alerts, done), newest first, Classic's rows; quiet
+    unread count. The feeder's `digest:` and `reminder:` entries are not shown in any tab (pushes unchanged).
+- **Signal fields (optional, additive; old clients and iOS ignore them):**
+  `brief` = `{situation ≤600, recommend ≤300, default ≤300, default_applies, reply_with ≤300}`;
+  `merge` = `{pr ≤40, url, review_url, risk ≤300, ci: green|red|running|unknown, review ≤300, lines, files,
+  state: open|merged|queued|approved|closed, post_merge, merged_at}`. Stored in details as sent (an update without
+  them drops them). Changing only these never pushes (pushes still need a changed title or summary).
+- **Squad endpoints:** `PUT /api/inbox/squad` (owner/admin, human credentials: the feeder's bot PAT) stores any JSON
+  object ≤256 KiB in memory per workspace; `GET /api/inbox/squad` (tabs-flagged users, else 404) returns
+  `{snapshot, received_at, inbox_load: [{user_id, name, decisions, merges, everything_else, new_asks_7d}]}`. After a
+  backend restart the snapshot is empty until the feeder's next PUT (it sends every 10 min, or when the report changes).
+- **iOS:** unchanged (sections). Rollout to everyone: add people to the flag once the owner is happy.

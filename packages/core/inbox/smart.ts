@@ -46,7 +46,93 @@ export interface SignalDetails {
   /** One-tap answers (unusable entries dropped; each keeps its index). */
   replies: SignalReply[];
   rank: { priority: RankPriority; blocks: number; since: string | null };
+  /** The ask in plain words (contango patch 43); null when the feeder sent none. */
+  brief: SignalBrief | null;
+  /** A merge ask's facts (contango patch 43); null when the feeder sent none. */
+  merge: SignalMerge | null;
 }
+
+export interface SignalBrief {
+  situation: string;
+  recommend: string;
+  /** What happens with no answer; "" with defaultApplies false means nothing happens. */
+  default: string;
+  defaultApplies: boolean;
+  replyWith: string;
+}
+
+export type MergeState = "open" | "merged" | "queued" | "approved" | "closed";
+export type CiState = "green" | "red" | "running" | "unknown";
+
+export interface SignalMerge {
+  pr: string;
+  url: string | null;
+  reviewUrl: string | null;
+  risk: string;
+  ci: CiState;
+  review: string;
+  lines: number;
+  files: number;
+  state: MergeState;
+  postMerge: boolean;
+  mergedAt: string | null;
+}
+
+const httpUrl = z
+  .string()
+  .nullish()
+  .catch(null)
+  .transform((v) => (v && /^https?:\/\//i.test(v) ? v : null));
+
+const SignalBriefSchema = z
+  .object({
+    situation: z.string().catch(""),
+    recommend: z.string().catch(""),
+    default: z.string().catch(""),
+    default_applies: z.boolean().catch(false),
+    reply_with: z.string().catch(""),
+  })
+  .partial()
+  .transform(
+    (b): SignalBrief => ({
+      situation: b.situation ?? "",
+      recommend: b.recommend ?? "",
+      default: b.default ?? "",
+      defaultApplies: b.default_applies ?? false,
+      replyWith: b.reply_with ?? "",
+    }),
+  );
+
+const SignalMergeSchema = z
+  .object({
+    pr: z.string().catch(""),
+    url: httpUrl,
+    review_url: httpUrl,
+    risk: z.string().catch(""),
+    ci: z.enum(["green", "red", "running", "unknown"]).catch("unknown"),
+    review: z.string().catch(""),
+    lines: z.number().nonnegative().catch(0),
+    files: z.number().nonnegative().catch(0),
+    state: z.enum(["open", "merged", "queued", "approved", "closed"]).catch("open"),
+    post_merge: z.boolean().catch(false),
+    merged_at: z.string().nullish().catch(null),
+  })
+  .partial()
+  .transform(
+    (m): SignalMerge => ({
+      pr: m.pr ?? "",
+      url: m.url ?? null,
+      reviewUrl: m.review_url ?? null,
+      risk: m.risk ?? "",
+      ci: m.ci ?? "unknown",
+      review: m.review ?? "",
+      lines: m.lines ?? 0,
+      files: m.files ?? 0,
+      state: m.state ?? "open",
+      postMerge: m.post_merge ?? false,
+      mergedAt: m.merged_at || null,
+    }),
+  );
 
 const SignalReplySchema = z.object({
   label: z.string(),
@@ -83,6 +169,8 @@ const SignalDetailsSchema = z.object({
       since: z.string().nullish().catch(null).transform((v) => v || null),
     })
     .catch({ priority: "none", blocks: 0, since: null }),
+  brief: SignalBriefSchema.nullish().catch(null).transform((v) => v ?? null),
+  merge: SignalMergeSchema.nullish().catch(null).transform((v) => v ?? null),
 });
 
 /** Parsed details of a `signal` entry; null for any other entry type. */

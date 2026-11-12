@@ -78,6 +78,8 @@ describe("signalDetails", () => {
       actions: [{ label: "Open PR", url: "https://github.com/x" }],
       replies: [],
       rank: { priority: "none", blocks: 0, since: null },
+      brief: null,
+      merge: null,
     });
   });
 

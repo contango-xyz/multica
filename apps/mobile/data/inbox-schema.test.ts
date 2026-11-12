@@ -87,6 +87,9 @@ describe("inbox list schema", () => {
       actions: [{ label: "Open card", url: "https://multica.example/acme/issues/CTG-12" }],
       replies: [{ index: 0, label: "Approve: agree", content: "agree", parent_comment_id: "c-1" }],
       rank: { priority: "high", blocks: 3, since: "2026-11-07T02:00:00Z" },
+      // Inbox tabs' fields (fork patch 43); this signal has neither.
+      brief: null,
+      merge: null,
     });
   });
 

@@ -42,6 +42,12 @@ const (
 	// answer such as "agree" or "approve pairing".
 	signalMaxReplies  = 2
 	signalReplyMaxLen = 500
+	// Inbox tabs (contango patch 43): the optional plain-words brief and merge
+	// facts. Plain text, shown as is.
+	signalBriefMaxLen     = 600
+	signalBriefLineMaxLen = 300
+	signalMergeTextMaxLen = 300
+	signalMergeMaxLines   = 1_000_000
 )
 
 // SignalGroups are the smart-inbox sections a signal can belong to.
@@ -107,6 +113,42 @@ type signalReply struct {
 	AskID           string `json:"ask_id,omitempty"` // contango patch 30: the ask this reply answers
 }
 
+// signalBrief is an ask in plain words (contango patch 43, inbox tabs): what is
+// going on, what the agent recommends, and what happens if nobody answers.
+// Optional and additive: clients that predate it ignore it.
+type signalBrief struct {
+	Situation string `json:"situation,omitempty"`
+	Recommend string `json:"recommend,omitempty"`
+	// Default: what happens with no answer, and when. Empty with
+	// DefaultApplies false means nothing happens.
+	Default        string `json:"default,omitempty"`
+	DefaultApplies bool   `json:"default_applies,omitempty"`
+	ReplyWith      string `json:"reply_with,omitempty"`
+}
+
+// signalMerge are a merge ask's facts (contango patch 43): the PR, why it needs a
+// human, CI, the agents' review and size. State says whether the ask still
+// stands: anything but "open" is finished (merged, queued, approved, closed)
+// and the tabs view hides it on screen without archiving it. PostMerge marks a
+// review of a PR that merged without its human.
+type signalMerge struct {
+	PR        string `json:"pr,omitempty"`
+	URL       string `json:"url,omitempty"`
+	ReviewURL string `json:"review_url,omitempty"`
+	Risk      string `json:"risk,omitempty"`
+	CI        string `json:"ci,omitempty"`
+	Review    string `json:"review,omitempty"`
+	Lines     int    `json:"lines,omitempty"`
+	Files     int    `json:"files,omitempty"`
+	State     string `json:"state,omitempty"`
+	PostMerge bool   `json:"post_merge,omitempty"`
+	MergedAt  string `json:"merged_at,omitempty"`
+}
+
+var signalMergeStates = map[string]bool{"": true, "open": true, "merged": true, "queued": true, "approved": true, "closed": true}
+
+var signalCIStates = map[string]bool{"": true, "green": true, "red": true, "running": true, "unknown": true}
+
 type signalRank struct {
 	Priority string `json:"priority"`
 	Blocks   int    `json:"blocks"`
@@ -122,6 +164,8 @@ type signalDetails struct {
 	Actions []signalAction `json:"actions"`
 	Replies []signalReply  `json:"replies,omitempty"`
 	Rank    signalRank     `json:"rank"`
+	Brief   *signalBrief   `json:"brief,omitempty"`
+	Merge   *signalMerge   `json:"merge,omitempty"`
 }
 
 type upsertSignalRequest struct {
@@ -140,7 +184,9 @@ type upsertSignalRequest struct {
 		Blocks   int     `json:"blocks"`
 		Since    *string `json:"since"`
 	} `json:"rank"`
-	Push *bool `json:"push"`
+	Push  *bool        `json:"push"`
+	Brief *signalBrief `json:"brief"`
+	Merge *signalMerge `json:"merge"`
 }
 
 type resolveSignalRequest struct {
@@ -231,6 +277,64 @@ func (req *upsertSignalRequest) validate() string {
 			if _, err := uuid.Parse(rp.ParentCommentID); err != nil {
 				return "reply parent_comment_id must be a uuid"
 			}
+		}
+	}
+	return req.validateTabs()
+}
+
+// validateTabs checks the optional brief and merge facts (patch 43). Empty ones
+// are dropped so they are stored as absent.
+func (req *upsertSignalRequest) validateTabs() string {
+	if b := req.Brief; b != nil {
+		b.Situation = strings.TrimSpace(sanitizeNullBytes(b.Situation))
+		b.Recommend = strings.TrimSpace(sanitizeNullBytes(b.Recommend))
+		b.Default = strings.TrimSpace(sanitizeNullBytes(b.Default))
+		b.ReplyWith = strings.TrimSpace(sanitizeNullBytes(b.ReplyWith))
+		switch {
+		case runeLen(b.Situation) > signalBriefMaxLen:
+			return "brief.situation is too long (max 600 characters)"
+		case runeLen(b.Recommend) > signalBriefLineMaxLen, runeLen(b.Default) > signalBriefLineMaxLen,
+			runeLen(b.ReplyWith) > signalBriefLineMaxLen:
+			return "brief.recommend, brief.default and brief.reply_with are at most 300 characters"
+		}
+		if b.Situation == "" && b.Recommend == "" && b.Default == "" && b.ReplyWith == "" {
+			req.Brief = nil
+		}
+	}
+	if m := req.Merge; m != nil {
+		m.PR = strings.TrimSpace(m.PR)
+		m.Risk = strings.TrimSpace(sanitizeNullBytes(m.Risk))
+		m.Review = strings.TrimSpace(sanitizeNullBytes(m.Review))
+		m.URL = strings.TrimSpace(m.URL)
+		m.ReviewURL = strings.TrimSpace(m.ReviewURL)
+		m.MergedAt = strings.TrimSpace(m.MergedAt)
+		switch {
+		case runeLen(m.PR) > signalLabelMaxLen:
+			return "merge.pr is too long (max 40 characters)"
+		case runeLen(m.Risk) > signalMergeTextMaxLen, runeLen(m.Review) > signalMergeTextMaxLen:
+			return "merge.risk and merge.review are at most 300 characters"
+		case !signalMergeStates[m.State]:
+			return "merge.state must be one of open, merged, queued, approved, closed"
+		case !signalCIStates[m.CI]:
+			return "merge.ci must be one of green, red, running, unknown"
+		case m.Lines < 0 || m.Lines > signalMergeMaxLines || m.Files < 0 || m.Files > signalMergeMaxLines:
+			return "merge.lines and merge.files must be between 0 and 1000000"
+		}
+		for _, raw := range []string{m.URL, m.ReviewURL} {
+			if raw == "" {
+				continue
+			}
+			u, err := url.Parse(raw)
+			if len(raw) > signalURLMaxLen || err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+				return "merge.url and merge.review_url must be absolute http or https URLs"
+			}
+		}
+		if m.MergedAt != "" {
+			t, err := time.Parse(time.RFC3339, m.MergedAt)
+			if err != nil {
+				return "merge.merged_at must be an RFC3339 timestamp"
+			}
+			m.MergedAt = t.UTC().Format(time.RFC3339)
 		}
 	}
 	return ""
@@ -373,7 +477,8 @@ func (h *Handler) upsertSignalOnce(ctx context.Context, wsID, recipientID, issue
 
 	details := signalDetails{
 		Key: req.Key, Group: req.Group, Summary: req.Summary, Actions: req.Actions, Replies: req.Replies,
-		Rank: signalRank{Priority: req.Rank.Priority, Blocks: req.Rank.Blocks},
+		Rank:  signalRank{Priority: req.Rank.Priority, Blocks: req.Rank.Blocks},
+		Brief: req.Brief, Merge: req.Merge,
 	}
 	var prev signalDetails
 	if found {

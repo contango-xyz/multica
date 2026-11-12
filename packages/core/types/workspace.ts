@@ -88,6 +88,8 @@ export interface User {
   updated_at: string;
   /** Smart inbox enabled for this user on the server (contango). */
   smart_inbox?: boolean;
+  /** Tabbed smart inbox enabled for this user on the server (contango patch 43). */
+  inbox_tabs?: boolean;
 }
 
 export interface MemberWithUser {

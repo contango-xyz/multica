@@ -123,6 +123,7 @@ import { SignalBrief, SmartFilterMenu } from "./smart-inbox";
 import { ResizableSignalBrief } from "./resizable-signal-brief";
 import { SmartInboxList } from "./smart-inbox-list";
 import { SmartDashboard } from "./smart-dashboard";
+import { InboxTabsView } from "./smart-tabs";
 import { buildSmartRows, smartRowUnreadIds } from "@multica/core/inbox/smart-fold";
 import { useT } from "../../i18n";
 import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade-prompt";
@@ -133,6 +134,7 @@ const MARK_READ_BATCH = 4;
 export function InboxPage({
   headerAccessory,
   smart = false,
+  tabs = false,
 }: {
   /** Extra header control; the contango smart-inbox toggle when enabled. */
   headerAccessory?: ReactNode;
@@ -142,6 +144,12 @@ export function InboxPage({
    * its brief above the issue thread. The archive stays classic.
    */
   smart?: boolean;
+  /**
+   * contango inbox tabs (patch 43), with `smart`: the list pane is the tab
+   * strip (Today, Decisions, Merges, Squad, Everything else) instead of the
+   * sections, and the dashboard above the panes is left out.
+   */
+  tabs?: boolean;
 } = {}) {
   const queryClient = useQueryClient();
   const { t } = useT("inbox");
@@ -243,15 +251,17 @@ export function InboxPage({
   }, [smart]);
   // The dashboard counts the whole active inbox, whatever the list filters hide.
   const smartDashboardSections = useMemo(
-    () => (smart && !isArchivedView ? buildSmartSections(items, rankNow) : null),
-    [smart, isArchivedView, items, rankNow],
+    () => (smart && !tabs && !isArchivedView ? buildSmartSections(items, rankNow) : null),
+    [smart, tabs, isArchivedView, items, rankNow],
   );
   const smartSections = useMemo(
     () =>
       smart && !isArchivedView
-        ? filterSmartSections(buildSmartSections(classicFilteredItems, rankNow), smartFilters, selectedKey)
+        ? tabs
+          ? buildSmartSections(classicFilteredItems, rankNow)
+          : filterSmartSections(buildSmartSections(classicFilteredItems, rankNow), smartFilters, selectedKey)
         : null,
-    [smart, isArchivedView, classicFilteredItems, rankNow, smartFilters, selectedKey],
+    [smart, tabs, isArchivedView, classicFilteredItems, rankNow, smartFilters, selectedKey],
   );
   // Selection walks the rows in the order the list shows them.
   const filteredItems = useMemo(
@@ -839,7 +849,7 @@ export function InboxPage({
         activeIssueIds={activeIssueIds}
         archived={isArchivedView}
       />
-      {smartSections && <SmartFilterMenu wsId={wsId} />}
+      {smartSections && !tabs && <SmartFilterMenu wsId={wsId} />}
       {/* Batch actions are main-view only. Every entry archives from the MAIN
           inbox, so offering them while the archived list is on screen reads as
           "archive all of these" and does the opposite of what it looks like. */}
@@ -899,7 +909,16 @@ export function InboxPage({
         onAction: isArchivedView ? handleUnarchive : handleArchive,
       }}
     >
-      {smartSections ? (
+      {smartSections && tabs ? (
+        <InboxTabsView
+          wsId={wsId}
+          items={classicFilteredItems}
+          now={rankNow}
+          selectedKey={selectedKey}
+          onSelect={handleSelect}
+          onArchive={handleArchive}
+        />
+      ) : smartSections ? (
         <SmartInboxList
           sections={smartSections}
           selectedKey={selectedKey}
