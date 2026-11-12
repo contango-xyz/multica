@@ -264,7 +264,15 @@
       "col_new_asks": "New asks, 7 days",
       "load_note": "Counts are cards, not entries. New asks count every decision and merge entry raised, re-asks included.",
       "else_sub": "Mentions that ask you nothing, updates and finished cards. No count on the tab, no push.",
-      "else_empty": "Nothing else"
+      "else_empty": "Nothing else",
+      "tab_actions": "Actions for this list",
+      "mark_tab_read": "Mark all read",
+      "archive_tab": "Archive all",
+      "confirm_archive_title_one": "Archive {{count}} card?",
+      "confirm_archive_title_other": "Archive {{count}} cards?",
+      "confirm_archive_description": "Every inbox entry on these cards moves to Archived. You can restore them from there.",
+      "confirm_archive": "Archive",
+      "archive": "Archive"
     }
   }
 }

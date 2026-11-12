@@ -917,6 +917,8 @@ export function InboxPage({
           selectedKey={selectedKey}
           onSelect={handleSelect}
           onArchive={handleArchive}
+          onArchiveEntries={handleArchiveSection}
+          onMarkEntriesRead={handleMarkSectionRead}
         />
       ) : smartSections ? (
         <SmartInboxList

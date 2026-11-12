@@ -250,7 +250,14 @@
       "col_new_asks": "新请求（7 天）",
       "load_note": "按卡片计数，而非条目。新请求包括重复提问。",
       "else_sub": "不需要你处理的提及、更新和已完成的卡片。无计数，无推送。",
-      "else_empty": "没有其他内容"
+      "else_empty": "没有其他内容",
+      "tab_actions": "此列表的操作",
+      "mark_tab_read": "全部标为已读",
+      "archive_tab": "全部归档",
+      "confirm_archive_title_other": "归档 {{count}} 张卡片？",
+      "confirm_archive_description": "这些卡片的所有收件箱条目都会移到已归档，可在那里恢复。",
+      "confirm_archive": "归档",
+      "archive": "归档"
     }
   }
 }

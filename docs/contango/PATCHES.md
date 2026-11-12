@@ -771,6 +771,12 @@ Spec: [SMART-INBOX.md](SMART-INBOX.md) "Tabs".
   load per person (raw SQL over `inbox_item`, no migration).
 - Web: `InboxPage` `tabs` prop swaps the smart sections for `InboxTabsView`; `inbox-entry.tsx` chooses it and adds a
   tabs/sections toggle.
+- Archive (fix, 2026-11-12 evening; owner: tab rows had no archive): every row on every tab archives as Smart's rows do
+  (hover icon, the compact menu on touch, right-click menu; `e` archives the open card). Today's cards, Decisions'
+  summary row and brief, both Merges sections, Everything else. A row archives one entry per card it stands for
+  (`archiveTargets`: the server archives the card's other entries). Each list has Smart's section "…" menu (Mark all
+  read, Archive all), asking first above 3 cards. Same handlers as Smart: `handleArchive` / `handleArchiveSection`.
+  Nothing archives automatically.
 
 Files: ours: `server/internal/handler/inbox_tabs{,_test}.go`, `packages/core/inbox/{smart-tabs,squad}.ts`,
 `packages/core/inbox/smart-tabs.test.ts`, `packages/views/inbox/components/smart-tabs{,.test}.tsx`. Upstream, small hooks:

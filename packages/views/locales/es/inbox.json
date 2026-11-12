@@ -264,7 +264,15 @@
       "col_new_asks": "Preguntas nuevas, 7 días",
       "load_note": "Se cuentan tarjetas, no entradas. Las preguntas nuevas incluyen repeticiones.",
       "else_sub": "Menciones que no te piden nada, novedades y tarjetas terminadas. Sin contador ni notificación.",
-      "else_empty": "Nada más"
+      "else_empty": "Nada más",
+      "tab_actions": "Acciones de esta lista",
+      "mark_tab_read": "Marcar todo como leído",
+      "archive_tab": "Archivar todo",
+      "confirm_archive_title_one": "¿Archivar {{count}} tarjeta?",
+      "confirm_archive_title_other": "¿Archivar {{count}} tarjetas?",
+      "confirm_archive_description": "Todas las entradas de la bandeja de estas tarjetas pasan a Archivados. Puedes restaurarlas desde allí.",
+      "confirm_archive": "Archivar",
+      "archive": "Archivar"
     }
   }
 }

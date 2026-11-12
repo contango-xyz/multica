@@ -137,6 +137,32 @@ export function buildInboxTabs(items: InboxItem[], now: number): InboxTabsModel 
   };
 }
 
+// --- Archive ----------------------------------------------------------------
+
+/** Archiving more cards than this at once asks first. */
+export const ARCHIVE_CONFIRM_OVER = 3;
+
+/**
+ * The entries to archive for some rows: one per card, since archiving an entry
+ * archives every inbox entry on its card (server-side, as Smart's per-row
+ * archive does), plus each entry that has no card.
+ */
+export function archiveTargets(entries: SmartEntry[]): SmartEntry[] {
+  const seen = new Set<string>();
+  return entries.filter((e) => {
+    const issue = e.item.issue_id;
+    if (!issue) return true;
+    if (seen.has(issue)) return false;
+    seen.add(issue);
+    return true;
+  });
+}
+
+/** Every entry the rows stand for, folded ones included. */
+export function rowEntries(rows: TabRow[]): SmartEntry[] {
+  return rows.flatMap((r) => r.entries);
+}
+
 // --- Opt-in -----------------------------------------------------------------
 
 export const INBOX_TABS_URL_PARAM = "inbox-tabs";

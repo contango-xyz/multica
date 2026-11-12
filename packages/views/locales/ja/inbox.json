@@ -250,7 +250,14 @@
       "col_new_asks": "新しい依頼 (7 日)",
       "load_note": "エントリーではなくカード数。新しい依頼には再依頼を含みます。",
       "else_sub": "何も求めないメンション、更新、完了したカード。件数表示も通知もありません。",
-      "else_empty": "その他はありません"
+      "else_empty": "その他はありません",
+      "tab_actions": "この一覧の操作",
+      "mark_tab_read": "すべて既読にする",
+      "archive_tab": "すべてアーカイブ",
+      "confirm_archive_title_other": "{{count}} 件のカードをアーカイブしますか？",
+      "confirm_archive_description": "これらのカードの受信箱の項目はすべてアーカイブに移ります。そこから元に戻せます。",
+      "confirm_archive": "アーカイブ",
+      "archive": "アーカイブ"
     }
   }
 }

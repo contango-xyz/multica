@@ -262,6 +262,11 @@ The owner approved a tabbed Smart inbox (mockup: five tabs). Behind its own flag
     (from the feeder's snapshot of the capacity report) and inbox load per person (counted by the server).
   - **Everything else:** every other row (mentions, fyi, stalled, alerts, done), newest first, Classic's rows; quiet
     unread count. The feeder's `digest:` and `reminder:` entries are not shown in any tab (pushes unchanged).
+- **Archive (every tab, as in Smart):** each row has the hover archive icon (compact menu on touch, right-click
+  menu; `e` archives the open card), on Today, Decisions (summary row and inside the brief), both Merges sections and
+  Everything else. Archiving a row archives every inbox entry on its card. Each list's "…" menu marks all read or
+  archives all of it, asking first above 3 cards. Classic's filters and bulk menu stay in the header. Nothing is
+  archived automatically.
 - **Signal fields (optional, additive; old clients and iOS ignore them):**
   `brief` = `{situation ≤600, recommend ≤300, default ≤300, default_applies, reply_with ≤300}`;
   `merge` = `{pr ≤40, url, review_url, risk ≤300, ci: green|red|running|unknown, review ≤300, lines, files,

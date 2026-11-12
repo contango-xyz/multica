@@ -15,10 +15,15 @@ vi.mock("../../i18n", () => ({
   }),
 }));
 vi.mock("./inbox-list-item", () => ({
-  InboxListItem: ({ item, onClick }: { item: InboxItem; onClick: () => void }) => (
-    <button type="button" data-testid="else-row" onClick={onClick}>{item.title}</button>
+  InboxListItem: ({ item, onClick, onAction }: { item: InboxItem; onClick: () => void; onAction: () => void }) => (
+    <div>
+      <button type="button" data-testid="else-row" onClick={onClick}>{item.title}</button>
+      <button type="button" aria-label="list.archive_tooltip" onClick={onAction} />
+    </div>
   ),
 }));
+// The compact row menu is Classic's (inbox-row-menu); its actions come from the page's provider.
+vi.mock("./inbox-row-menu", () => ({ InboxRowMenu: () => null }));
 vi.mock("./signal-reply-button", () => ({
   SignalReplyButton: ({ reply }: { reply: { label: string } }) => <button type="button">{reply.label}</button>,
 }));
@@ -42,20 +47,36 @@ function signal(group: string, details: Record<string, unknown> = {}, over: Part
   };
 }
 
+const archive = { onArchive: vi.fn(), onArchiveEntries: vi.fn(), onMarkEntriesRead: vi.fn() };
+
 function renderTabs(items: InboxItem[]) {
   const onSelect = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <InboxTabsView wsId="ws" items={items} now={NOW} selectedKey="" onSelect={onSelect} onArchive={vi.fn()} />
+      <InboxTabsView wsId="ws" items={items} now={NOW} selectedKey="" onSelect={onSelect} {...archive} />
     </QueryClientProvider>,
   );
   return onSelect;
 }
 
+/** The row (card) that holds `title`, found by its row key. */
+function rowOf(title: string): HTMLElement {
+  const row = screen.getByText(title).closest<HTMLElement>("[data-inbox-row-key]");
+  if (!row) throw new Error(`no row for ${title}`);
+  return row;
+}
+const archiveIn = (el: HTMLElement) => within(el).getByRole("button", { name: "list.archive_tooltip" });
+const archivedIds = () => archive.onArchive.mock.calls.map((c) => c[0]);
+
 const tab = (name: RegExp) => screen.getByRole("tab", { name });
 
 describe("InboxTabsView", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    archive.onArchive.mockClear();
+    archive.onArchiveEntries.mockClear();
+    archive.onMarkEntriesRead.mockClear();
+  });
 
   it("shows five tabs with badges on Today, Decisions and Merges only", () => {
     renderTabs([
@@ -129,6 +150,94 @@ describe("InboxTabsView", () => {
     fireEvent.click(tab(/else/));
     expect(within(screen.getByRole("tabpanel")).getByTestId("else-row")).toHaveTextContent("FYI one");
     expect(localStorage.getItem("multica:inbox-tab")).toBe("else");
+  });
+});
+
+describe("InboxTabsView archive (Smart's row and section archive on every tab)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    archive.onArchive.mockClear();
+    archive.onArchiveEntries.mockClear();
+    archive.onMarkEntriesRead.mockClear();
+  });
+
+  it("Today: each ranked card has the hover archive", () => {
+    renderTabs([signal("decision", {}, { id: "t1", title: "First" }), signal("merge", {}, { id: "t2", title: "Second" })]);
+    fireEvent.click(archiveIn(rowOf("Second")));
+    fireEvent.click(archiveIn(rowOf("First")));
+    expect(archivedIds()).toEqual(["t2", "t1"]);
+  });
+
+  it("Decisions: the summary row and the brief both archive the card", () => {
+    renderTabs([signal("decision", {}, { id: "d1", title: "Pick one" })]);
+    fireEvent.click(tab(/decisions/));
+    const row = rowOf("Pick one");
+    fireEvent.click(archiveIn(row));
+    expect(archivedIds()).toEqual(["d1"]);
+    // Archiving from the summary does not open the brief.
+    expect(within(row).getByRole("button", { name: /Pick one/ })).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(within(row).getByRole("button", { name: /Pick one/ }));
+    fireEvent.click(within(row).getByRole("button", { name: "smart.tabs.archive" }));
+    expect(archivedIds()).toEqual(["d1", "d1"]);
+  });
+
+  it("Decisions: a row folding asks on one card archives once; asks on two cards archive both", () => {
+    renderTabs([
+      signal("decision", {}, { id: "a1", issue_id: "c1", created_at: hoursAgo(3), title: "Older" }),
+      signal("decision", {}, { id: "a2", issue_id: "c1", title: "Newer" }),
+    ]);
+    fireEvent.click(tab(/decisions/));
+    fireEvent.click(archiveIn(rowOf("Newer")));
+    expect(archivedIds()).toEqual(["a2"]);
+    expect(archive.onArchiveEntries).not.toHaveBeenCalled();
+  });
+
+  it("Merges: approval and merged-without-you cards both archive", () => {
+    renderTabs([
+      signal("merge", { merge: { pr: "#1", state: "open" } }, { id: "m1", title: "Approve merge #1" }),
+      signal("merge", { key: "post-merge:CTG-9:core#2", merge: { pr: "#2", post_merge: true } }, { id: "m2", title: "Merged #2" }),
+    ]);
+    fireEvent.click(tab(/merges/));
+    fireEvent.click(archiveIn(rowOf("Approve merge #1")));
+    fireEvent.click(archiveIn(rowOf("Merged #2")));
+    expect(archivedIds()).toEqual(["m1", "m2"]);
+  });
+
+  it("Everything else: rows keep Classic's archive", () => {
+    renderTabs([signal("fyi", {}, { id: "e1", severity: "info", title: "FYI" })]);
+    fireEvent.click(tab(/else/));
+    fireEvent.click(within(screen.getByRole("tabpanel")).getByRole("button", { name: "list.archive_tooltip" }));
+    expect(archivedIds()).toEqual(["e1"]);
+  });
+
+  it("a list's Archive all archives up to 3 cards at once", async () => {
+    renderTabs([1, 2, 3].map((n) => signal("decision", {}, { id: `d${n}`, title: `Ask ${n}` })));
+    fireEvent.click(tab(/decisions/));
+    fireEvent.click(screen.getByRole("button", { name: "smart.tabs.tab_actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /smart.tabs.archive_tab/ }));
+    expect(archive.onArchiveEntries).toHaveBeenCalledTimes(1);
+    expect(archive.onArchiveEntries.mock.calls[0]![0].map((e: { item: InboxItem }) => e.item.id).sort()).toEqual(["d1", "d2", "d3"]);
+  });
+
+  it("a list's Archive all asks first above 3 cards", async () => {
+    renderTabs([1, 2, 3, 4].map((n) => signal("fyi", {}, { id: `f${n}`, severity: "info", title: `FYI ${n}` })));
+    fireEvent.click(tab(/else/));
+    fireEvent.click(screen.getByRole("button", { name: "smart.tabs.tab_actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /smart.tabs.archive_tab/ }));
+    expect(archive.onArchiveEntries).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("smart.tabs.confirm_archive_title:4");
+    fireEvent.click(within(dialog).getByRole("button", { name: "smart.tabs.confirm_archive" }));
+    expect(archive.onArchiveEntries.mock.calls[0]![0]).toHaveLength(4);
+  });
+
+  it("a list's Mark read marks every entry it shows", async () => {
+    renderTabs([signal("decision", {}, { id: "r1", title: "Read me" })]);
+    fireEvent.click(tab(/decisions/));
+    fireEvent.click(screen.getByRole("button", { name: "smart.tabs.tab_actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /smart.tabs.mark_tab_read/ }));
+    expect(archive.onMarkEntriesRead.mock.calls[0]![0].map((e: { item: InboxItem }) => e.item.id)).toEqual(["r1"]);
+    expect(archive.onArchiveEntries).not.toHaveBeenCalled();
   });
 });
 

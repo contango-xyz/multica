@@ -264,7 +264,15 @@
       "col_new_asks": "Nouvelles demandes, 7 jours",
       "load_note": "On compte des cartes, pas des entrées. Les nouvelles demandes incluent les relances.",
       "else_sub": "Mentions sans demande, nouvelles et cartes terminées. Pas de compteur ni de notification.",
-      "else_empty": "Rien d'autre"
+      "else_empty": "Rien d'autre",
+      "tab_actions": "Actions de cette liste",
+      "mark_tab_read": "Tout marquer comme lu",
+      "archive_tab": "Tout archiver",
+      "confirm_archive_title_one": "Archiver {{count}} carte ?",
+      "confirm_archive_title_other": "Archiver {{count}} cartes ?",
+      "confirm_archive_description": "Toutes les entrées de ces cartes passent dans Archivés. Vous pouvez les restaurer depuis là.",
+      "confirm_archive": "Archiver",
+      "archive": "Archiver"
     }
   }
 }

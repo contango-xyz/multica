@@ -250,7 +250,14 @@
       "col_new_asks": "新請求（7 天）",
       "load_note": "依卡片計數，而非條目。新請求包含重複提問。",
       "else_sub": "不需要你處理的提及、更新與已完成的卡片。無計數，無推播。",
-      "else_empty": "沒有其他內容"
+      "else_empty": "沒有其他內容",
+      "tab_actions": "此列表的操作",
+      "mark_tab_read": "全部標為已讀",
+      "archive_tab": "全部封存",
+      "confirm_archive_title_other": "封存 {{count}} 張卡片？",
+      "confirm_archive_description": "這些卡片的所有收件匣項目都會移到已封存，可在那裡還原。",
+      "confirm_archive": "封存",
+      "archive": "封存"
     }
   }
 }

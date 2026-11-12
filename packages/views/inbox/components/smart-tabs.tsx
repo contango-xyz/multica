@@ -6,29 +6,180 @@
 // plain-words brief), Merges (one card per PR; approving happens on GitHub),
 // Squad (a read-only screen) and Everything else. Selecting a row opens the
 // card on the right, as in Smart. Rows and ranking: core's smart-tabs.ts.
+// Archiving is Smart's: every row has the hover archive icon (the compact menu
+// on touch, the row menu on right-click; `e` archives the open card), and each
+// list's "…" menu marks read or archives all of it, asking first above 3 cards.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, ExternalLink } from "@multica/ui/icons";
+import { Archive, CheckCheck, ChevronRight, ExternalLink, MoreHorizontal } from "@multica/ui/icons";
 import { inboxRowKey } from "@multica/core/inbox/filter-store";
 import { inboxSquadOptions } from "@multica/core/inbox/queries";
 import { ageTint, type SmartEntry } from "@multica/core/inbox/smart";
 import {
+  ARCHIVE_CONFIRM_OVER,
+  archiveTargets,
   buildInboxTabs,
   cardHoursLost,
   cardRef,
   INBOX_TABS,
+  rowEntries,
   type InboxTab,
   type TabRow,
 } from "@multica/core/inbox/smart-tabs";
 import { SQUAD_BUCKETS, type InboxSquad } from "@multica/core/inbox/squad";
 import type { InboxItem } from "@multica/core/types";
+import { IconButton } from "@multica/ui/components/common/icon-button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@multica/ui/components/ui/alert-dialog";
 import { Button } from "@multica/ui/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@multica/ui/components/ui/dropdown-menu";
 import { cn } from "@multica/ui/lib/utils";
 import { useT } from "../../i18n";
+import { DeferredTooltip } from "../../common/deferred-tooltip";
+import { useInboxContextMenu } from "./inbox-context-menu";
 import { getInboxDisplayTitle } from "./inbox-display";
 import { InboxListItem } from "./inbox-list-item";
+import { InboxRowMenu } from "./inbox-row-menu";
 import { SignalReplyButton } from "./signal-reply-button";
+
+/** What a tab's rows can do besides open: Smart's row and section actions. */
+interface TabArchive {
+  /** One card: Smart's per-row archive (the server takes the card's other entries with it). */
+  onArchive: (id: string) => void;
+  /** Several cards: Smart's per-section archive, one toast. */
+  onArchiveEntries: (entries: SmartEntry[]) => void;
+  onMarkEntriesRead: (entries: SmartEntry[]) => void;
+}
+
+/** Archive what a row stands for: its card, plus any folded entry on another card. */
+function archiveRow(row: TabRow, actions: TabArchive) {
+  const targets = archiveTargets(row.entries);
+  if (targets.length === 1) actions.onArchive(targets[0]!.item.id);
+  else if (targets.length > 1) actions.onArchiveEntries(targets);
+}
+
+/**
+ * A row's archive controls, as on Smart's rows: the archive icon shows on hover
+ * or keyboard focus (pointer devices), the compact menu stands in on touch.
+ * The row needs the `group` class.
+ */
+function RowArchive({ item, onArchive }: { item: InboxItem; onArchive: () => void }) {
+  const { t } = useT("inbox");
+  const label = t(($) => $.list.archive_tooltip);
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <DeferredTooltip
+        content={label}
+        trigger={
+          <button
+            type="button"
+            aria-label={label}
+            onClick={(e) => {
+              e.stopPropagation();
+              onArchive();
+            }}
+            className="hidden rounded-xs p-0.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring [@media(hover:hover)]:group-hover:inline-flex [@media(hover:hover)]:group-focus-within:inline-flex"
+          >
+            <Archive className="h-3.5 w-3.5" />
+          </button>
+        }
+      />
+      <InboxRowMenu item={item} view="inbox" />
+    </div>
+  );
+}
+
+/** Right-click on a card opens the list's shared row menu, as on Smart's rows. */
+function useRowContextMenu(item: InboxItem) {
+  const open = useInboxContextMenu();
+  return open ? (e: MouseEvent) => open(item, e) : undefined;
+}
+
+/**
+ * A list's "…" menu, as on Smart's section headers: mark read, archive all.
+ * Archiving more than ARCHIVE_CONFIRM_OVER cards asks first.
+ */
+function ListActions({ entries, actions }: { entries: SmartEntry[]; actions: TabArchive }) {
+  const { t } = useT("inbox");
+  const [confirming, setConfirming] = useState(false);
+  const targets = archiveTargets(entries);
+  if (targets.length === 0) return null;
+  const archiveAll = () => {
+    if (targets.length > ARCHIVE_CONFIRM_OVER) setConfirming(true);
+    else actions.onArchiveEntries(targets);
+  };
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <IconButton
+              label={t(($) => $.smart.tabs.tab_actions)}
+              tooltipSide="bottom"
+              size="icon-xs"
+              className="shrink-0 text-muted-foreground"
+            />
+          }
+        >
+          <MoreHorizontal className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-auto">
+          <DropdownMenuItem onClick={() => actions.onMarkEntriesRead(entries)}>
+            <CheckCheck className="h-4 w-4" />
+            {t(($) => $.smart.tabs.mark_tab_read)}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={archiveAll}>
+            <Archive className="h-4 w-4" />
+            {t(($) => $.smart.tabs.archive_tab)}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t(($) => $.smart.tabs.confirm_archive_title, { count: targets.length })}</AlertDialogTitle>
+            <AlertDialogDescription>{t(($) => $.smart.tabs.confirm_archive_description)}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t(($) => $.smart.reply.cancel)}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirming(false);
+                actions.onArchiveEntries(targets);
+              }}
+            >
+              {t(($) => $.smart.tabs.confirm_archive)}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+/** A list's heading with its "…" menu on the right. */
+function ListHeader({ children, entries, actions }: { children: ReactNode; entries: SmartEntry[]; actions: TabArchive }) {
+  return (
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">{children}</div>
+      <ListActions entries={entries} actions={actions} />
+    </div>
+  );
+}
 
 const TAB_STORAGE_KEY = "multica:inbox-tab";
 
@@ -70,8 +221,26 @@ function Pill({ tone = "default", children }: { tone?: "default" | "accent" | "o
   return <span className={cn("rounded px-1.5 py-0.5 text-caption tabular-nums", toneClass)}>{children}</span>;
 }
 
-function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("grid min-w-0 gap-2 rounded-lg border bg-background p-3", className)}>{children}</div>;
+function Card({
+  children,
+  className,
+  onContextMenu,
+  rowKey,
+}: {
+  children: ReactNode;
+  className?: string;
+  onContextMenu?: (e: MouseEvent) => void;
+  rowKey?: string;
+}) {
+  return (
+    <div
+      className={cn("grid min-w-0 gap-2 rounded-lg border bg-background p-3", className)}
+      onContextMenu={onContextMenu}
+      data-inbox-row-key={rowKey}
+    >
+      {children}
+    </div>
+  );
 }
 
 function Kind({ children }: { children: ReactNode }) {
@@ -154,7 +323,16 @@ function OpenCard({ entry, onSelect }: { entry: SmartEntry; onSelect: (item: Inb
 }
 
 /** The one-tap answers, or for a merge the GitHub button, then Open card. */
-function RowActions({ entry, onSelect }: { entry: SmartEntry; onSelect: (item: InboxItem) => void }) {
+function RowActions({
+  entry,
+  onSelect,
+  onArchive,
+}: {
+  entry: SmartEntry;
+  onSelect: (item: InboxItem) => void;
+  /** Adds an Archive button after Open card. */
+  onArchive?: () => void;
+}) {
   const { t } = useT("inbox");
   const s = entry.signal;
   const replies = entry.item.issue_id ? (s?.replies ?? []) : [];
@@ -184,20 +362,57 @@ function RowActions({ entry, onSelect }: { entry: SmartEntry; onSelect: (item: I
             </ExternalButton>
           ))}
       <OpenCard entry={entry} onSelect={onSelect} />
+      {onArchive && (
+        <Button size="sm" variant="ghost" className="min-h-10 text-muted-foreground lg:min-h-0" onClick={onArchive}>
+          <Archive className="h-3.5 w-3.5" />
+          {t(($) => $.smart.tabs.archive)}
+        </Button>
+      )}
     </div>
   );
 }
 
 // --- Today -------------------------------------------------------------------
 
+function TodayCard({ row, rank, onSelect, actions }: { row: TabRow; rank: number; onSelect: (item: InboxItem) => void; actions: TabArchive }) {
+  const onContextMenu = useRowContextMenu(row.entry.item);
+  return (
+    <Card className="group" onContextMenu={onContextMenu} rowKey={inboxRowKey(row.entry.item)}>
+      <div className="grid grid-cols-[2rem_1fr] items-start gap-2.5">
+        <span aria-hidden className="grid size-7 place-items-center rounded-full bg-primary/10 font-semibold tabular-nums text-primary">
+          {rank}
+        </span>
+        <div className="grid min-w-0 gap-1.5">
+          <div className="flex min-w-0 items-start gap-2">
+            <button
+              type="button"
+              onClick={() => onSelect(row.entry.item)}
+              className="min-w-0 flex-1 break-words text-left text-body font-semibold hover:underline"
+            >
+              <span className="sr-only">{rank}. </span>
+              {getInboxDisplayTitle(row.entry.item)}
+            </button>
+            <RowArchive item={row.entry.item} onArchive={() => archiveRow(row, actions)} />
+          </div>
+          <RowMeta entry={row.entry} showLost />
+          {whyText(row.entry) && <p className="line-clamp-3 break-words text-body">{whyText(row.entry)}</p>}
+          <RowActions entry={row.entry} onSelect={onSelect} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function TodayPanel({
   model,
   onSelect,
   onGo,
+  actions,
 }: {
   model: ReturnType<typeof buildInboxTabs>;
   onSelect: (item: InboxItem) => void;
   onGo: (tab: InboxTab) => void;
+  actions: TabArchive;
 }) {
   const { t } = useT("inbox");
   const { rows, more, alerts } = model.today;
@@ -216,28 +431,11 @@ function TodayPanel({
         <Empty>{t(($) => $.smart.tabs.today_empty)}</Empty>
       ) : (
         <>
-          <Lede title={t(($) => $.smart.tabs.today_lede)} sub={t(($) => $.smart.tabs.today_sub)} />
+          <ListHeader entries={rowEntries(rows)} actions={actions}>
+            <Lede title={t(($) => $.smart.tabs.today_lede)} sub={t(($) => $.smart.tabs.today_sub)} />
+          </ListHeader>
           {rows.map((row, i) => (
-            <Card key={row.entry.item.id}>
-              <div className="grid grid-cols-[2rem_1fr] items-start gap-2.5">
-                <span aria-hidden className="grid size-7 place-items-center rounded-full bg-primary/10 font-semibold tabular-nums text-primary">
-                  {i + 1}
-                </span>
-                <div className="grid min-w-0 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => onSelect(row.entry.item)}
-                    className="break-words text-left text-body font-semibold hover:underline"
-                  >
-                    <span className="sr-only">{i + 1}. </span>
-                    {getInboxDisplayTitle(row.entry.item)}
-                  </button>
-                  <RowMeta entry={row.entry} showLost />
-                  {whyText(row.entry) && <p className="line-clamp-3 break-words text-body">{whyText(row.entry)}</p>}
-                  <RowActions entry={row.entry} onSelect={onSelect} />
-                </div>
-              </div>
-            </Card>
+            <TodayCard key={row.entry.item.id} row={row} rank={i + 1} onSelect={onSelect} actions={actions} />
           ))}
           {more > 0 && (
             <p className="text-caption text-muted-foreground">
@@ -284,40 +482,65 @@ function BriefBody({ entry }: { entry: SmartEntry }) {
   );
 }
 
-function DecisionRow({ row, open, onToggle, onSelect }: { row: TabRow; open: boolean; onToggle: () => void; onSelect: (item: InboxItem) => void }) {
+function DecisionRow({
+  row,
+  open,
+  onToggle,
+  onSelect,
+  actions,
+}: {
+  row: TabRow;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (item: InboxItem) => void;
+  actions: TabArchive;
+}) {
+  const onContextMenu = useRowContextMenu(row.entry.item);
+  const archive = () => archiveRow(row, actions);
   return (
-    <div className="min-w-0 rounded-lg border bg-background" data-inbox-row-key={inboxRowKey(row.entry.item)}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onToggle}
-        className="grid w-full min-w-0 grid-cols-[1fr_auto] items-start gap-2 px-3 py-2.5 text-left"
-      >
-        <span className="grid min-w-0 gap-1">
-          <span className={cn("break-words text-body", !row.entry.item.read && "font-semibold")}>
-            {getInboxDisplayTitle(row.entry.item)}
+    <div
+      className="group min-w-0 rounded-lg border bg-background"
+      data-inbox-row-key={inboxRowKey(row.entry.item)}
+      onContextMenu={onContextMenu}
+    >
+      <div className="flex min-w-0 items-start">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-start gap-2 py-2.5 pl-3 pr-1 text-left"
+        >
+          <span className="grid min-w-0 gap-1">
+            <span className={cn("break-words text-body", !row.entry.item.read && "font-semibold")}>
+              {getInboxDisplayTitle(row.entry.item)}
+            </span>
+            <RowMeta entry={row.entry} folded={row.entries.length} />
           </span>
-          <RowMeta entry={row.entry} folded={row.entries.length} />
-        </span>
-        <ChevronRight className={cn("mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
-      </button>
+          <ChevronRight className={cn("mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+        </button>
+        <div className="py-2 pr-2">
+          <RowArchive item={row.entry.item} onArchive={archive} />
+        </div>
+      </div>
       {open && (
         <div className="grid gap-3 border-t px-3 py-3">
           <BriefBody entry={row.entry} />
-          <RowActions entry={row.entry} onSelect={onSelect} />
+          <RowActions entry={row.entry} onSelect={onSelect} onArchive={archive} />
         </div>
       )}
     </div>
   );
 }
 
-function DecisionsPanel({ rows, onSelect }: { rows: TabRow[]; onSelect: (item: InboxItem) => void }) {
+function DecisionsPanel({ rows, onSelect, actions }: { rows: TabRow[]; onSelect: (item: InboxItem) => void; actions: TabArchive }) {
   const { t } = useT("inbox");
   const [open, setOpen] = useState<string | null>(null);
   if (rows.length === 0) return <Empty>{t(($) => $.smart.tabs.decisions_empty)}</Empty>;
   return (
     <>
-      <Lede title={t(($) => $.smart.tabs.decisions_lede, { count: rows.length })} sub={t(($) => $.smart.tabs.decisions_sub)} />
+      <ListHeader entries={rowEntries(rows)} actions={actions}>
+        <Lede title={t(($) => $.smart.tabs.decisions_lede, { count: rows.length })} sub={t(($) => $.smart.tabs.decisions_sub)} />
+      </ListHeader>
       {rows.map((row) => (
         <DecisionRow
           key={row.entry.item.id}
@@ -325,6 +548,7 @@ function DecisionsPanel({ rows, onSelect }: { rows: TabRow[]; onSelect: (item: I
           open={open === row.entry.item.id}
           onToggle={() => setOpen((cur) => (cur === row.entry.item.id ? null : row.entry.item.id))}
           onSelect={onSelect}
+          actions={actions}
         />
       ))}
     </>
@@ -333,8 +557,9 @@ function DecisionsPanel({ rows, onSelect }: { rows: TabRow[]; onSelect: (item: I
 
 // --- Merges ------------------------------------------------------------------
 
-function MergeCard({ row, onSelect }: { row: TabRow; onSelect: (item: InboxItem) => void }) {
+function MergeCard({ row, onSelect, actions }: { row: TabRow; onSelect: (item: InboxItem) => void; actions: TabArchive }) {
   const { t } = useT("inbox");
+  const onContextMenu = useRowContextMenu(row.entry.item);
   const m = row.entry.signal?.merge;
   const postMerge = m?.postMerge || row.entry.signal?.key.startsWith("post-merge:");
   const fact = (label: string, value: ReactNode) => (
@@ -344,10 +569,17 @@ function MergeCard({ row, onSelect }: { row: TabRow; onSelect: (item: InboxItem)
     </div>
   );
   return (
-    <Card>
-      <button type="button" onClick={() => onSelect(row.entry.item)} className="break-words text-left text-body font-semibold hover:underline">
-        {getInboxDisplayTitle(row.entry.item)}
-      </button>
+    <Card className="group" onContextMenu={onContextMenu} rowKey={inboxRowKey(row.entry.item)}>
+      <div className="flex min-w-0 items-start gap-2">
+        <button
+          type="button"
+          onClick={() => onSelect(row.entry.item)}
+          className="min-w-0 flex-1 break-words text-left text-body font-semibold hover:underline"
+        >
+          {getInboxDisplayTitle(row.entry.item)}
+        </button>
+        <RowArchive item={row.entry.item} onArchive={() => archiveRow(row, actions)} />
+      </div>
       <RowMeta entry={row.entry} />
       {postMerge ? (
         m?.mergedAt ? <p className="text-caption text-muted-foreground">{t(($) => $.smart.tabs.merged_at, { time: utcTime(m.mergedAt) })}</p> : null
@@ -363,7 +595,15 @@ function MergeCard({ row, onSelect }: { row: TabRow; onSelect: (item: InboxItem)
   );
 }
 
-function MergesPanel({ model, onSelect }: { model: ReturnType<typeof buildInboxTabs>; onSelect: (item: InboxItem) => void }) {
+function MergesPanel({
+  model,
+  onSelect,
+  actions,
+}: {
+  model: ReturnType<typeof buildInboxTabs>;
+  onSelect: (item: InboxItem) => void;
+  actions: TabArchive;
+}) {
   const { t } = useT("inbox");
   const { approval, postMerge } = model.merges;
   return (
@@ -372,17 +612,21 @@ function MergesPanel({ model, onSelect }: { model: ReturnType<typeof buildInboxT
         <Empty>{t(($) => $.smart.tabs.merges_empty)}</Empty>
       ) : (
         <>
-          <Lede title={t(($) => $.smart.tabs.merges_lede, { count: approval.length })} sub={t(($) => $.smart.tabs.merges_sub)} />
+          <ListHeader entries={rowEntries(approval)} actions={actions}>
+            <Lede title={t(($) => $.smart.tabs.merges_lede, { count: approval.length })} sub={t(($) => $.smart.tabs.merges_sub)} />
+          </ListHeader>
           {approval.map((row) => (
-            <MergeCard key={row.entry.item.id} row={row} onSelect={onSelect} />
+            <MergeCard key={row.entry.item.id} row={row} onSelect={onSelect} actions={actions} />
           ))}
         </>
       )}
       {postMerge.length > 0 && (
         <>
-          <p className="mt-2 text-micro font-semibold uppercase tracking-wide text-muted-foreground">{t(($) => $.smart.tabs.merged_without_you)}</p>
+          <ListHeader entries={rowEntries(postMerge)} actions={actions}>
+            <p className="mt-2 text-micro font-semibold uppercase tracking-wide text-muted-foreground">{t(($) => $.smart.tabs.merged_without_you)}</p>
+          </ListHeader>
           {postMerge.map((row) => (
-            <MergeCard key={row.entry.item.id} row={row} onSelect={onSelect} />
+            <MergeCard key={row.entry.item.id} row={row} onSelect={onSelect} actions={actions} />
           ))}
         </>
       )}
@@ -535,18 +779,20 @@ function ElsePanel({
   entries,
   selectedKey,
   onSelect,
-  onArchive,
+  actions,
 }: {
   entries: SmartEntry[];
   selectedKey: string;
   onSelect: (item: InboxItem) => void;
-  onArchive: (id: string) => void;
+  actions: TabArchive;
 }) {
   const { t } = useT("inbox");
   if (entries.length === 0) return <Empty>{t(($) => $.smart.tabs.else_empty)}</Empty>;
   return (
     <>
-      <p className="text-caption text-muted-foreground">{t(($) => $.smart.tabs.else_sub)}</p>
+      <ListHeader entries={entries} actions={actions}>
+        <p className="text-caption text-muted-foreground">{t(($) => $.smart.tabs.else_sub)}</p>
+      </ListHeader>
       <div className="-mx-3">
         {entries.map((e) => (
           <InboxListItem
@@ -555,7 +801,7 @@ function ElsePanel({
             view="inbox"
             isSelected={inboxRowKey(e.item) === selectedKey}
             onClick={() => onSelect(e.item)}
-            onAction={() => onArchive(e.item.id)}
+            onAction={() => actions.onArchive(e.item.id)}
           />
         ))}
       </div>
@@ -572,6 +818,8 @@ export function InboxTabsView({
   selectedKey,
   onSelect,
   onArchive,
+  onArchiveEntries,
+  onMarkEntriesRead,
 }: {
   wsId: string;
   /** The Smart rows (one per card where an action signal folds the rest). */
@@ -579,9 +827,9 @@ export function InboxTabsView({
   now: number;
   selectedKey: string;
   onSelect: (item: InboxItem) => void;
-  onArchive: (id: string) => void;
-}) {
+} & TabArchive) {
   const { t } = useT("inbox");
+  const actions: TabArchive = { onArchive, onArchiveEntries, onMarkEntriesRead };
   const [tab, setTab] = useState<InboxTab>(readStoredTab);
   const model = useMemo(() => buildInboxTabs(items, now), [items, now]);
   const choose = (next: InboxTab) => {
@@ -633,11 +881,11 @@ export function InboxTabsView({
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
       >
         <div className="mx-auto grid w-full max-w-3xl gap-3 p-3">
-          {tab === "today" && <TodayPanel model={model} onSelect={onSelect} onGo={choose} />}
-          {tab === "decisions" && <DecisionsPanel rows={model.decisions} onSelect={onSelect} />}
-          {tab === "merges" && <MergesPanel model={model} onSelect={onSelect} />}
+          {tab === "today" && <TodayPanel model={model} onSelect={onSelect} onGo={choose} actions={actions} />}
+          {tab === "decisions" && <DecisionsPanel rows={model.decisions} onSelect={onSelect} actions={actions} />}
+          {tab === "merges" && <MergesPanel model={model} onSelect={onSelect} actions={actions} />}
           {tab === "squad" && <SquadPanel wsId={wsId} />}
-          {tab === "else" && <ElsePanel entries={model.else} selectedKey={selectedKey} onSelect={onSelect} onArchive={onArchive} />}
+          {tab === "else" && <ElsePanel entries={model.else} selectedKey={selectedKey} onSelect={onSelect} actions={actions} />}
         </div>
       </div>
     </div>

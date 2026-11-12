@@ -215,6 +215,29 @@ vi.mock("./smart-inbox-list", () => ({
     </div>
   ),
 }));
+vi.mock("./smart-tabs", () => ({
+  InboxTabsView: ({
+    items,
+    onSelect,
+    onArchive,
+    onArchiveEntries,
+  }: {
+    items: InboxItem[];
+    onSelect: (item: InboxItem) => void;
+    onArchive: (id: string) => void;
+    onArchiveEntries: (entries: Array<{ item: InboxItem }>) => void;
+  }) => (
+    <div data-testid="inbox-tabs">
+      {items.map((i) => (
+        <span key={i.id}>
+          <button type="button" aria-label={`tabs open ${i.id}`} onClick={() => onSelect(i)} />
+          <button type="button" aria-label={`tabs archive ${i.id}`} onClick={() => onArchive(i.id)} />
+        </span>
+      ))}
+      <button type="button" aria-label="tabs archive all" onClick={() => onArchiveEntries(items.map((item) => ({ item })))} />
+    </div>
+  ),
+}));
 vi.mock("./smart-inbox", () => ({
   SignalBrief: ({ entry }: { entry: { item: InboxItem } }) => (
     <div data-testid="signal-brief">{entry.item.id}</div>
@@ -1385,6 +1408,40 @@ describe("InboxPage smart two-pane (contango)", () => {
     render(<InboxPage smart />);
     fireEvent.click(screen.getByRole("button", { name: "archive stalled" }));
     expect(archiveMutateAsync.mock.calls.map((c) => c[0]).sort()).toEqual(["a", "b"]);
+  });
+
+  // Tabs (patch 43): the stub calls the archive props the way the tabs' row
+  // and list controls do (smart-tabs.test.tsx covers the buttons). They must
+  // reach the same mutations, so the same API, as Smart's archive above.
+  it("tabs: a row's archive is Smart's per-row archive", () => {
+    reset();
+    layout.width = DESKTOP;
+    archiveMutate.mockClear();
+    listData.active = [signal("ask", "decision", { issue_id: "i-ask" })];
+    render(<InboxPage smart tabs />);
+    fireEvent.click(screen.getByRole("button", { name: "tabs archive ask" }));
+    expect(archiveMutate).toHaveBeenCalledWith("ask", expect.anything());
+  });
+
+  it("tabs: a list's archive all is Smart's per-section archive", () => {
+    reset();
+    layout.width = DESKTOP;
+    archiveMutateAsync.mockClear();
+    listData.active = ["a", "b", "c", "d"].map((id) => signal(id, "decision", { issue_id: `i-${id}` }));
+    render(<InboxPage smart tabs />);
+    fireEvent.click(screen.getByRole("button", { name: "tabs archive all" }));
+    expect(archiveMutateAsync.mock.calls.map((c) => c[0]).sort()).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("tabs: e archives the card selected on a tab", () => {
+    reset();
+    layout.width = DESKTOP;
+    archiveMutate.mockClear();
+    listData.active = [signal("ask", "decision", { issue_id: "i-ask" })];
+    render(<InboxPage smart tabs />);
+    fireEvent.click(screen.getByRole("button", { name: "tabs open ask" }));
+    fireEvent.keyDown(document, { key: "e" });
+    expect(archiveMutate).toHaveBeenCalledWith("ask", expect.anything());
   });
 
   it("keeps the archive sub-view classic", () => {

@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { InboxItem } from "../types";
 import { signalDetails } from "./smart";
 import {
+  archiveTargets,
   buildInboxTabs,
   cardHoursLost,
   cardRef,
   inboxTabsModeFromParam,
+  rowEntries,
   TODAY_LIMIT,
 } from "./smart-tabs";
 
@@ -166,6 +168,22 @@ describe("helpers", () => {
     expect(parsed?.merge).toMatchObject({ pr: "#3840", url: null, reviewUrl: "https://github.com/a/b/pull/1/files", ci: "unknown", lines: 212, state: "open" });
     expect(signalDetails(sig("decision"))?.brief).toBeNull();
     expect(signalDetails(sig("decision", { extra: { brief: "nonsense" } }))?.brief).toBeNull();
+  });
+
+  it("archives one entry per card, plus each entry with no card", () => {
+    const m = buildInboxTabs(
+      [
+        sig("decision", { card: "c1", since: 3 }),
+        sig("decision", { card: "c1", since: 1 }),
+        sig("decision", { card: "c2" }),
+        item({ type: "mentioned", issue_id: null, title: "loose 1" }),
+        item({ type: "mentioned", issue_id: null, title: "loose 2" }),
+      ],
+      NOW,
+    );
+    const decisionTargets = archiveTargets(rowEntries(m.decisions));
+    expect(decisionTargets.map((e) => e.item.issue_id).sort()).toEqual(["c1", "c2"]);
+    expect(archiveTargets(m.else).map((e) => e.item.title).sort()).toEqual(["loose 1", "loose 2"]);
   });
 
   it("chooses tabs unless sections were picked", () => {
