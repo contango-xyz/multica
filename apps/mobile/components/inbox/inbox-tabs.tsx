@@ -289,17 +289,27 @@ function TodayPanel({
       refreshControl={<Refresh refreshing={refreshing} onRefresh={onRefresh} />}
     >
       {alerts.map((a) => (
-        <Pressable
+        // Swipes like every other row (contango patch 47: a "CD is red" banner had no archive).
+        <SwipeableInboxRow
           key={a.item.id}
-          accessibilityRole="button"
+          item={a.item}
           onPress={() => actions.onOpen(a.item)}
-          className="mx-4 mb-1 gap-0.5 rounded-xl bg-destructive/10 px-3 py-2.5 active:opacity-70"
+          onArchive={() => actions.onArchive([a])}
+          onMarkRead={() => actions.onMarkRead([a])}
         >
-          <Text className="text-xs font-semibold uppercase text-destructive">{t("smart.tabs.alert")}</Text>
-          <Text className="text-sm font-semibold text-destructive" numberOfLines={2}>
-            {getInboxDisplayTitle(a.item)}
-          </Text>
-        </Pressable>
+          <View className="bg-background px-4 pb-1">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => actions.onOpen(a.item)}
+              className="gap-0.5 rounded-xl bg-destructive/10 px-3 py-2.5 active:opacity-70"
+            >
+              <Text className="text-xs font-semibold uppercase text-destructive">{t("smart.tabs.alert")}</Text>
+              <Text className="text-sm font-semibold text-destructive" numberOfLines={2}>
+                {getInboxDisplayTitle(a.item)}
+              </Text>
+            </Pressable>
+          </View>
+        </SwipeableInboxRow>
       ))}
       {rows.length === 0 ? (
         <Empty icon="checkmark-circle-outline" text={t("smart.tabs.today_empty")} />

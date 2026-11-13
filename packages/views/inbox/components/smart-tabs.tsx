@@ -403,6 +403,35 @@ function TodayCard({ row, rank, onSelect, actions }: { row: TabRow; rank: number
   );
 }
 
+/**
+ * Today's red banner for an alert signal (main red: `fix-main:…`). Archives as
+ * every other row does (contango patch 47; owner 2026-11-13: a "CD is red"
+ * banner had no archive at all): hover icon, compact menu on touch, right-click.
+ */
+function AlertCard({ entry, onSelect, actions }: { entry: SmartEntry; onSelect: (item: InboxItem) => void; actions: TabArchive }) {
+  const { t } = useT("inbox");
+  const onContextMenu = useRowContextMenu(entry.item);
+  return (
+    <div
+      role="status"
+      className="group grid min-w-0 gap-1 rounded-lg bg-destructive/10 px-3 py-2.5"
+      onContextMenu={onContextMenu}
+      data-inbox-row-key={inboxRowKey(entry.item)}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 flex-1">
+          <Kind>{t(($) => $.smart.tabs.alert)}</Kind>
+        </span>
+        <RowArchive item={entry.item} onArchive={() => actions.onArchive(entry.item.id)} />
+      </div>
+      <button type="button" onClick={() => onSelect(entry.item)} className="min-w-0 break-words text-left text-body hover:underline">
+        <b className="text-destructive">{getInboxDisplayTitle(entry.item)}</b>
+        {entry.signal?.summary ? <span className="text-muted-foreground"> · {entry.signal.summary}</span> : null}
+      </button>
+    </div>
+  );
+}
+
 function TodayPanel({
   model,
   onSelect,
@@ -419,13 +448,7 @@ function TodayPanel({
   return (
     <>
       {alerts.map((a) => (
-        <div key={a.item.id} role="status" className="grid gap-1 rounded-lg bg-destructive/10 px-3 py-2.5">
-          <Kind>{t(($) => $.smart.tabs.alert)}</Kind>
-          <button type="button" onClick={() => onSelect(a.item)} className="text-left text-body hover:underline">
-            <b className="text-destructive">{getInboxDisplayTitle(a.item)}</b>
-            {a.signal?.summary ? <span className="text-muted-foreground"> · {a.signal.summary}</span> : null}
-          </button>
-        </div>
+        <AlertCard key={a.item.id} entry={a} onSelect={onSelect} actions={actions} />
       ))}
       {rows.length === 0 ? (
         <Empty>{t(($) => $.smart.tabs.today_empty)}</Empty>
@@ -917,7 +940,12 @@ export function InboxTabsView({
         aria-labelledby={`inbox-tab-${tab}`}
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
       >
-        <div className="mx-auto grid w-full max-w-3xl gap-3 p-3">
+        {/* grid-cols-1 = minmax(0, 1fr) (contango patch 47): an implicit `auto`
+            column grows to the widest row's min-content, so a long one-line
+            title (Everything else's Classic rows) pushed the column past the
+            pane and overflow-x-hidden clipped the row's right edge: the hover
+            archive, the compact menu and the time. */}
+        <div data-testid="inbox-tab-list" className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-3 p-3">
           {tab === "today" && <TodayPanel model={model} onSelect={onSelect} onGo={choose} actions={actions} />}
           {tab === "decisions" && <DecisionsPanel rows={model.decisions} onSelect={onSelect} actions={actions} />}
           {tab === "merges" && <MergesPanel model={model} onSelect={onSelect} actions={actions} />}

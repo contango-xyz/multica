@@ -838,6 +838,28 @@ Files: ours: `apps/mobile/lib/inbox-tabs{,.test}.ts`, `apps/mobile/components/in
 Rebase check: the inbox screen's smart branch; `SwipeableInboxRow` props.
 Drop when: never on its own (ours); fold into patch 43.
 
+### 47. Every inbox card archives on hover (long titles; Today's alert banner)
+
+Owner 2026-11-13: the Everything else tab's rows had no hover archive ("leave it there, I just need the buttons"),
+and a Today "CD is red" banner (`fix-main:…`, CTG-2762) had none at all ("stupid not having archive buttons on the
+cards when hover"). Two causes:
+
+- **Long titles (web/desktop):** the tab list was a CSS grid with an implicit `auto` column, which grows to its
+  widest item's min-content. Everything else's rows are Classic's (`InboxListItem`, one-line `truncate` title), so one
+  long title widened the column past the 400px list pane and the panel's `overflow-x-hidden` clipped every row's right
+  edge: the hover archive, the compact "…" menu (touch) and the time. Fix: the list grid is `grid-cols-1`
+  (`minmax(0, 1fr)`) on every tab.
+- **Today's alert banner** (alert signals, e.g. main red) was a bare link. Web: `AlertCard` has the row controls
+  (hover icon, compact menu on touch, right-click; `group`, `data-inbox-row-key`). iOS: the banner is a
+  `SwipeableInboxRow` (swipe left reveals Archive, right marks read) like every other row.
+- (Patch 46 is the parked `contango/inbox-stale-asks` draft, not on `contango/main`.)
+
+Files: `packages/views/inbox/components/smart-tabs{,.test}.tsx`, `apps/mobile/components/inbox/inbox-tabs.tsx`,
+`apps/mobile/components/inbox/inbox-tabs-archive.test.ts` (+ `apps/mobile/vitest.config.ts` include),
+`docs/contango/SMART-INBOX.md`. Tests render every card type on every tab (alert, Today card, grouped Decisions row,
+Merges approval and post-merge, Everything else) and assert the archive affordance archives that card.
+Rebase check: none beyond patches 43/45. Drop when: fold into patch 43 (web) and 45 (iOS).
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

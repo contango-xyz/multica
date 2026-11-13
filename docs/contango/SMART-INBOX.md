@@ -266,7 +266,9 @@ The owner approved a tabbed Smart inbox (mockup: five tabs). Behind its own flag
   menu; `e` archives the open card), on Today, Decisions (summary row and inside the brief), both Merges sections and
   Everything else. Archiving a row archives every inbox entry on its card. Each list's "…" menu marks all read or
   archives all of it, asking first above 3 cards. Classic's filters and bulk menu stay in the header. Nothing is
-  archived automatically.
+  archived automatically. Patch 47: Today's alert banner archives too (iOS: it swipes), and the tab list is one
+  `minmax(0, 1fr)` column: a long one-line title must truncate, never widen the list past the pane, or the row's right
+  edge (archive, menu, time) is clipped.
 - **Signal fields (optional, additive; old clients and iOS ignore them):**
   `brief` = `{situation ≤600, recommend ≤300, default ≤300, default_applies, reply_with ≤300}`;
   `merge` = `{pr ≤40, url, review_url, risk ≤300, ci: green|red|running|unknown, review ≤300, lines, files,

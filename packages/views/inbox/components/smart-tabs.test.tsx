@@ -15,15 +15,17 @@ vi.mock("../../i18n", () => ({
   }),
 }));
 vi.mock("./inbox-list-item", () => ({
+  // Mirrors the real row's controls (hover archive + compact menu; see inbox-list-item.test.tsx).
   InboxListItem: ({ item, onClick, onAction }: { item: InboxItem; onClick: () => void; onAction: () => void }) => (
-    <div>
+    <div data-inbox-row-key={`else:${item.id}`}>
+      <span data-testid="row-menu" />
       <button type="button" data-testid="else-row" onClick={onClick}>{item.title}</button>
       <button type="button" aria-label="list.archive_tooltip" onClick={onAction} />
     </div>
   ),
 }));
 // The compact row menu is Classic's (inbox-row-menu); its actions come from the page's provider.
-vi.mock("./inbox-row-menu", () => ({ InboxRowMenu: () => null }));
+vi.mock("./inbox-row-menu", () => ({ InboxRowMenu: () => <span data-testid="row-menu" /> }));
 vi.mock("./signal-reply-button", () => ({
   SignalReplyButton: ({ reply }: { reply: { label: string } }) => <button type="button">{reply.label}</button>,
 }));
@@ -161,6 +163,22 @@ describe("InboxTabsView", () => {
     expect(screen.getByRole("button", { name: /review_on_github/ })).toHaveAttribute("href", "https://github.com/o/r/pull/3824/files");
   });
 
+  // Contango patch 47: the list grid's one column must be minmax(0, 1fr). An
+  // implicit `auto` column grew to Everything else's longest one-line title, so
+  // overflow-x-hidden clipped the rows' right edge (hover archive, compact menu,
+  // time). jsdom has no layout: this pins the class that prevents it.
+  it("every tab's list is one shrinkable column, so long rows keep their archive", () => {
+    renderTabs([
+      signal("decision", {}, { title: "Decide" }),
+      signal("fyi", {}, { severity: "info", title: "x".repeat(400) }),
+    ]);
+    for (const name of [/today/, /decisions/, /merges/, /else/]) {
+      fireEvent.click(tab(name));
+      expect(screen.getByTestId("inbox-tab-list")).toHaveClass("grid", "grid-cols-1");
+    }
+    expect(within(screen.getByRole("tabpanel")).getByRole("button", { name: "list.archive_tooltip" })).toBeInTheDocument();
+  });
+
   it("Everything else lists the rest and remembers the tab", () => {
     renderTabs([signal("fyi", {}, { severity: "info", title: "FYI one" })]);
     fireEvent.click(tab(/else/));
@@ -217,6 +235,52 @@ describe("InboxTabsView archive (Smart's row and section archive on every tab)",
     fireEvent.click(archiveIn(rowOf("Approve merge #1")));
     fireEvent.click(archiveIn(rowOf("Merged #2")));
     expect(archivedIds()).toEqual(["m1", "m2"]);
+  });
+
+  // Owner 2026-11-13 (contango patch 47): "stupid not having archive buttons on the cards when hover". A Today
+  // "CD is red" alert banner (fix-main:…) had none. Every card type, every tab: the hover icon (revealed on
+  // hover/focus only where hover exists), the compact menu for touch, and a click archives that card.
+  it("every card type on every tab has the hover archive and the touch menu", () => {
+    renderTabs([
+      signal("alert", { key: "fix-main:core:main" }, { id: "al", issue_id: "c-al", title: "CD is red" }),
+      signal("decision", {}, { id: "td", issue_id: "c-td", title: "Today ask" }),
+      signal("decision", {}, { id: "g1", issue_id: "c-g", created_at: hoursAgo(3), title: "Grouped older" }),
+      signal("decision", {}, { id: "g2", issue_id: "c-g", title: "Grouped newer" }),
+      signal("merge", { merge: { pr: "#1", state: "open" } }, { id: "mg", issue_id: "c-mg", title: "Approve merge #1" }),
+      signal("merge", { key: "post-merge:CTG-9:core#2", merge: { pr: "#2", post_merge: true } }, { id: "pm", issue_id: "c-pm", title: "Merged #2" }),
+      signal("fyi", {}, { id: "fy", issue_id: "c-fy", severity: "info", title: "FYI" }),
+    ]);
+    const expectArchivable = (row: HTMLElement, id: string) => {
+      const btn = archiveIn(row);
+      expect(btn.className).toContain("[@media(hover:hover)]:group-hover:inline-flex");
+      expect(btn.closest(".group")).not.toBeNull();
+      expect(within(row).getByTestId("row-menu")).toBeInTheDocument();
+      archive.onArchive.mockClear();
+      fireEvent.click(btn);
+      expect(archivedIds()).toEqual([id]);
+    };
+    // Today: the alert banner and the ranked cards.
+    expectArchivable(rowOf("CD is red"), "al");
+    expectArchivable(rowOf("Today ask"), "td");
+    expectArchivable(rowOf("Grouped newer"), "g2");
+    // Decisions, including a grouped (folded) row.
+    fireEvent.click(tab(/decisions/));
+    expectArchivable(rowOf("Today ask"), "td");
+    expectArchivable(rowOf("Grouped newer"), "g2");
+    // Merges: approval and merged-without-you.
+    fireEvent.click(tab(/merges/));
+    expectArchivable(rowOf("Approve merge #1"), "mg");
+    expectArchivable(rowOf("Merged #2"), "pm");
+    // Everything else: Classic's rows (the alert is listed here too).
+    fireEvent.click(tab(/else/));
+    const panel = screen.getByRole("tabpanel");
+    for (const [title, id] of [["FYI", "fy"], ["CD is red", "al"]] as const) {
+      const row = within(panel).getByText(title).closest<HTMLElement>("[data-inbox-row-key]")!;
+      archive.onArchive.mockClear();
+      fireEvent.click(archiveIn(row));
+      expect(within(row).getByTestId("row-menu")).toBeInTheDocument();
+      expect(archivedIds()).toEqual([id]);
+    }
   });
 
   it("Everything else: rows keep Classic's archive", () => {
