@@ -434,3 +434,64 @@ func mustDuration(s string) time.Duration {
 	}
 	return d
 }
+
+// contango patch 46: archive:false ends a signal in place. It stays in the
+// inbox (the reader archives), the key is free for a new ask, related entries
+// are untouched, and the unread summary no longer counts it.
+func TestResolveInboxSignalWithoutArchive(t *testing.T) {
+	f := newSignalFixture(t)
+	issue := dbfx.Issue(t, "Ended ask", testutil.Cols{"workspace_id": f.workspaceID})
+	mention := dbfx.Insert(t, "inbox_item", testutil.Cols{
+		"workspace_id": f.workspaceID, "recipient_type": "member", "recipient_id": f.recipientID,
+		"type": "mentioned", "severity": "info", "issue_id": issue, "title": "Ended ask", "read": true,
+		"created_at": time.Now().Add(-time.Hour),
+	})
+	rec := recordInboxEvents(t, f.recipientID)
+	var raised signalUpsertResponse
+	testutil.Call(t, signalHandler(testHandler.UpsertInboxSignal),
+		signalRequest("/api/inbox/signals", f.botUserID, f.workspaceID, f.body(map[string]any{"key": "ended", "issue_id": issue, "push": false}))).
+		Want(http.StatusCreated).JSON(&raised)
+	unread := func() int {
+		rows, err := testHandler.Queries.CountUnreadInboxByWorkspace(t.Context(), parseUUID(f.recipientID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range rows {
+			if uuidToString(r.WorkspaceID) == f.workspaceID {
+				return int(r.Count)
+			}
+		}
+		return 0
+	}
+	if got := unread(); got != 1 {
+		t.Fatalf("unread before = %d, want 1", got)
+	}
+
+	resolve := signalHandler(testHandler.ResolveInboxSignal)
+	testutil.Call(t, resolve, signalRequest("/api/inbox/signals/resolve", f.botUserID, f.workspaceID,
+		map[string]any{"recipient_member_id": f.recipientID, "key": "ended", "archive": false, "archive_related": true})).
+		Want(http.StatusBadRequest)
+	archivedBefore := rec.get(protocol.EventInboxArchived)
+	testutil.Call(t, resolve, signalRequest("/api/inbox/signals/resolve", f.botUserID, f.workspaceID,
+		map[string]any{"recipient_member_id": f.recipientID, "key": "ended", "archive": false})).
+		Want(http.StatusOK)
+	if n := dbfx.Count(t, `SELECT count(*) FROM inbox_item WHERE id = $1 AND NOT archived AND details ? 'resolved_at'`, raised.Item.ID); n != 1 {
+		t.Fatal("ended signal should stay unarchived with resolved_at")
+	}
+	if n := dbfx.Count(t, `SELECT count(*) FROM inbox_item WHERE id = $1 AND archived`, mention); n != 0 {
+		t.Fatal("ending a signal archived a related entry")
+	}
+	if rec.get(protocol.EventInboxArchived) != archivedBefore || rec.get(protocol.EventInboxUpdated) == 0 {
+		t.Fatalf("events: archived %d→%d, updated %d", archivedBefore, rec.get(protocol.EventInboxArchived), rec.get(protocol.EventInboxUpdated))
+	}
+	if got := unread(); got != 0 {
+		t.Fatalf("unread after = %d, want 0 (an ended signal is hidden)", got)
+	}
+	// Ending again is a no-op; the key takes a new ask.
+	testutil.Call(t, resolve, signalRequest("/api/inbox/signals/resolve", f.botUserID, f.workspaceID,
+		map[string]any{"recipient_member_id": f.recipientID, "key": "ended", "archive": false})).
+		Want(http.StatusNoContent)
+	testutil.Call(t, signalHandler(testHandler.UpsertInboxSignal),
+		signalRequest("/api/inbox/signals", f.botUserID, f.workspaceID, f.body(map[string]any{"key": "ended", "issue_id": issue, "push": false}))).
+		Want(http.StatusCreated)
+}

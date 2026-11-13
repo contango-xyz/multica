@@ -113,7 +113,7 @@ import {
   resolveDetailItem,
 } from "./inbox-display";
 import { AutopilotQuotaNotice } from "./autopilot-quota-notice";
-import { buildSmartSections, type SmartEntry } from "@multica/core/inbox/smart";
+import { buildSmartSections, isEndedSignal, type SmartEntry } from "@multica/core/inbox/smart";
 import {
   filterSmartSections,
   smartInboxFilterCount,
@@ -192,7 +192,18 @@ export function InboxPage({
     ...inboxListOptions(wsId), enabled: !isArchivedView,
   });
   // Smart: one row per card; a card's entries fold into its action signal.
-  const smartRows = useMemo(() => (smart ? buildSmartRows(rawItems) : null), [rawItems, smart]);
+  // An ended ask on the open card stays until the reader moves on.
+  const keepEnded = useMemo(
+    () =>
+      smart && selectedKey && rawItems.some((i) => isEndedSignal(i) && (i.issue_id === selectedKey || i.id === selectedKey))
+        ? selectedKey
+        : null,
+    [smart, selectedKey, rawItems],
+  );
+  const smartRows = useMemo(
+    () => (smart ? buildSmartRows(rawItems, keepEnded) : null),
+    [rawItems, smart, keepEnded],
+  );
   const items = useMemo(
     () => smartRows?.items ?? deduplicateInboxItems(rawItems),
     [rawItems, smartRows],

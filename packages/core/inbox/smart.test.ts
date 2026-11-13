@@ -5,6 +5,7 @@ import {
   ageTint,
   buildSmartSections,
   doThisFirst,
+  isEndedSignal,
   smartCounters,
   squadHealth,
   rankInput,
@@ -272,5 +273,17 @@ describe("smartInboxModeFromParam", () => {
     expect(smartInboxModeFromParam("1", "classic")).toBe("classic");
     expect(smartInboxModeFromParam(null, "classic")).toBe("classic");
     expect(smartInboxModeFromParam("0", "smart")).toBe("classic");
+  });
+});
+
+describe("isEndedSignal", () => {
+  it("is true only for a signal whose details carry resolved_at", () => {
+    const base = { type: "signal" as const, details: { key: "k" } };
+    expect(isEndedSignal(base)).toBe(false);
+    expect(isEndedSignal({ ...base, details: { key: "k", resolved_at: "2026-11-12T09:00:00Z" } })).toBe(true);
+    expect(isEndedSignal({ ...base, details: { key: "k", resolved_at: "" } })).toBe(false);
+    expect(isEndedSignal({ ...base, details: { key: "k", resolved_at: null } })).toBe(false);
+    expect(isEndedSignal({ type: "mentioned", details: { resolved_at: "2026-11-12T09:00:00Z" } })).toBe(false);
+    expect(isEndedSignal({ type: "signal", details: null })).toBe(false);
   });
 });

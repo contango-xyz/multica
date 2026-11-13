@@ -1,6 +1,6 @@
 // Smart inbox rows (contango, docs/contango/SMART-INBOX.md): one row per card.
 //
-// A card with an unresolved action signal (any group but fyi) shows ONE row:
+// A card with a live action signal (any group but fyi) shows ONE row:
 // the signal, with the card's other entries (the mention that tagged you,
 // comments, status changes) folded into it. The row keeps the signal's
 // title, summary and rank, shows the sender of the latest mention, anchors
@@ -8,7 +8,7 @@
 // without an action signal are grouped per issue exactly as in Classic.
 
 import { deduplicateInboxItems } from "./queries";
-import { signalDetails } from "./smart";
+import { isEndedSignal, signalDetails } from "./smart";
 import type { InboxItem } from "../types";
 
 const ADDRESSED = new Set<InboxItem["type"]>(["mentioned", "review_requested"]);
@@ -43,8 +43,17 @@ function foldInto(signal: InboxItem, entries: InboxItem[]): InboxItem {
   };
 }
 
-export function buildSmartRows(raw: InboxItem[]): SmartRows {
-  const active = raw.filter((i) => !i.archived);
+/**
+ * `keep`: the open row's key (issue id, else entry id). An ended signal on it
+ * stays listed until the reader moves on, so an ask that ends while they are
+ * answering it does not vanish under them (owner 2026-11-11, CTG-2629).
+ */
+export function buildSmartRows(raw: InboxItem[], keep?: string | null): SmartRows {
+  // Ended signals are hidden (never archived), and the card's mentions then
+  // list as they do in Classic instead of folding into a hidden row.
+  const active = raw.filter(
+    (i) => !i.archived && (!isEndedSignal(i) || (!!keep && (i.issue_id === keep || i.id === keep))),
+  );
   const signals = active.filter((i) => i.type === "signal");
   // The card's host row: its newest action signal.
   const host = new Map<string, InboxItem>();

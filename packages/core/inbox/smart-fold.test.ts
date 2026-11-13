@@ -99,3 +99,37 @@ describe("dashboard counts cards", () => {
     expect(doThisFirst(sections).map((e) => e.item.issue_id)).toEqual(["card-a", "card-b"]);
   });
 });
+
+describe("buildSmartRows: ended signals (contango patch 46)", () => {
+  const ended = (id: string, group: string, over: Partial<Omit<InboxItem, "details">> = {}) => {
+    const s = signal(id, group, over);
+    return { ...s, details: { ...(s.details ?? {}), resolved_at: "2026-11-12T09:00:00Z" } } as InboxItem;
+  };
+  // CTG-2176 (2026-11-13): the merge ask for #3573 stayed live after the PR
+  // merged and the ask was answered; the card itself is Blocked on others.
+  const raw = () => [
+    ended("merge-3573", "merge", { issue_id: "ctg-2176", issue_status: "blocked", read: false, created_at: hoursAgo(48) }),
+    item({ id: "mention-a", type: "mentioned", issue_id: "ctg-2176", created_at: hoursAgo(48.1), details: { comment_id: "c-a" } }),
+    item({ id: "mention-b", type: "mentioned", issue_id: "ctg-2176", created_at: hoursAgo(66), details: { comment_id: "c-b" } }),
+    signal("live-ask", "decision", { issue_id: "ctg-7" }),
+  ];
+
+  it("hides an ended signal and lists the card's mentions as Classic does", () => {
+    const { items, folded } = buildSmartRows(raw());
+    expect(items.map((i) => i.id).sort()).toEqual(["live-ask", "mention-a"]);
+    expect(folded.size).toBe(0);
+    const sections = buildSmartSections(items, NOW);
+    expect(sections.find((s) => s.id === "merge")).toBeUndefined();
+    expect(doThisFirst(sections).map((e) => e.item.id)).toEqual(["live-ask"]);
+  });
+
+  it("keeps an ended signal on the open card until the reader moves on", () => {
+    expect(buildSmartRows(raw(), "ctg-2176").items.map((i) => i.id).sort()).toEqual(["live-ask", "merge-3573"]);
+    expect(buildSmartRows(raw(), "ctg-7").items.map((i) => i.id).sort()).toEqual(["live-ask", "mention-a"]);
+  });
+
+  it("an unended signal with no resolved_at is unchanged", () => {
+    const live = signal("ask", "merge", { issue_id: "ctg-1" });
+    expect(buildSmartRows([live]).items.map((i) => i.id)).toEqual(["ask"]);
+  });
+});

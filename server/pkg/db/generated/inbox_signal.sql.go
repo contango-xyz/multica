@@ -147,13 +147,13 @@ func (q *Queries) InsertInboxSignal(ctx context.Context, arg InsertInboxSignalPa
 
 const resolveInboxSignal = `-- name: ResolveInboxSignal :one
 UPDATE inbox_item SET
-    archived = true,
+    archived = CASE WHEN $3::bool THEN true ELSE archived END,
     details = details || jsonb_build_object('resolved_at', now())
 WHERE workspace_id = $1
   AND recipient_type = 'member'
   AND recipient_id = $2
   AND type = 'signal'
-  AND details->>'key' = $3::text
+  AND details->>'key' = $4::text
   AND (details->>'resolved_at') IS NULL
 RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details, section
 `
@@ -161,11 +161,20 @@ RETURNING id, workspace_id, recipient_type, recipient_id, type, severity, issue_
 type ResolveInboxSignalParams struct {
 	WorkspaceID pgtype.UUID `json:"workspace_id"`
 	RecipientID pgtype.UUID `json:"recipient_id"`
+	Archive     bool        `json:"archive"`
 	SignalKey   string      `json:"signal_key"`
 }
 
+// archive=false ends the signal without archiving it (contango patch 46): the
+// entry stays in the recipient's inbox, and clients hide an ended signal on
+// screen. The owner turned auto-archiving off on 2026-11-11.
 func (q *Queries) ResolveInboxSignal(ctx context.Context, arg ResolveInboxSignalParams) (InboxItem, error) {
-	row := q.db.QueryRow(ctx, resolveInboxSignal, arg.WorkspaceID, arg.RecipientID, arg.SignalKey)
+	row := q.db.QueryRow(ctx, resolveInboxSignal,
+		arg.WorkspaceID,
+		arg.RecipientID,
+		arg.Archive,
+		arg.SignalKey,
+	)
 	var i InboxItem
 	err := row.Scan(
 		&i.ID,

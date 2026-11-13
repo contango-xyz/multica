@@ -46,8 +46,11 @@ WHERE id = $1
 RETURNING *;
 
 -- name: ResolveInboxSignal :one
+-- archive=false ends the signal without archiving it (contango patch 46): the
+-- entry stays in the recipient's inbox, and clients hide an ended signal on
+-- screen. The owner turned auto-archiving off on 2026-11-11.
 UPDATE inbox_item SET
-    archived = true,
+    archived = CASE WHEN sqlc.arg(archive)::bool THEN true ELSE archived END,
     details = details || jsonb_build_object('resolved_at', now())
 WHERE workspace_id = $1
   AND recipient_type = 'member'

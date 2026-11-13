@@ -11,6 +11,7 @@
 import type { InboxItem } from "@multica/core/types";
 import {
   buildSmartSections,
+  isEndedSignal,
   signalDetails,
   type SmartEntry,
   type SmartSectionId,
@@ -50,7 +51,9 @@ function foldInto(signal: InboxItem, entries: InboxItem[]): InboxItem {
  * row of the issue.
  */
 export function buildSmartRows(raw: InboxItem[]): InboxItem[] {
-  const active = raw.filter((i) => !i.archived);
+  // An ended signal (contango patch 46) is hidden, never archived; the card's
+  // mentions then list as in Classic.
+  const active = raw.filter((i) => !i.archived && !isEndedSignal(i));
   const signals = active.filter((i) => i.type === "signal");
   const host = new Map<string, InboxItem>();
   for (const s of signals) {

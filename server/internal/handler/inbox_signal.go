@@ -195,6 +195,10 @@ type resolveSignalRequest struct {
 	// ArchiveRelated also archives the recipient's other entries on the
 	// signal's issue created up to now (the mentions that carried the ask).
 	ArchiveRelated bool `json:"archive_related"`
+	// Archive false (contango patch 46) ends the signal (details.resolved_at)
+	// but leaves it, and every related entry, in the inbox; clients hide an
+	// ended signal on screen. Absent means true, as before.
+	Archive *bool `json:"archive"`
 }
 
 func runeLen(s string) int { return utf8.RuneCountInString(s) }
@@ -537,8 +541,9 @@ func (h *Handler) signalPushAllowed(ctx context.Context, workspaceID string, use
 	return signalPushEnabled(prefs, group)
 }
 
-// ResolveInboxSignal handles POST /api/inbox/signals/resolve: archive the
-// live signal for the key, without a push. Unknown keys answer 204.
+// ResolveInboxSignal handles POST /api/inbox/signals/resolve: end the live
+// signal for the key (details.resolved_at) and archive it, or with
+// archive:false leave it in the inbox, without a push. Unknown keys answer 204.
 func (h *Handler) ResolveInboxSignal(w http.ResponseWriter, r *http.Request) {
 	var req resolveSignalRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req); err != nil {
@@ -563,8 +568,13 @@ func (h *Handler) ResolveInboxSignal(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	archive := req.Archive == nil || *req.Archive
+	if !archive && req.ArchiveRelated {
+		writeError(w, http.StatusBadRequest, "archive_related needs archive")
+		return
+	}
 	item, err := h.Queries.ResolveInboxSignal(r.Context(), db.ResolveInboxSignalParams{
-		WorkspaceID: wsUUID, RecipientID: recipient.ID, SignalKey: req.Key,
+		WorkspaceID: wsUUID, RecipientID: recipient.ID, SignalKey: req.Key, Archive: archive,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		w.WriteHeader(http.StatusNoContent)
@@ -573,6 +583,15 @@ func (h *Handler) ResolveInboxSignal(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Warn("resolve inbox signal failed", append(logger.RequestAttrs(r), "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to resolve signal")
+		return
+	}
+	if !archive {
+		// Ended in place: clients refetch and hide it.
+		resp := h.enrichInboxResponse(r.Context(), inboxToResponse(item), item.IssueID)
+		h.publish(protocol.EventInboxUpdated, workspaceID, "member", requestUserID(r), map[string]any{
+			"item_id": resp.ID, "recipient_id": uuidToString(item.RecipientID), "item": inboxResponseMap(resp),
+		})
+		writeJSON(w, http.StatusOK, map[string]any{"item": resp, "archived_related": 0})
 		return
 	}
 	h.publish(protocol.EventInboxArchived, workspaceID, "member", requestUserID(r), map[string]any{

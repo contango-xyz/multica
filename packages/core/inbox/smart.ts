@@ -173,6 +173,18 @@ const SignalDetailsSchema = z.object({
   merge: SignalMergeSchema.nullish().catch(null).transform((v) => v ?? null),
 });
 
+/**
+ * A signal its feeder has ended (details.resolved_at) but left in the inbox
+ * (contango patch 46): the ask was answered, withdrawn, merged or its card
+ * closed. Auto-archiving is off (owner 2026-11-11), so the entry stays stored
+ * and the Smart views hide it on screen; archiving stays the reader's call.
+ */
+export function isEndedSignal(item: Pick<InboxItem, "type" | "details">): boolean {
+  if (item.type !== "signal") return false;
+  const at = (item.details as Record<string, unknown> | null | undefined)?.resolved_at;
+  return typeof at === "string" ? at.trim() !== "" : at != null && at !== false;
+}
+
 /** Parsed details of a `signal` entry; null for any other entry type. */
 export function signalDetails(item: InboxItem): SignalDetails | null {
   if (item.type !== "signal") return null;

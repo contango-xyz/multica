@@ -172,3 +172,14 @@ describe("signalReplyError", () => {
     expect(signalReplyError(undefined)).toEqual({ key: "smart.reply.failed" });
   });
 });
+
+describe("buildSmartRows: ended signals (contango patch 46)", () => {
+  it("hides an ended signal; the card's mention lists on its own", () => {
+    const ended = signal("merge-3573", "merge", {
+      issue_id: "ctg-2176",
+      details: { key: "merge-3573", group: "merge", summary: "s", resolved_at: "2026-11-12T09:00:00Z" } as unknown as Record<string, string>,
+    });
+    const mention = item({ id: "mention", type: "mentioned", issue_id: "ctg-2176" });
+    expect(buildSmartRows([ended, mention]).map((i) => i.id)).toEqual(["mention"]);
+  });
+});

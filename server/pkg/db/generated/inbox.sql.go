@@ -216,6 +216,7 @@ FROM (
     WHERE i.recipient_type = 'member'
       AND i.recipient_id = $1
       AND i.archived = false
+      AND NOT (i.type = 'signal' AND i.details ? 'resolved_at')
     ORDER BY i.workspace_id, COALESCE(i.issue_id, i.id), i.created_at DESC
 ) newest
 WHERE newest.read = false
@@ -237,7 +238,8 @@ type CountUnreadInboxByWorkspaceRow struct {
 // (MUL-3695). Items without an issue group on their own id. The
 // member join keeps counts scoped to workspaces the user still belongs to,
 // so a stale item left behind in a workspace the user has since left cannot
-// light the dot.
+// light the dot. An ended signal (contango patch 46: resolved, left in the
+// inbox) is hidden on screen, so it does not count either.
 func (q *Queries) CountUnreadInboxByWorkspace(ctx context.Context, recipientID pgtype.UUID) ([]CountUnreadInboxByWorkspaceRow, error) {
 	rows, err := q.db.Query(ctx, countUnreadInboxByWorkspace, recipientID)
 	if err != nil {
