@@ -120,6 +120,67 @@
       "failed": "無法發布回覆",
       "gone": "此請求已不在你的收件匣中。",
       "changed": "此請求已變更。請下拉重新整理後再試。"
+    },
+    "tabs": {
+      "short": {
+        "today": "今天",
+        "decisions": "決策",
+        "merges": "合併",
+        "squad": "團隊",
+        "else": "其他"
+      },
+      "today_empty": "沒有等你處理的事項",
+      "today_more_other": "還有 {{count}} 個請求在",
+      "alert": "團隊告警",
+      "frees_other": "可放行 {{count}} 張卡片",
+      "asked": "提出於 {{time}}",
+      "open_brief": "查看簡報",
+      "approve_on_github": "在 GitHub 上批准",
+      "review_on_github": "在 GitHub 上審查",
+      "decisions_empty": "沒有等你做的決策",
+      "folded_other": "已合併 {{count}} 個請求",
+      "going": "現狀",
+      "recommend": "我們的建議",
+      "if_silent": "如果你不回覆",
+      "nothing_happens": "什么都不會發生。",
+      "merges_empty": "沒有需要你批准的 PR",
+      "merged_without_you": "未經你批准已合併 · 有空時審查",
+      "why_human": "為什么需要你",
+      "agent_review": "智能體審查",
+      "size": "規模",
+      "size_value": "{{lines}} 行 · {{files}} 個文件",
+      "merged_at": "合併於 {{time}}",
+      "ci_label": "CI",
+      "ci": {
+        "green": "CI 通過",
+        "red": "CI 失敗",
+        "running": "CI 運行中",
+        "unknown": "CI 未知"
+      },
+      "squad_sub": "最近 {{hours}} 小時，來自 {{time}} 的容量報告。這裡不需要你做任何事。",
+      "squad_empty": "還沒有團隊數據，會在 2 分鐘內随下一次同步到達。",
+      "where_time_goes": "卡片時間花在哪裡",
+      "buckets": {
+        "people": "等待某人",
+        "blocked": "被其他卡片阻塞",
+        "machines": "等待 CI 或工具",
+        "working": "智能體工作中",
+        "nobody": "無人處理",
+        "subs": "等待訂閱額度",
+        "seats": "等待席位"
+      },
+      "who_holds": "誰手上卡住的卡片最多",
+      "hours_value": "{{hours}} 小時",
+      "biggest_holds": "最大的五個單項阻塞",
+      "hold_line_other": "等待 {{human}} · {{hours}} 卡片小時 · 後面有 {{count}} 張卡片",
+      "inbox_load": "每人當前收件箱負載",
+      "load_line": "{{decisions}} 決策 · {{merges}} 合併 · {{other}} 其他",
+      "else_empty": "沒有其他內容",
+      "mark_tab_read": "將{{tab}}標為已讀",
+      "archive_tab_other": "歸檔{{tab}}（{{count}} 張卡片）",
+      "confirm_archive_title_other": "歸檔 {{count}} 張卡片？",
+      "confirm_archive_description": "這些卡片上的所有收件箱條目都會移到已歸檔，可在那裡恢復。",
+      "confirm_archive": "歸檔"
     }
   }
 }

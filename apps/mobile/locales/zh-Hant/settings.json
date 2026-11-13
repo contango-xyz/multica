@@ -83,5 +83,10 @@
     "system_description": "帳號變更、安全提醒和產品更新。"
   },
   "groups.assignments_description": "任務分配給我或取消分配給我時。",
-  "groups.mentions_description": "有人用 @ 提到你時，包括 @all 和 @squad。"
+  "groups.mentions_description": "有人用 @ 提到你時，包括 @all 和 @squad。",
+  "inbox": {
+    "title": "收件箱",
+    "tabs": "分標籤收件箱",
+    "tabs_off_hint": "關閉後顯示分組視圖。"
+  }
 }

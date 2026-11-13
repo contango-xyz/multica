@@ -81,5 +81,10 @@
     "system": "System",
     "system_notifications": "System notifications",
     "system_description": "Account changes, security alerts, product updates."
+  },
+  "inbox": {
+    "title": "Inbox",
+    "tabs": "Tabbed inbox",
+    "tabs_off_hint": "Off: the sections view."
   }
 }

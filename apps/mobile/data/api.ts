@@ -143,6 +143,11 @@ import {
   WorkspaceListSchema,
 } from "./schemas";
 import type { ZodType } from "zod";
+import {
+  EMPTY_INBOX_SQUAD,
+  InboxSquadSchema,
+  type InboxSquad,
+} from "@multica/core/inbox/squad";
 import { getCurrentSlug } from "./workspace-store";
 import { parseWithFallback } from "@/lib/parse-response";
 import { createRequestId } from "@/lib/request-id";
@@ -535,6 +540,19 @@ class ApiClient {
       EMPTY_INBOX_UNREAD_SUMMARY,
       { endpoint: "getInboxUnreadSummary" },
     );
+  }
+
+  /**
+   * Inbox tabs' Squad screen (contango patch 43; mobile patch 45): the ops
+   * feeder's capacity snapshot plus the inbox load per person. Core's pure
+   * schema; 404 for users without the tabs flag (the screen shows its empty
+   * state).
+   */
+  async getInboxSquad(opts?: { signal?: AbortSignal }): Promise<InboxSquad> {
+    return this.fetchValidated("/api/inbox/squad", InboxSquadSchema, EMPTY_INBOX_SQUAD, {
+      signal: opts?.signal,
+      endpoint: "getInboxSquad",
+    });
   }
 
   async markInboxRead(id: string): Promise<InboxItem> {

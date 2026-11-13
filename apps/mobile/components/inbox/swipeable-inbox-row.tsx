@@ -26,8 +26,12 @@
  *     from the FlatList (driven by the optimistic mutation flipping
  *     `archived: true`, which the parent's `deduplicateInboxItems` filters
  *     out) doesn't race the spring close.
+ *   - Swipe right to mark read (inbox tabs, contango patch 45; opt-in via
+ *     `onMarkRead`): not destructive, so it fires when the row is released
+ *     open past the threshold (Mail's swipe-to-read), then springs closed.
+ *   - `children` replaces the classic InboxRow (the tabs' cards and rows).
  */
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   type SharedValue,
@@ -35,6 +39,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import ReanimatedSwipeable, {
+  SwipeDirection,
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Ionicons } from "@expo/vector-icons";
@@ -52,9 +57,13 @@ interface Props {
   /** Forwarded to InboxRow: smart inbox section row. */
   inSmartSection?: boolean;
   onArchive: () => void;
+  /** Swipe right marks read (inbox tabs). Without it the row has no left action. */
+  onMarkRead?: () => void;
+  /** Row content instead of the classic InboxRow. */
+  children?: ReactNode;
 }
 
-export function SwipeableInboxRow({ item, onPress, onArchive, inSmartSection }: Props) {
+export function SwipeableInboxRow({ item, onPress, onArchive, onMarkRead, inSmartSection, children }: Props) {
   const ref = useRef<SwipeableMethods>(null);
 
   const fireArchive = () => {
@@ -69,11 +78,22 @@ export function SwipeableInboxRow({ item, onPress, onArchive, inSmartSection }: 
       ref={ref}
       friction={2}
       rightThreshold={ACTION_WIDTH}
+      leftThreshold={ACTION_WIDTH}
       renderRightActions={(_progress, drag) => (
         <ArchiveAction onPress={fireArchive} drag={drag} />
       )}
+      renderLeftActions={
+        onMarkRead ? (_progress, drag) => <ReadAction drag={drag} /> : undefined
+      }
+      onSwipeableOpen={(direction) => {
+        // RIGHT = the row moved right, revealing the left (read) action.
+        if (direction === SwipeDirection.RIGHT && onMarkRead) {
+          ref.current?.close();
+          onMarkRead();
+        }
+      }}
     >
-      <InboxRow item={item} onPress={onPress} inSmartSection={inSmartSection} />
+      {children ?? <InboxRow item={item} onPress={onPress} inSmartSection={inSmartSection} />}
     </ReanimatedSwipeable>
   );
 }
@@ -111,6 +131,33 @@ function ArchiveAction({
           <Text className="text-xs text-white">{t("actions.archive")}</Text>
         </View>
       </Pressable>
+    </Animated.View>
+  );
+}
+
+function ReadAction({ drag }: { drag: SharedValue<number> }) {
+  const { t } = useT("inbox");
+  useAnimatedReaction(
+    () => drag.value >= ACTION_WIDTH,
+    (crossed, prev) => {
+      if (crossed && !prev) {
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+      }
+    },
+    [],
+  );
+
+  return (
+    <Animated.View style={{ width: ACTION_WIDTH }}>
+      <View
+        accessibilityLabel={t("actions.mark_read")}
+        className="flex-1 items-center justify-center bg-brand"
+      >
+        <View className="items-center gap-0.5">
+          <Ionicons name="mail-open-outline" size={20} color="white" />
+          <Text className="text-xs text-white">{t("actions.mark_read")}</Text>
+        </View>
+      </View>
     </Animated.View>
   );
 }

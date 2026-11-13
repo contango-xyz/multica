@@ -16,6 +16,8 @@ export const inboxKeys = {
   // counts for every workspace the user belongs to. Same key shape as web
   // (packages/core/inbox/queries.ts) so the mental model stays shared.
   unreadSummary: () => ["inbox", "unread-summary"] as const,
+  // Inbox tabs' Squad screen (contango patch 45); same key as web's.
+  squad: (wsId: string | null) => [...inboxKeys.all(wsId), "squad"] as const,
 };
 
 export const inboxListOptions = (wsId: string | null) =>
@@ -36,4 +38,18 @@ export const inboxUnreadSummaryOptions = (wsId: string | null) =>
     queryKey: inboxKeys.unreadSummary(),
     queryFn: ({ signal }) => api.getInboxUnreadSummary({ signal }),
     enabled: !!wsId,
+  });
+
+/**
+ * Inbox tabs' Squad screen (contango patch 45): read-only, refreshed every
+ * 2 minutes (the feeder's pace) while the tab is mounted, and by pull to
+ * refresh. Only queried by tabs-flagged users (others get 404).
+ */
+export const inboxSquadOptions = (wsId: string | null, enabled = true) =>
+  queryOptions({
+    queryKey: inboxKeys.squad(wsId),
+    queryFn: ({ signal }) => api.getInboxSquad({ signal }),
+    enabled: !!wsId && enabled,
+    refetchInterval: 120_000,
+    retry: false,
   });

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActionSheetIOS,
   Alert,
@@ -36,6 +36,37 @@ import {
   getInboxNavigationTarget,
 } from "@/lib/inbox-display";
 import { buildSmartList } from "@/lib/smart-inbox";
+import {
+  ARCHIVE_CONFIRM_OVER,
+  archiveIds,
+  buildMobileInboxTabs,
+  unreadIds,
+  type InboxTab,
+  type InboxTabsModel,
+} from "@/lib/inbox-tabs";
+import { useInboxTabsStore } from "@/data/inbox-tabs-store";
+import {
+  InboxTabPanel,
+  InboxTabStrip,
+  type TabActions,
+} from "@/components/inbox/inbox-tabs";
+import type { SmartEntry } from "@multica/core/inbox/smart";
+
+/** The entries a tab's "…" actions act on (Squad has none). */
+function tabEntries(model: InboxTabsModel, tab: InboxTab): SmartEntry[] {
+  switch (tab) {
+    case "today":
+      return [...model.today.alerts, ...model.today.rows.flatMap((r) => r.entries)];
+    case "decisions":
+      return model.decisions.flatMap((r) => r.entries);
+    case "merges":
+      return [...model.merges.approval, ...model.merges.postMerge].flatMap((r) => r.entries);
+    case "else":
+      return model.else;
+    case "squad":
+      return [];
+  }
+}
 
 export default function Inbox() {
   const { t } = useT("inbox");
@@ -56,9 +87,22 @@ export default function Inbox() {
   // Classic toggle. Ranked as of the list's last update (fetch, focus,
   // realtime, local write), not every minute like web.
   const smart = useAuthStore((s) => s.user?.smart_inbox === true);
+  // Inbox tabs (contango patch 45): the server's inbox_tabs flag (needs
+  // smart_inbox too, as on web) plus the device's Settings > Inbox choice.
+  // Today is the home screen: the inbox always opens on it.
+  const tabsFlag = useAuthStore((s) => s.user?.inbox_tabs === true);
+  const tabsMode = useInboxTabsStore((s) => s.mode);
+  const hydrateTabsMode = useInboxTabsStore((s) => s.hydrate);
+  useEffect(() => hydrateTabsMode(), [hydrateTabsMode]);
+  const tabs = smart && tabsFlag && tabsMode === "tabs";
+  const [tab, setTab] = useState<InboxTab>("today");
   const sections = useMemo(
-    () => (smart ? buildSmartList(rawItems ?? [], dataUpdatedAt || 0) : []),
-    [smart, rawItems, dataUpdatedAt],
+    () => (smart && !tabs ? buildSmartList(rawItems ?? [], dataUpdatedAt || 0) : []),
+    [smart, tabs, rawItems, dataUpdatedAt],
+  );
+  const tabsModel = useMemo(
+    () => (tabs ? buildMobileInboxTabs(rawItems ?? [], dataUpdatedAt || 0) : null),
+    [tabs, rawItems, dataUpdatedAt],
   );
   const markRead = useMarkInboxRead();
   const markAllRead = useMarkAllInboxRead();
@@ -75,6 +119,58 @@ export default function Inbox() {
     const target = getInboxNavigationTarget(item, wsSlug, String(Date.now()));
     if (target) router.push(target);
   }, [markRead, wsSlug]);
+
+  // Tabs: a swipe or a list action acts on every card a row stands for, one
+  // request per card (the server's read and archive are issue-wide).
+  const tabActions: TabActions = {
+    onOpen: onPressItem,
+    onArchive: (entries) => archiveIds(entries).forEach((id) => archive.mutate(id)),
+    onMarkRead: (entries) => unreadIds(entries).forEach((id) => markRead.mutate(id)),
+  };
+
+  // Tabs' header menu: this list's read/archive first (web's per-list "…"
+  // menu, asking first above 3 cards), then the whole inbox's mark-read.
+  const onPressTabsMenu = (model: InboxTabsModel) => {
+    const entries = tabEntries(model, tab);
+    const ids = archiveIds(entries);
+    const listName = t(`smart.tabs.short.${tab}`);
+    const options: string[] = [t("common:actions.cancel")];
+    const run: (() => void)[] = [() => {}];
+    if (ids.length > 0) {
+      options.push(t("smart.tabs.mark_tab_read", { tab: listName }));
+      run.push(() => tabActions.onMarkRead(entries));
+      options.push(t("smart.tabs.archive_tab", { tab: listName, count: ids.length }));
+      run.push(() => {
+        if (ids.length <= ARCHIVE_CONFIRM_OVER) {
+          tabActions.onArchive(entries);
+          return;
+        }
+        Alert.alert(
+          t("smart.tabs.confirm_archive_title", { count: ids.length }),
+          t("smart.tabs.confirm_archive_description"),
+          [
+            { text: t("common:actions.cancel"), style: "cancel" },
+            {
+              text: t("smart.tabs.confirm_archive"),
+              style: "destructive",
+              onPress: () => tabActions.onArchive(entries),
+            },
+          ],
+        );
+      });
+    }
+    options.push(t("actions.mark_all_read"));
+    run.push(() => markAllRead.mutate());
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex: 0,
+        destructiveButtonIndex: ids.length > 0 ? 2 : undefined,
+        title: t("title"),
+      },
+      (i) => run[i]?.(),
+    );
+  };
 
   // Trailing batch menu — mirrors web's dropdown
   // (packages/views/inbox/components/inbox-page.tsx). "Mark all read" is
@@ -125,7 +221,7 @@ export default function Inbox() {
           <>
             <IconButton
               name="ellipsis-horizontal"
-              onPress={onPressMenu}
+              onPress={() => (tabsModel ? onPressTabsMenu(tabsModel) : onPressMenu())}
               accessibilityLabel={t("actions.inbox_actions")}
             />
             <HeaderActions />
@@ -144,6 +240,19 @@ export default function Inbox() {
           <Button variant="outline" onPress={() => refetch()}>
             <Text>{t("common:actions.retry")}</Text>
           </Button>
+        </View>
+      ) : tabsModel ? (
+        <View className="flex-1">
+          <InboxTabStrip model={tabsModel} tab={tab} onChange={setTab} />
+          <InboxTabPanel
+            model={tabsModel}
+            tab={tab}
+            onChangeTab={setTab}
+            actions={tabActions}
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            now={dataUpdatedAt}
+          />
         </View>
       ) : !data || data.length === 0 ? (
         <InboxEmpty iconColor={THEME[colorScheme].mutedForeground} />

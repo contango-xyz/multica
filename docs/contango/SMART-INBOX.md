@@ -276,4 +276,11 @@ The owner approved a tabbed Smart inbox (mockup: five tabs). Behind its own flag
   object ≤256 KiB in memory per workspace; `GET /api/inbox/squad` (tabs-flagged users, else 404) returns
   `{snapshot, received_at, inbox_load: [{user_id, name, decisions, merges, everything_else, new_asks_7d}]}`. After a
   backend restart the snapshot is empty until the feeder's next PUT (it sends every 10 min, or when the report changes).
-- **iOS:** unchanged (sections). Rollout to everyone: add people to the flag once the owner is happy.
+- **iOS (fork patch 45, 2026-11-13):** the same tabs for the same flag, built for one hand. The inbox opens on Today
+  (max 5 big cards: what to do, frees N, why in one line, the one-tap answers or Approve on GitHub; alerts as a red
+  banner). A tab strip with icons under the header, badges on Today, Decisions and Merges only. Decisions: one row
+  per card, a tap opens the brief sheet with the answers at the bottom (thumb reach). Merges: one card per PR (why
+  it needs you, CI, agent review, size, Approve on GitHub; post-merge below). Squad: read-only. Else: Classic rows,
+  no badge. Swipe left reveals Archive (tap to archive the card), swipe right marks read; the header "…" menu marks
+  or archives the open tab (asks above 3 cards). Pull to refresh. Never: auto-archive, a Held card on Today, a row
+  opening by itself. Settings > Inbox > "Tabbed inbox" off shows the sections view (device-local).

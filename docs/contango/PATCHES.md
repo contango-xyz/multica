@@ -807,6 +807,37 @@ pane"), `smart-tabs.test.tsx` ("selection"), `smart-inbox-list.test.tsx`, `inbox
 Rebase check: upstream's archive handler in `InboxPage` (`advanceSelectionPast` must not come back).
 Drop when: never on its own (ours).
 
+### 45. Inbox tabs on iOS
+
+Owner 2026-11-13: "this is arguably where being extreme ADHD UX is critical, as the small screen makes dealing with
+tickets quite cumbersome". The tabs of patch 43 in the iOS app, same flag (`inbox_tabs` + `smart_inbox` on
+`/api/me`), same rows: core's `buildInboxTabs` fed by mobile's per-card fold (`buildSmartRows`).
+Spec: [SMART-INBOX.md](SMART-INBOX.md) "Tabs" > "iOS".
+
+- The inbox opens on **Today**: at most 5 big cards (title, "frees N", why in one line, one-tap answers or
+  "Approve on GitHub"); alerts as a red banner. A tab strip with icons under the header (Today · Decisions · Merges ·
+  Squad · Else); badges on the first three only.
+- **Decisions**: one row per card; a tap opens the brief sheet. The sheet (`SignalDetail`, all signals) shows the
+  feeder's brief (What's going on / We recommend / If you say nothing) and a merge's facts, with the answers in a
+  footer at the bottom of the sheet. Merge asks get "Approve on GitHub" (`<pr>/files`) instead of replies, as on web.
+- **Merges**: one card per PR (why it needs you, CI, agent review, size, Approve on GitHub); "Merged without you"
+  below with Review on GitHub. **Squad**: read-only (`GET /api/inbox/squad`, core's schema). **Else**: Classic rows.
+- Every row: swipe left reveals Archive (tap needed), swipe right marks read (fires on release, not destructive);
+  one request per card (`archiveIds` / `unreadIds`). The header "…" menu marks this tab read or archives it (asks
+  above 3 cards), then Mark all read. Pull to refresh everywhere. Nothing archives or opens on its own.
+- Settings > Inbox > "Tabbed inbox" (shown to tabs-flagged users) switches back to the sections view; device-local,
+  expo-secure-store `inbox-tabs-mode`.
+
+Files: ours: `apps/mobile/lib/inbox-tabs{,.test}.ts`, `apps/mobile/components/inbox/{inbox-tabs.tsx,use-signal-reply.ts}`,
+`apps/mobile/data/inbox-tabs-store.ts`. Upstream, small hooks: `apps/mobile/app/(app)/[workspace]/(tabs)/inbox.tsx`
+(tabs branch, header menu), `apps/mobile/app/(app)/[workspace]/more/settings.tsx` (toggle),
+`apps/mobile/components/inbox/{signal-detail,swipeable-inbox-row}.tsx` (brief + footer; `onMarkRead`, `children`),
+`apps/mobile/data/{api,queries/inbox}.ts` (`getInboxSquad`, `inboxSquadOptions`), tests
+`components/inbox/inbox-screen.test.ts`, `data/api.test.ts`, locales `inbox.json` (`smart.tabs`) and `settings.json`
+(`inbox`).
+Rebase check: the inbox screen's smart branch; `SwipeableInboxRow` props.
+Drop when: never on its own (ours); fold into patch 43.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

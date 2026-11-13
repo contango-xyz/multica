@@ -181,3 +181,29 @@ describe("api.replyToInboxSignal", () => {
     expect(err).toMatchObject({ status, body: { error: reason } });
   });
 });
+
+describe("api.getInboxSquad", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("parses the squad snapshot and inbox load", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      snapshot: { generated_at: "2026-11-13T09:00:00Z", window_hours: 24, buckets: { people: { hours: 10, share: 0.4 } }, people: [{ name: "Dele", hours: 6 }] },
+      received_at: "2026-11-13T09:01:00Z",
+      inbox_load: [{ user_id: "u1", name: "Dele", decisions: 3, merges: 2, everything_else: 9, new_asks_7d: 14 }],
+    })));
+    const squad = await api.getInboxSquad();
+    expect(squad.snapshot?.buckets.people?.share).toBe(0.4);
+    expect(squad.snapshot?.people).toEqual([{ name: "Dele", hours: 6 }]);
+    expect(squad.inbox_load[0]).toMatchObject({ name: "Dele", decisions: 3, merges: 2 });
+  });
+
+  it("degrades a malformed body to an empty screen instead of throwing", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ snapshot: "nope", inbox_load: "nope" })));
+    await expect(api.getInboxSquad()).resolves.toMatchObject({ snapshot: null, inbox_load: [] });
+  });
+});

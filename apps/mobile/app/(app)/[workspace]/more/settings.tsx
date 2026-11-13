@@ -12,6 +12,7 @@
  *
  * Theme picker stays inline (3 fixed options, fits in one section).
  */
+import { useEffect } from "react";
 import { unregisterForPush } from "@/data/push-registration";
 import { Alert, ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,8 @@ import type { Workspace } from "@multica/core/types";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { useInboxTabsStore } from "@/data/inbox-tabs-store";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { workspaceListOptions } from "@/data/queries/workspaces";
@@ -67,6 +70,13 @@ export default function SettingsPage() {
   } = useLocalePreference();
   const { t } = useT("settings");
   const { t: tCommon } = useT();
+  // Inbox tabs (contango patch 45): only for users the server put on both
+  // smart-inbox flags; off shows the Smart sections view.
+  const tabsAvailable = user?.smart_inbox === true && user?.inbox_tabs === true;
+  const tabsMode = useInboxTabsStore((s) => s.mode);
+  const setTabsMode = useInboxTabsStore((s) => s.setMode);
+  const hydrateTabsMode = useInboxTabsStore((s) => s.hydrate);
+  useEffect(() => hydrateTabsMode(), [hydrateTabsMode]);
   const mutedFg = THEME[colorScheme].mutedForeground;
   const localeLabels = {
     system: t("language.system"),
@@ -168,6 +178,26 @@ export default function SettingsPage() {
           })
         )}
       </SectionGroup>
+
+      {tabsAvailable ? (
+        <SectionGroup title={t("inbox.title")}>
+          <Pressable
+            onPress={() => setTabsMode(tabsMode === "tabs" ? "sections" : "tabs")}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: tabsMode === "tabs" }}
+            className="flex-row items-center gap-3 px-4 py-3.5 active:bg-secondary"
+          >
+            <View className="flex-1">
+              <Text className="text-base font-medium text-foreground">{t("inbox.tabs")}</Text>
+              <Text className="mt-0.5 text-sm text-muted-foreground">{t("inbox.tabs_off_hint")}</Text>
+            </View>
+            <Switch
+              checked={tabsMode === "tabs"}
+              onCheckedChange={(on) => setTabsMode(on ? "tabs" : "sections")}
+            />
+          </Pressable>
+        </SectionGroup>
+      ) : null}
 
       <SectionGroup title={t("appearance.title")}>
         {/* Two converging entry points by design, NOT a double-fire:
