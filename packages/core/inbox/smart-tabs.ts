@@ -7,13 +7,21 @@
 // - Merges: merge signals, one row per PR, in "needs your approval" and
 //   "merged without you" (post-merge reviews). A merge ask whose PR is finished
 //   (details.merge.state other than open, or its card merged, queued or closed)
-//   is hidden here: never archived (auto-archive is off by owner decision).
+//   leaves Merges for Everything else: never archived (auto-archive is off by
+//   owner decision).
 // - Today: the top 5 of Decisions and Merges' approvals by score, never a Held
-//   card; alert signals (main red) are its banner.
-// - Everything else: every other row (mentions, fyi, stalled, done, alerts),
-//   newest first.
-// The feeder's digest:/reminder: entries are left out: Today replaces them on
-// screen (their pushes are unchanged).
+//   card; alert signals (main red) are its banner; notices (below) sit on top.
+// - Everything else: every other row (mentions, fyi, stalled, done, alerts,
+//   finished merge asks), newest first.
+//
+// Every unarchived entry lands on a tab (contango patch 49, owner 2026-11-16:
+// the unread badge counted entries no tab showed). Notices are the signals with
+// no card that ask something of the reader: the feeder's `reminder:pending`
+// ("2 asks waiting on you") and `digest:<day>` entries, or any card-less
+// decision/merge ask. They have no card to open or answer on, so Today shows
+// them as compact banners with their body and link buttons. A finished merge
+// ask (and what folded into it) moves to Everything else rather than
+// disappearing; nothing is archived on the reader's behalf.
 
 import type { InboxItem } from "../types";
 import { buildSmartSections, cardKey, type SmartEntry } from "./smart";
@@ -24,7 +32,9 @@ export type InboxTab = (typeof INBOX_TABS)[number];
 export const TODAY_LIMIT = 5;
 
 const DECISION_GROUPS = new Set(["decision", "access", "blocking"]);
-const HIDDEN_KEY = /^(?:digest|reminder):/;
+// The feeder's roll-ups: a notice even if one day carries a card.
+const NOTICE_KEY = /^(?:digest|reminder):/;
+const NOTICE_GROUPS = new Set(["decision", "access", "blocking", "merge"]);
 // A card in one of these has nothing left to approve.
 const MERGE_FINISHED_STATUSES = new Set(["done", "merged_but_not_approved", "cancelled", "in_merge_queue"]);
 const HELD_STATUSES = new Set(["held"]);
@@ -39,11 +49,24 @@ export interface TabRow {
 }
 
 export interface InboxTabsModel {
-  today: { rows: TabRow[]; more: number; alerts: SmartEntry[] };
+  /** `notices`: card-less asks (reminder, digest), shown as banners on top. */
+  today: { rows: TabRow[]; more: number; alerts: SmartEntry[]; notices: SmartEntry[] };
   decisions: TabRow[];
   merges: { approval: TabRow[]; postMerge: TabRow[] };
   else: SmartEntry[];
   badges: { today: number; decisions: number; merges: number; elseUnread: number };
+}
+
+/**
+ * A notice: a signal with no card that asks something of the reader (the
+ * feeder's reminder and digest roll-ups, or a card-less ask). Alerts keep their
+ * own banner; card-less fyi and stalled signals are Everything else's.
+ */
+export function isNotice(entry: SmartEntry): boolean {
+  const s = entry.signal;
+  if (!s || s.group === "alert") return false;
+  if (NOTICE_KEY.test(s.key)) return true;
+  return !entry.item.issue_id && NOTICE_GROUPS.has(s.group);
 }
 
 /** "CTG-2114" from a signal's summary ("CTG-2114 · unblocks 3 cards · …"), else null. */
@@ -62,7 +85,7 @@ function isPostMerge(entry: SmartEntry): boolean {
   return !!entry.signal && (entry.signal.merge?.postMerge === true || entry.signal.key.startsWith("post-merge:"));
 }
 
-/** A merge ask with nothing left for its human: hidden on screen, never archived. */
+/** A merge ask with nothing left for its human: off Merges (Everything else lists it), never archived. */
 export function isFinishedMergeAsk(entry: SmartEntry): boolean {
   const s = entry.signal;
   if (!s || s.group !== "merge" || isPostMerge(entry)) return false;
@@ -94,14 +117,16 @@ export function buildInboxTabs(items: InboxItem[], now: number): InboxTabsModel 
   const approval: SmartEntry[] = [];
   const postMerge: SmartEntry[] = [];
   const alerts: SmartEntry[] = [];
+  const notices: SmartEntry[] = [];
   const rest: SmartEntry[] = [];
   for (const e of all) {
     const s = e.signal;
-    if (s && HIDDEN_KEY.test(s.key)) continue;
-    if (s && DECISION_GROUPS.has(s.group)) decisions.push(e);
+    if (isNotice(e)) notices.push(e);
+    else if (s && DECISION_GROUPS.has(s.group)) decisions.push(e);
     else if (s?.group === "merge") {
       if (isPostMerge(e)) postMerge.push(e);
-      else if (!isFinishedMergeAsk(e)) approval.push(e);
+      else if (isFinishedMergeAsk(e)) rest.push(e);
+      else approval.push(e);
     } else {
       if (s?.group === "alert") alerts.push(e);
       rest.push(e);
@@ -124,16 +149,33 @@ export function buildInboxTabs(items: InboxItem[], now: number): InboxTabsModel 
   const todayRows = candidates.slice(0, TODAY_LIMIT);
   const elseRows = rest.sort(newest);
   return {
-    today: { rows: todayRows, more: candidates.length - todayRows.length, alerts },
+    today: { rows: todayRows, more: candidates.length - todayRows.length, alerts, notices: notices.sort(newest) },
     decisions: decisionRows,
     merges: { approval: approvalRows, postMerge: postMergeRows },
     else: elseRows,
     badges: {
-      today: todayRows.length,
+      today: todayRows.length + notices.filter((e) => !e.item.read).length,
       decisions: decisionRows.length,
       merges: approvalRows.length,
       elseUnread: elseRows.filter((e) => !e.item.read).length,
     },
+  };
+}
+
+/**
+ * The entries each tab lists as their home (contango patch 49): every entry of
+ * the model exactly once. Today's ranked rows are copies of Decisions and
+ * Merges rows and its alert banners repeat Everything else's, so Today's own
+ * entries are its notices only; Squad lists none. A row stands for the entries
+ * folded into it (`TabRow.entries`).
+ */
+export function tabHomeEntries(model: InboxTabsModel): Record<InboxTab, SmartEntry[]> {
+  return {
+    today: model.today.notices,
+    decisions: rowEntries(model.decisions),
+    merges: [...rowEntries(model.merges.approval), ...rowEntries(model.merges.postMerge)],
+    squad: [],
+    else: model.else,
   };
 }
 

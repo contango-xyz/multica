@@ -2,15 +2,19 @@
 import { describe, expect, it } from "vitest";
 import type { InboxItem } from "../types";
 import { signalDetails } from "./smart";
+import { buildSmartRows } from "./smart-fold";
 import {
   archiveTargets,
   buildInboxTabs,
   cardHoursLost,
   cardRef,
+  INBOX_TABS,
   inboxTabsModeFromParam,
   rowEntries,
+  tabHomeEntries,
   TODAY_LIMIT,
 } from "./smart-tabs";
+import { everyInboxKind, unreadBadgeKeys } from "./smart-tabs.fixture";
 
 const NOW = Date.parse("2026-11-12T12:00:00Z");
 const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
@@ -64,7 +68,7 @@ function sig(
 }
 
 describe("buildInboxTabs", () => {
-  it("files signals into their tabs and leaves digest and reminder entries out", () => {
+  it("files signals into their tabs; digest and reminder entries are Today's notices", () => {
     const m = buildInboxTabs(
       [
         sig("decision"),
@@ -91,6 +95,23 @@ describe("buildInboxTabs", () => {
     // stalled, fyi, alert and the mention
     expect(m.else).toHaveLength(4);
     expect(m.else.some((e) => e.signal && /^(digest|reminder):/.test(e.signal.key))).toBe(false);
+    expect(m.today.notices.map((e) => e.signal?.key).sort()).toEqual(["digest:2026-11-12", "reminder:pending"]);
+    expect(m.decisions.some((r) => /^(digest|reminder):/.test(r.entry.signal?.key ?? ""))).toBe(false);
+  });
+
+  // Owner 2026-11-16: the badge showed 1, no tab showed it ("2 asks waiting on you", no card).
+  it("puts a card-less reminder on Today as a notice and counts it in Today's badge", () => {
+    const reminder = sig("decision", { key: "reminder:pending" }, { issue_id: null, title: "2 asks waiting on you" });
+    const cardless = sig("decision", { key: "needs-human:x" }, { issue_id: null });
+    const cardlessFyi = sig("fyi", {}, { issue_id: null, severity: "info" });
+    const m = buildInboxTabs([reminder, cardless, cardlessFyi], NOW);
+    expect(m.today.notices.map((e) => e.item.id).sort()).toEqual([reminder.id, cardless.id].sort());
+    expect(m.decisions).toHaveLength(0);
+    expect(m.else.map((e) => e.item.id)).toEqual([cardlessFyi.id]);
+    expect(m.badges.today).toBe(2);
+    const read = buildInboxTabs([{ ...reminder, read: true }], NOW);
+    expect(read.today.notices).toHaveLength(1);
+    expect(read.badges.today).toBe(0);
   });
 
   it("folds an agent's re-ask on the same card into one Decisions row", () => {
@@ -105,7 +126,7 @@ describe("buildInboxTabs", () => {
     expect(m.decisions[0]!.score).toBe(Math.max(...m.decisions[0]!.entries.map((e) => e.score)));
   });
 
-  it("hides finished merge asks on screen", () => {
+  it("moves finished merge asks to Everything else, never hiding them", () => {
     const merged = sig("merge", { extra: { merge: { pr: "#1", state: "merged" } } });
     const queuedCard = sig("merge", {}, { issue_status: "in_merge_queue" });
     const doneCard = sig("merge", {}, { issue_status: "done" });
@@ -115,8 +136,7 @@ describe("buildInboxTabs", () => {
     expect(m.merges.approval.map((r) => r.entry.item.id)).toEqual([open.id]);
     expect(m.merges.postMerge.map((r) => r.entry.item.id)).toEqual([postMergeOnDoneCard.id]);
     expect(m.badges.merges).toBe(1);
-    // Hidden, not moved: nothing else lists them.
-    expect(m.else).toHaveLength(0);
+    expect(m.else.map((e) => e.item.id).sort()).toEqual([merged.id, queuedCard.id, doneCard.id].sort());
   });
 
   it("ranks Today by score, one row per card, never a Held card, capped at 5", () => {
@@ -141,6 +161,36 @@ describe("buildInboxTabs", () => {
   it("ignores archived entries", () => {
     const m = buildInboxTabs([sig("decision", {}, { archived: true })], NOW);
     expect(m.decisions).toHaveLength(0);
+  });
+});
+
+// Contango patch 49: whatever the unread badge counts is on a tab.
+describe("every entry the badge counts is on a tab", () => {
+  const cases = everyInboxKind(NOW);
+  const raw = cases.flatMap((c) => c.items);
+  const model = buildInboxTabs(buildSmartRows(raw).items, NOW);
+  const home = tabHomeEntries(model);
+  const groupOf = (e: { item: InboxItem }) => e.item.issue_id ?? e.item.id;
+  const shown = new Set(INBOX_TABS.flatMap((tab) => home[tab].map(groupOf)));
+  const badge = unreadBadgeKeys(raw);
+
+  it.each(cases.filter((c) => !/not counted/.test(c.kind)))("$kind", ({ items }) => {
+    const live = items.filter((i) => !i.archived);
+    expect(live.some((i) => shown.has(i.issue_id ?? i.id))).toBe(true);
+  });
+
+  it("badge count == sum of the tabs' unread cards", () => {
+    const unreadOnTab = (tab: (typeof INBOX_TABS)[number]) =>
+      new Set(home[tab].map(groupOf).filter((k) => badge.has(k))).size;
+    const sum = INBOX_TABS.reduce((n, tab) => n + unreadOnTab(tab), 0);
+    expect(badge.size).toBe(cases.length - 2);
+    expect(sum).toBe(badge.size);
+    for (const k of badge) expect(shown.has(k)).toBe(true);
+  });
+
+  it("lists each entry on exactly one tab", () => {
+    const ids = INBOX_TABS.flatMap((tab) => home[tab].map((e) => e.item.id));
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 

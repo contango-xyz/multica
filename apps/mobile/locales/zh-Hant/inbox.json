@@ -132,6 +132,7 @@
       "today_empty": "沒有等你處理的事項",
       "today_more_other": "還有 {{count}} 個請求在",
       "alert": "團隊告警",
+      "notice": "提醒",
       "frees_other": "可放行 {{count}} 張卡片",
       "asked": "提出於 {{time}}",
       "open_brief": "查看簡報",

@@ -9,11 +9,14 @@
 // Archiving is Smart's: every row has the hover archive icon (the compact menu
 // on touch, the row menu on right-click; `e` archives the open card), and each
 // list's "…" menu marks read or archives all of it, asking first above 3 cards.
+// Every unarchived entry is on a tab (patch 49): card-less asks such as the
+// feeder's "N asks waiting on you" reminder are Today's notices.
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Archive, CheckCheck, ChevronRight, ExternalLink, MoreHorizontal } from "@multica/ui/icons";
 import { inboxRowKey } from "@multica/core/inbox/filter-store";
+import { useWorkspaceSlug } from "@multica/core/paths";
 import { inboxSquadOptions } from "@multica/core/inbox/queries";
 import { ageTint, type SmartEntry } from "@multica/core/inbox/smart";
 import {
@@ -50,6 +53,8 @@ import {
 import { cn } from "@multica/ui/lib/utils";
 import { useT } from "../../i18n";
 import { DeferredTooltip } from "../../common/deferred-tooltip";
+import { openLink, toInternalAppPath } from "../../editor/utils/link-handler";
+import { resolveClickIntent, useAppOrigin } from "../../navigation";
 import { useInboxContextMenu } from "./inbox-context-menu";
 import { getInboxDisplayTitle } from "./inbox-display";
 import { InboxListItem } from "./inbox-list-item";
@@ -432,6 +437,67 @@ function AlertCard({ entry, onSelect, actions }: { entry: SmartEntry; onSelect: 
   );
 }
 
+/**
+ * A notice on top of Today (contango patch 49): a card-less ask, such as the
+ * feeder's "2 asks waiting on you" reminder. It has no card to open or answer
+ * on, so the banner carries its body and its link buttons (a link to a card on
+ * this deployment opens in the app). Archives like every other row; the title
+ * opens it on the right, which reads it.
+ */
+function NoticeCard({ entry, onSelect, actions }: { entry: SmartEntry; onSelect: (item: InboxItem) => void; actions: TabArchive }) {
+  const { t } = useT("inbox");
+  const onContextMenu = useRowContextMenu(entry.item);
+  const slug = useWorkspaceSlug();
+  const appOrigin = useAppOrigin();
+  const links = entry.signal?.actions ?? [];
+  return (
+    <div
+      role="status"
+      data-testid="inbox-notice"
+      className="group grid min-w-0 gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5"
+      onContextMenu={onContextMenu}
+      data-inbox-row-key={inboxRowKey(entry.item)}
+    >
+      <div className="flex min-w-0 items-start gap-2">
+        <button
+          type="button"
+          onClick={() => onSelect(entry.item)}
+          className="min-w-0 flex-1 break-words text-left text-body hover:underline"
+        >
+          <span className="mr-1.5">
+            <Kind>{t(($) => $.smart.tabs.notice)}</Kind>
+          </span>
+          <b className={cn(!entry.item.read && "text-primary")}>{getInboxDisplayTitle(entry.item)}</b>
+          {entry.signal?.summary ? <span className="text-muted-foreground"> · {entry.signal.summary}</span> : null}
+        </button>
+        <RowArchive item={entry.item} onArchive={() => actions.onArchive(entry.item.id)} />
+      </div>
+      {entry.item.body && <p className="whitespace-pre-wrap break-words text-caption">{entry.item.body}</p>}
+      {links.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {links.map((a, i) => (
+            <Button
+              key={`${a.url}-${i}`}
+              size="sm"
+              variant="outline"
+              className="min-h-10 lg:min-h-0"
+              render={<a href={a.url} target="_blank" rel="noopener noreferrer" />}
+              nativeButton={false}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || !toInternalAppPath(a.url, appOrigin)) return;
+                e.preventDefault();
+                openLink(a.url, slug, appOrigin, resolveClickIntent(e));
+              }}
+            >
+              <span className="truncate">{a.label}</span>
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TodayPanel({
   model,
   onSelect,
@@ -444,11 +510,14 @@ function TodayPanel({
   actions: TabArchive;
 }) {
   const { t } = useT("inbox");
-  const { rows, more, alerts } = model.today;
+  const { rows, more, alerts, notices } = model.today;
   return (
     <>
       {alerts.map((a) => (
         <AlertCard key={a.item.id} entry={a} onSelect={onSelect} actions={actions} />
+      ))}
+      {notices.map((n) => (
+        <NoticeCard key={n.item.id} entry={n} onSelect={onSelect} actions={actions} />
       ))}
       {rows.length === 0 ? (
         <Empty>{t(($) => $.smart.tabs.today_empty)}</Empty>
@@ -838,7 +907,7 @@ function ElsePanel({
 function tabRowKeys(model: ReturnType<typeof buildInboxTabs>, tab: InboxTab): Set<string> {
   const entries: SmartEntry[] =
     tab === "today"
-      ? [...model.today.alerts, ...model.today.rows.map((r) => r.entry)]
+      ? [...model.today.alerts, ...model.today.notices, ...model.today.rows.map((r) => r.entry)]
       : tab === "decisions"
         ? model.decisions.map((r) => r.entry)
         : tab === "merges"

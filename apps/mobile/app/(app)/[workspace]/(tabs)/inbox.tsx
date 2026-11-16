@@ -3,6 +3,7 @@ import {
   ActionSheetIOS,
   Alert,
   FlatList,
+  Linking,
   SectionList,
   View,
 } from "react-native";
@@ -35,7 +36,7 @@ import {
   deduplicateInboxItems,
   getInboxNavigationTarget,
 } from "@/lib/inbox-display";
-import { buildSmartList } from "@/lib/smart-inbox";
+import { buildSmartList, cardIdFromUrl } from "@/lib/smart-inbox";
 import {
   ARCHIVE_CONFIRM_OVER,
   archiveIds,
@@ -56,7 +57,7 @@ import type { SmartEntry } from "@multica/core/inbox/smart";
 function tabEntries(model: InboxTabsModel, tab: InboxTab): SmartEntry[] {
   switch (tab) {
     case "today":
-      return [...model.today.alerts, ...model.today.rows.flatMap((r) => r.entries)];
+      return [...model.today.alerts, ...model.today.notices, ...model.today.rows.flatMap((r) => r.entries)];
     case "decisions":
       return model.decisions.flatMap((r) => r.entries);
     case "merges":
@@ -126,6 +127,16 @@ export default function Inbox() {
     onOpen: onPressItem,
     onArchive: (entries) => archiveIds(entries).forEach((id) => archive.mutate(id)),
     onMarkRead: (entries) => unreadIds(entries).forEach((id) => markRead.mutate(id)),
+    onOpenUrl: (url) => {
+      const cardId = cardIdFromUrl(url, wsSlug);
+      if (cardId && wsSlug) {
+        router.push({ pathname: "/[workspace]/issue/[id]", params: { workspace: wsSlug, id: cardId } });
+        return;
+      }
+      Linking.openURL(url).catch(() => {
+        // A URL no app handles: a no-op tap beats a crash.
+      });
+    },
   };
 
   // Tabs' header menu: this list's read/archive first (web's per-list "…"

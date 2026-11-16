@@ -7,7 +7,8 @@
  *
  * - Today (the home screen): at most 5 big cards, each: what to do, "frees N",
  *   why in one line, and the one-tap answers or "Approve on GitHub". Alerts
- *   are a red banner on top. Nothing else.
+ *   are a red banner on top, then notices (patch 49): card-less asks such as
+ *   the feeder's "2 asks waiting on you", with their body and link buttons.
  * - Decisions: one row per card; a tap opens the brief sheet (answers at the
  *   bottom of the sheet).
  * - Merges: one card per PR with why it needs a human, CI, review and size,
@@ -64,6 +65,8 @@ export interface TabActions {
   onArchive: (entries: SmartEntry[]) => void;
   /** Mark the entries read (one call per card). */
   onMarkRead: (entries: SmartEntry[]) => void;
+  /** A notice's link: a card on this workspace opens in the app, anything else in the browser. */
+  onOpenUrl: (url: string) => void;
 }
 
 const TAB_ICON: Record<InboxTab, { on: keyof typeof Ionicons.glyphMap; off: keyof typeof Ionicons.glyphMap }> = {
@@ -281,7 +284,7 @@ function TodayPanel({
   onRefresh: () => void;
 }) {
   const { t } = useT("inbox");
-  const { rows, more, alerts } = model.today;
+  const { rows, more, alerts, notices } = model.today;
   return (
     <ScrollView
       className="flex-1"
@@ -311,6 +314,9 @@ function TodayPanel({
           </View>
         </SwipeableInboxRow>
       ))}
+      {notices.map((n) => (
+        <NoticeCard key={n.item.id} entry={n} actions={actions} />
+      ))}
       {rows.length === 0 ? (
         <Empty icon="checkmark-circle-outline" text={t("smart.tabs.today_empty")} />
       ) : (
@@ -329,6 +335,63 @@ function TodayPanel({
         </View>
       ) : null}
     </ScrollView>
+  );
+}
+
+/**
+ * A card-less ask on top of Today (contango patch 49; the unread badge counted
+ * it while no tab showed it): title, summary, body and its link buttons. Swipes
+ * like every other row; a tap opens its sheet, which reads it.
+ */
+function NoticeCard({ entry, actions }: { entry: SmartEntry; actions: TabActions }) {
+  const { t } = useT("inbox");
+  const links = entry.signal?.actions ?? [];
+  return (
+    <SwipeableInboxRow
+      item={entry.item}
+      onPress={() => actions.onOpen(entry.item)}
+      onArchive={() => actions.onArchive([entry])}
+      onMarkRead={() => actions.onMarkRead([entry])}
+    >
+      <View className="bg-background px-4 pb-1">
+        <View className="gap-2 rounded-xl border border-brand/30 bg-brand/5 px-3 py-2.5">
+          <Pressable accessibilityRole="button" onPress={() => actions.onOpen(entry.item)} className="gap-0.5 active:opacity-70">
+            <Text className="text-xs font-semibold uppercase text-muted-foreground">{t("smart.tabs.notice")}</Text>
+            <View className="flex-row gap-2">
+              <UnreadDot item={entry.item} />
+              <Text className="flex-1 text-base font-semibold text-foreground" numberOfLines={2}>
+                {getInboxDisplayTitle(entry.item)}
+              </Text>
+            </View>
+            {entry.signal?.summary ? (
+              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                {entry.signal.summary}
+              </Text>
+            ) : null}
+          </Pressable>
+          {entry.item.body ? (
+            <Text selectable className="text-sm leading-5 text-foreground">
+              {entry.item.body}
+            </Text>
+          ) : null}
+          {links.length > 0 ? (
+            <View className="flex-row flex-wrap gap-2">
+              {links.map((a, i) => (
+                <Button
+                  key={`${a.url}-${i}`}
+                  variant="outline"
+                  className="min-w-[45%] flex-1"
+                  accessibilityLabel={a.label}
+                  onPress={() => actions.onOpenUrl(a.url)}
+                >
+                  <Text numberOfLines={1}>{a.label}</Text>
+                </Button>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </SwipeableInboxRow>
   );
 }
 

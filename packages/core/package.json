@@ -74,6 +74,7 @@
     "./inbox/smart-filter-store": "./inbox/smart-filter-store.ts",
     "./inbox/smart-fold": "./inbox/smart-fold.ts",
     "./inbox/smart-tabs": "./inbox/smart-tabs.ts",
+    "./inbox/smart-tabs.fixture": "./inbox/smart-tabs.fixture.ts",
     "./inbox/squad": "./inbox/squad.ts",
     "./inbox/via-group": "./inbox/via-group.ts",
     "./notification-preferences": "./notification-preferences/index.ts",

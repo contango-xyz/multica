@@ -196,6 +196,7 @@
       "today_empty": "기다리는 항목이 없습니다",
       "today_more_other": "남은 요청 {{count}}건:",
       "alert": "팀 알림",
+      "notice": "리마인더",
       "frees_other": "카드 {{count}}개 해제",
       "card_hours": "카드 시간 {{hours}} 손실",
       "asked": "{{time}} 요청",

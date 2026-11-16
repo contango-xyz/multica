@@ -206,6 +206,7 @@
       "today_more_one": "{{count}} pregunta más está en",
       "today_more_other": "{{count}} preguntas más están en",
       "alert": "Alerta del equipo",
+      "notice": "Recordatorio",
       "frees_one": "libera {{count}} tarjeta",
       "frees_other": "libera {{count}} tarjetas",
       "card_hours": "{{hours}} horas-tarjeta perdidas",

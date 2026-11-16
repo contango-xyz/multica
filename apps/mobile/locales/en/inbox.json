@@ -126,6 +126,7 @@
       "today_more_one": "{{count}} more ask in",
       "today_more_other": "{{count}} more asks in",
       "alert": "Squad alert",
+      "notice": "Reminder",
       "frees_one": "frees {{count}} card",
       "frees_other": "frees {{count}} cards",
       "asked": "asked {{time}}",

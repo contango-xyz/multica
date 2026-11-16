@@ -16,7 +16,7 @@ vi.mock("react", async (importOriginal) => ({
   useState: (initial: unknown) => [initial, vi.fn()],
 }));
 vi.mock("react-native", () => ({
-  ActionSheetIOS: {}, Alert: {}, FlatList: "FlatList", SectionList: "SectionList", View: "View",
+  ActionSheetIOS: {}, Alert: {}, FlatList: "FlatList", Linking: { openURL: vi.fn() }, SectionList: "SectionList", View: "View",
 }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: "Ionicons" }));

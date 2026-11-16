@@ -7,7 +7,8 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { InboxItem } from "@multica/core/types";
 import type { SmartEntry } from "@multica/core/inbox/smart";
-import { buildMobileInboxTabs, type InboxTab } from "@/lib/inbox-tabs";
+import { everyInboxKind, unreadBadgeKeys } from "@multica/core/inbox/smart-tabs.fixture";
+import { buildMobileInboxTabs, INBOX_TABS, type InboxTab } from "@/lib/inbox-tabs";
 import { InboxTabPanel, type TabActions } from "./inbox-tabs";
 
 vi.mock("react-native", () => ({
@@ -87,6 +88,11 @@ describe("iOS inbox tabs: every card swipes to Archive", () => {
     signal("mg", "merge", { merge: { pr: "#1", state: "open", url: "https://github.com/o/r/pull/1" } }, { title: "Approve merge #1" }),
     signal("pm", "merge", { key: "post-merge:CTG-9:core#2", merge: { pr: "#2", post_merge: true, url: "https://github.com/o/r/pull/2" } }, { title: "Merged #2" }),
     signal("fy", "fyi", {}, { severity: "info", title: "FYI" }),
+    signal("rm", "decision", {
+      key: "reminder:pending",
+      actions: [{ label: "Open CTG-2612", url: "https://multica.example/ws-1/issues/CTG-2612" }],
+    }, { issue_id: null, title: "2 asks waiting on you", body: "Still open:\n- CTG-2612: Merged without you" }),
+    signal("mm", "merge", { merge: { pr: "#3", state: "merged" } }, { title: "Approve merge #3" }),
   ];
   const model = buildMobileInboxTabs(items, NOW);
 
@@ -110,6 +116,9 @@ describe("iOS inbox tabs: every card swipes to Archive", () => {
     ["merges", "Merged #2", ["pm"]],
     ["else", "FYI", ["fy"]],
     ["else", "CD is red", ["al"]],
+    // Patch 49: a card-less reminder is a Today notice; a finished merge ask is Everything else's.
+    ["today", "2 asks waiting on you", ["rm"]],
+    ["else", "Approve merge #3", ["mm"]],
   ];
   it.each(cases)("%s: %s", (tab, title, ids) => {
     const row = panel(tab).find((s) => s.text.includes(title));
@@ -120,3 +129,67 @@ describe("iOS inbox tabs: every card swipes to Archive", () => {
     expect([...archived[0]!].sort()).toEqual([...ids].sort());
   });
 });
+
+// Contango patch 49 (owner 2026-11-16): the badge counted a card-less reminder no tab showed.
+describe("iOS inbox tabs: whatever the unread badge counts has a swipe row", () => {
+  it("every kind of entry is on some tab", () => {
+    const raw = everyInboxKind(NOW).flatMap((c) => c.items);
+    const model = buildMobileInboxTabs(raw, NOW);
+    const actions = { onOpen: vi.fn(), onArchive: vi.fn(), onMarkRead: vi.fn(), onOpenUrl: vi.fn() } as unknown as TabActions;
+    const shown = new Set<string>();
+    for (const tab of INBOX_TABS) {
+      const tree = InboxTabPanel({ model, tab, onChangeTab: vi.fn(), actions, now: NOW, refreshing: false, onRefresh: vi.fn() });
+      for (const row of rows(tree)) shown.add(row.issue_id ?? row.id);
+    }
+    expect([...unreadBadgeKeys(raw)].filter((k) => !shown.has(k))).toEqual([]);
+  });
+
+  it("a notice's link button opens its url", () => {
+    const onOpenUrl = vi.fn();
+    const reminder = signal("rm", "decision", {
+      key: "reminder:pending",
+      actions: [{ label: "Open CTG-2612", url: "https://multica.example/ws-1/issues/CTG-2612" }],
+    }, { issue_id: null, title: "2 asks waiting on you" });
+    const model = buildMobileInboxTabs([reminder], NOW);
+    expect(model.today.notices.map((e) => e.item.id)).toEqual(["rm"]);
+    const actions = { onOpen: vi.fn(), onArchive: vi.fn(), onMarkRead: vi.fn(), onOpenUrl } as unknown as TabActions;
+    const button = find(InboxTabPanel({ model, tab: "today", onChangeTab: vi.fn(), actions, now: NOW, refreshing: false, onRefresh: vi.fn() }),
+      (el) => el.type === "Button" && el.props.accessibilityLabel === "Open CTG-2612");
+    expect(button).toBeDefined();
+    (button!.props.onPress as () => void)();
+    expect(onOpenUrl).toHaveBeenCalledWith("https://multica.example/ws-1/issues/CTG-2612");
+  });
+});
+
+/** Every SwipeableInboxRow's item, with our components and FlatList rows expanded. */
+function rows(node: ReactNode, out: InboxItem[] = []): InboxItem[] {
+  walk(node, (el) => {
+    if (el.type === "SwipeableInboxRow") out.push(el.props.item as InboxItem);
+  });
+  return out;
+}
+
+function find(node: ReactNode, pred: (el: ReactElement<Record<string, unknown>>) => boolean) {
+  let hit: ReactElement<Record<string, unknown>> | undefined;
+  walk(node, (el) => {
+    if (!hit && pred(el)) hit = el;
+  });
+  return hit;
+}
+
+function walk(node: ReactNode, visit: (el: ReactElement<Record<string, unknown>>) => void): void {
+  if (Array.isArray(node)) {
+    for (const n of node) walk(n, visit);
+    return;
+  }
+  if (!isValidElement(node)) return;
+  const el = node as ReactElement<Record<string, unknown>>;
+  if (typeof el.type === "function") return walk((el.type as (p: unknown) => ReactNode)(el.props), visit);
+  visit(el);
+  if (el.type === "FlatList") {
+    const data = (el.props.data as unknown[]) ?? [];
+    const renderItem = el.props.renderItem as (a: { item: unknown }) => ReactNode;
+    for (const d of data) walk(renderItem({ item: d }), visit);
+  }
+  for (const key of ["children", "ListHeaderComponent", "ListFooterComponent"]) walk(el.props[key] as ReactNode, visit);
+}

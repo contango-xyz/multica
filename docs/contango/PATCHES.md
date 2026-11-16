@@ -915,6 +915,33 @@ locales `issues.json`.
 Rebase check: `MentionRe` and the TypeScript copies still list `group`; migrations 628–630 stay exempt (upstream
 v0.10.0 uses 628–664). Drop when: upstream ships mentionable groups of people.
 
+### 49. Every inbox entry the badge counts is on a tab (card-less reminders, finished merge asks)
+
+Owner 2026-11-16: the unread count showed an entry no tab listed, so he had to switch back to the sections view. The
+example: the feeder's `reminder:pending` signal ("2 asks waiting on you", no card, buttons Open CTG-2612 / Open
+CTG-2386). The badge (`CountUnreadInboxByWorkspace`) counts every unarchived card whose newest entry is unread, a
+card-less entry as its own card; patch 43's tab model dropped two kinds:
+
+- `digest:` / `reminder:` signals (left out on purpose in patch 43; all card-less). Now Today's **notices**: with any
+  other card-less decision/access/blocking/merge ask, a compact banner on top of Today (title, summary, body, link
+  buttons; a link to a card on this deployment opens in the app) with the row archive (hover icon, compact menu,
+  right-click; iOS swipe). Today's badge adds unread notices.
+- Finished merge asks (PR merged/queued/closed, card done/queued/cancelled), and whatever folded into them (a comment
+  on that card): hidden on screen. Now in Everything else, never archived.
+- Every other kind was already listed: mentions incl. patch 48's "via @group" (Everything else, or folded into the
+  card's ask), card-less system entries (autopilot, quick create: Everything else), fyi/stalled/alert signals with or
+  without a card, Held cards (Decisions). There are no chat inbox entries. Classic's header filters can still hide rows.
+- `tabHomeEntries(model)` lists each tab's own entries (each entry once); `smart-tabs.fixture.ts` (`everyInboxKind`,
+  `unreadBadgeKeys`, the badge's SQL rule) drives core/web/iOS tests: badge == the tabs' unread cards, and every
+  badge card has a row on some tab.
+
+Files: `packages/core/inbox/smart-tabs{,.test}.ts`, `packages/core/inbox/smart-tabs.fixture.ts` (+ `package.json`
+export), `packages/views/inbox/components/smart-tabs{,.test}.tsx`, `apps/mobile/components/inbox/inbox-tabs.tsx`
+(`NoticeCard`, `TabActions.onOpenUrl`), `apps/mobile/app/(app)/[workspace]/(tabs)/inbox.tsx`, tests
+`apps/mobile/components/inbox/{inbox-tabs-archive,inbox-screen}.test.ts`, locales `inbox.json` (`smart.tabs.notice`,
+web 7 + mobile 3), `docs/contango/SMART-INBOX.md`.
+Rebase check: none beyond patches 43/45. Drop when: fold into patch 43 (web) and 45 (iOS).
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

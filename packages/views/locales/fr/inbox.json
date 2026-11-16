@@ -206,6 +206,7 @@
       "today_more_one": "{{count}} autre demande se trouve dans",
       "today_more_other": "{{count}} autres demandes se trouvent dans",
       "alert": "Alerte d'équipe",
+      "notice": "Rappel",
       "frees_one": "libère {{count}} carte",
       "frees_other": "libère {{count}} cartes",
       "card_hours": "{{hours}} heures-carte perdues",

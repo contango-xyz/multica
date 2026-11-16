@@ -2,6 +2,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InboxItem } from "@multica/core/types";
+import { buildSmartRows } from "@multica/core/inbox/smart-fold";
+import { everyInboxKind, unreadBadgeKeys } from "@multica/core/inbox/smart-tabs.fixture";
 
 // t(selector, opts) -> "path" or "path:count".
 vi.mock("../../i18n", () => ({
@@ -146,7 +148,7 @@ describe("InboxTabsView", () => {
     expect(screen.getByRole("button", { name: "Approve: done" })).toBeInTheDocument();
   });
 
-  it("Merges links Approve to the PR's GitHub review page and hides merged asks", () => {
+  it("Merges links Approve to the PR's GitHub review page; merged asks move to Everything else", () => {
     renderTabs([
       signal("merge", {
         merge: { pr: "#3840", url: "https://github.com/o/r/pull/3840", risk: "money: services/swap", ci: "green", review: "passed", lines: 212, files: 4, state: "open" },
@@ -161,6 +163,60 @@ describe("InboxTabsView", () => {
     expect(screen.getByText("smart.tabs.ci.green")).toBeInTheDocument();
     expect(screen.getByText("smart.tabs.merged_without_you")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /review_on_github/ })).toHaveAttribute("href", "https://github.com/o/r/pull/3824/files");
+    fireEvent.click(tab(/else/));
+    expect(within(screen.getByRole("tabpanel")).getByText("Approve merge #3826")).toBeInTheDocument();
+  });
+
+  // Contango patch 49 (owner 2026-11-16): the badge counted the feeder's card-less
+  // reminder, but no tab showed it.
+  it("Today shows a card-less reminder as a notice with its body, links and archive", () => {
+    const onSelect = renderTabs([
+      signal("decision", {
+        key: "reminder:pending",
+        summary: "as of 16:47 UTC · oldest 2 d",
+        actions: [
+          { label: "Open CTG-2612", url: "https://multica.example/contango/issues/CTG-2612" },
+          { label: "Open CTG-2386", url: "https://multica.example/contango/issues/CTG-2386" },
+        ],
+      }, {
+        id: "rem", issue_id: null, title: "2 asks waiting on you",
+        body: "Still open:\n- CTG-2612: Merged without you\n- CTG-2386: Decide: MVP scope review",
+      }),
+    ]);
+    expect(tab(/today/)).toHaveTextContent("smart.tabs.today1");
+    const notice = screen.getByTestId("inbox-notice");
+    expect(notice).toHaveTextContent("2 asks waiting on you");
+    expect(notice).toHaveTextContent("CTG-2386: Decide: MVP scope review");
+    expect(within(notice).getByRole("button", { name: "Open CTG-2612" })).toHaveAttribute(
+      "href", "https://multica.example/contango/issues/CTG-2612",
+    );
+    expect(within(notice).getByRole("button", { name: "Open CTG-2386" })).toBeInTheDocument();
+    expect(within(notice).getByTestId("row-menu")).toBeInTheDocument();
+    const btn = archiveIn(notice);
+    expect(btn.className).toContain("[@media(hover:hover)]:group-hover:inline-flex");
+    fireEvent.click(btn);
+    expect(archivedIds()).toEqual(["rem"]);
+    fireEvent.click(within(notice).getByRole("button", { name: /2 asks waiting on you/ }));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "rem" }));
+    // Not repeated on Decisions.
+    fireEvent.click(tab(/decisions/));
+    expect(screen.queryByText("2 asks waiting on you")).toBeNull();
+  });
+
+  it("every entry the unread badge counts has a row on some tab (every kind)", () => {
+    const raw = everyInboxKind(NOW).flatMap((c) => c.items);
+    renderTabs(buildSmartRows(raw).items);
+    const shown = new Set<string>();
+    for (const name of [/today/, /decisions/, /merges/, /squad/, /else/]) {
+      fireEvent.click(tab(name));
+      for (const el of screen.getByRole("tabpanel").querySelectorAll<HTMLElement>("[data-inbox-row-key]")) {
+        shown.add(el.dataset.inboxRowKey!.replace(/^else:/, ""));
+      }
+    }
+    const groupOf = new Map(raw.map((i) => [i.id, i.issue_id ?? i.id]));
+    const shownGroups = new Set([...shown].map((k) => groupOf.get(k) ?? k));
+    const missing = [...unreadBadgeKeys(raw)].filter((k) => !shownGroups.has(k));
+    expect(missing).toEqual([]);
   });
 
   // Contango patch 47: the list grid's one column must be minmax(0, 1fr). An

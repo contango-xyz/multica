@@ -249,19 +249,29 @@ The owner approved a tabbed Smart inbox (mockup: five tabs). Behind its own flag
   - **Today:** the top 5 rows of Decisions and Merges' approvals by the smart score (priority × (1 + blocks) × wait),
     one per card, never a Held card; each with frees N (rank.blocks), card-hours lost (blocks × hours waited), the
     why (brief.situation, else the merge risk, else the body's first line after "Why now"), its one-tap reply or
-    "Approve on GitHub", and Open card. Alert signals are a banner on top. Badge: the rows shown (max 5).
+    "Approve on GitHub", and Open card. Alert signals are a banner on top, then **notices** (patch 49): signals with no
+    card that ask something (the feeder's `reminder:pending` "N asks waiting on you", `digest:<day>`, any card-less
+    decision/access/blocking/merge ask) as a compact banner with title, summary, body and their link buttons (a link
+    to a card on this deployment opens in the app; iOS: in-app issue screen), archived like any row (hover icon,
+    compact menu, right-click; iOS swipe); the title opens it on the right (which reads it). Badge: the rows shown
+    (max 5) plus unread notices.
   - **Decisions:** signals in decision, access, blocking; one row per card (an agent's re-ask folds in: "N asks
     folded"); tapping expands the brief: What's going on / We recommend / If you say nothing (the default, or "Nothing
     happens.") and the one-tap replies.
   - **Merges:** merge signals, one card per PR (details.merge.pr, else the card): "needs your approval" with why it needs
     a human (merge.risk), CI, agent review, size, and **Approve on GitHub** (opens `<pr>/files`; no in-inbox approve,
     owner: people look at the code); then "Merged without you" (post-merge reviews, Review on GitHub). A merge ask whose
-    `merge.state` is not `open`, or whose card is done / merged_but_not_approved / cancelled / in_merge_queue, is
-    hidden on screen only: never archived.
+    `merge.state` is not `open`, or whose card is done / merged_but_not_approved / cancelled / in_merge_queue, moves
+    to Everything else (patch 49; it was hidden): never archived.
   - **Squad:** no badge, no notifications. Where card time goes, card-hours held per person, the 5 biggest single holds
     (from the feeder's snapshot of the capacity report) and inbox load per person (counted by the server).
-  - **Everything else:** every other row (mentions, fyi, stalled, alerts, done), newest first, Classic's rows; quiet
-    unread count. The feeder's `digest:` and `reminder:` entries are not shown in any tab (pushes unchanged).
+  - **Everything else:** every other row (mentions incl. "via @group", fyi, stalled, alerts, done, card-less system
+    entries such as autopilot or quick-create notices, finished merge asks), newest first, Classic's rows; quiet
+    unread count.
+  - **Coverage rule (patch 49):** every unarchived entry is on exactly one tab (Today's ranked rows and alert banner
+    repeat Decisions/Merges/Everything else), so whatever the unread badge counts (newest entry per card unread; a
+    card-less entry is its own card) can be found. Pinned by `smart-tabs.fixture.ts` (one entry of every kind) in
+    core, web and iOS tests. Classic's filters in the header can still hide rows, as in every view.
 - **Archive (every tab, as in Smart):** each row has the hover archive icon (compact menu on touch, right-click
   menu; `e` archives the open card), on Today, Decisions (summary row and inside the brief), both Merges sections and
   Everything else. Archiving a row archives every inbox entry on its card. Each list's "…" menu marks all read or
@@ -280,7 +290,7 @@ The owner approved a tabbed Smart inbox (mockup: five tabs). Behind its own flag
   backend restart the snapshot is empty until the feeder's next PUT (it sends every 10 min, or when the report changes).
 - **iOS (fork patch 45, 2026-11-13):** the same tabs for the same flag, built for one hand. The inbox opens on Today
   (max 5 big cards: what to do, frees N, why in one line, the one-tap answers or Approve on GitHub; alerts as a red
-  banner). A tab strip with icons under the header, badges on Today, Decisions and Merges only. Decisions: one row
+  banner; notices with body and link buttons). A tab strip with icons under the header, badges on Today, Decisions and Merges only. Decisions: one row
   per card, a tap opens the brief sheet with the answers at the bottom (thumb reach). Merges: one card per PR (why
   it needs you, CI, agent review, size, Approve on GitHub; post-merge below). Squad: read-only. Else: Classic rows,
   no badge. Swipe left reveals Archive (tap to archive the card), swipe right marks read; the header "…" menu marks

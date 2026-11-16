@@ -196,6 +196,7 @@
       "today_empty": "対応待ちはありません",
       "today_more_other": "残り {{count}} 件:",
       "alert": "チームアラート",
+      "notice": "リマインダー",
       "frees_other": "{{count}} 件が進む",
       "card_hours": "{{hours}} カード時間の損失",
       "asked": "{{time}} に依頼",
