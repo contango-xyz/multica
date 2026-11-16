@@ -1166,7 +1166,7 @@ func (h *Handler) shouldSuppressSquadLeaderSelfTrigger(ctx context.Context, issu
 func commentMentionsAnyone(content string) bool {
 	for _, m := range util.ParseMentions(content) {
 		switch m.Type {
-		case "agent", "member", "squad", "all":
+		case "agent", "member", "squad", "group", "all":
 			return true
 		}
 	}

@@ -22,7 +22,7 @@ func newIssueAskCommand() *cobra.Command {
 
 	create := &cobra.Command{Use: "create <issue-id>", Args: cobra.ExactArgs(1), Short: "Post an ask: its comment and its record, together", RunE: runIssueAskCreate}
 	create.Long = "Posts a [NEEDS HUMAN] (or, with --to operator, [NEEDS OPERATOR]) comment in the usual format and records the ask. A person's reply in the ask's own thread answers it; any other comment leaves it open."
-	create.Flags().String("to", "", "Who is asked: @handle (member) or operator")
+	create.Flags().String("to", "", "Who is asked: @handle (member), @group (role group, e.g. @devops) or operator")
 	create.Flags().String("kind", "", "merge, decision, access, admission or tech_owner (operator asks: operator, or omit)")
 	create.Flags().String("topic", "", "One-line topic")
 	create.Flags().StringArray("reply", nil, "An accepted reply, repeatable; \"Label=reply text\" sets a button label")
@@ -90,7 +90,7 @@ func runIssueAskCreate(cmd *cobra.Command, args []string) error {
 
 	to, _ := cmd.Flags().GetString("to")
 	if to == "" {
-		return fmt.Errorf("--to is required: @handle or operator")
+		return fmt.Errorf("--to is required: @handle, @group or operator")
 	}
 	kind, _ := cmd.Flags().GetString("kind")
 	body := map[string]any{}
@@ -99,6 +99,9 @@ func runIssueAskCreate(cmd *cobra.Command, args []string) error {
 			kind = "operator"
 		}
 		body["addressee_type"], body["addressee_role"] = "role", "operator"
+	} else if gid, _, isGroup, err := resolveGroupHandle(ctx, client, to); err == nil && isGroup {
+		// A role group (contango patch 48): any member's reply in the thread answers it.
+		body["addressee_type"], body["addressee_id"] = "group", gid
 	} else {
 		typ, id, err := resolveAssignee(ctx, client, to, memberOnlyKinds)
 		if err != nil {

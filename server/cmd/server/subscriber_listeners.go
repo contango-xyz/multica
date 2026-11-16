@@ -55,6 +55,9 @@ func registerSubscriberListeners(bus *events.Bus, pool *pgxpool.Pool) {
 		// Subscribe @mentioned users in description
 		if issue.Description != nil && *issue.Description != "" {
 			for _, m := range parseMentions(*issue.Description) {
+				if m.Type == "group" { // contango patch 48: a group is not a subscriber
+					continue
+				}
 				addSubscriber(bus, queries, e.WorkspaceID, issue.ID, m.Type, m.ID, "mentioned")
 			}
 		}
@@ -96,7 +99,7 @@ func registerSubscriberListeners(bus *events.Bus, pool *pgxpool.Pool) {
 					}
 				}
 				for _, m := range newMentions {
-					if !prevMentioned[m.Type+":"+m.ID] {
+					if !prevMentioned[m.Type+":"+m.ID] && m.Type != "group" {
 						addSubscriber(bus, queries, e.WorkspaceID, issue.ID, m.Type, m.ID, "mentioned")
 					}
 				}

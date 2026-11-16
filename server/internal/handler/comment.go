@@ -2862,7 +2862,8 @@ func hasAgentOrSquadMention(mentions []util.Mention) bool {
 
 func hasMemberMention(mentions []util.Mention) bool {
 	for _, m := range mentions {
-		if m.Type == "member" {
+		// A @group is people too (contango patch 48): it stops the lead fallback.
+		if m.Type == "member" || m.Type == "group" {
 			return true
 		}
 	}

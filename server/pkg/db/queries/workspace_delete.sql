@@ -720,6 +720,14 @@ deleted_member_availability AS (
     DELETE FROM member_availability
     WHERE member_availability.workspace_id = $1
 ),
+deleted_member_group_members AS (
+    DELETE FROM member_group_member
+    WHERE member_group_member.workspace_id = $1
+),
+deleted_member_groups AS (
+    DELETE FROM member_group
+    WHERE member_group.workspace_id = $1
+),
 deleted_notification_preferences AS (
     DELETE FROM notification_preference
     WHERE notification_preference.workspace_id = $1

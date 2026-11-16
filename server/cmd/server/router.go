@@ -2624,6 +2624,17 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.With(handler.RequireHumanActor).Post("/{id}/signal-reply", h.ReplyToInboxSignal)
 			})
 
+			// Role mention groups: @devops, @fe, ... (contango patch 48).
+			r.Route("/api/groups", func(r chi.Router) {
+				r.Get("/", h.ListMemberGroups)
+				r.Get("/{ref}", h.GetMemberGroup)
+				r.Get("/{ref}/on-duty", h.GetMemberGroupOnDuty)
+				r.With(handler.RequireHumanActor).Post("/", h.CreateMemberGroup)
+				r.With(handler.RequireHumanActor).Patch("/{ref}", h.UpdateMemberGroup)
+				r.With(handler.RequireHumanActor).Put("/{ref}/members", h.SetMemberGroupMembers)
+				r.With(handler.RequireHumanActor).Delete("/{ref}", h.ArchiveMemberGroup)
+			})
+
 			// Availability: working hours, time off, backups (contango patch 38).
 			r.Route("/api/availability", func(r chi.Router) {
 				r.Get("/", h.GetAvailability)

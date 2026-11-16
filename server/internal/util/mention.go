@@ -18,7 +18,7 @@ import (
 
 // Mention represents a parsed @mention from markdown content.
 type Mention struct {
-	Type string // "member", "agent", "squad", "issue", or "all"
+	Type string // "member", "agent", "squad", "group" (contango patch 48), "issue", or "all"
 	ID   string // user_id, agent_id, issue_id, or "all"
 }
 
@@ -27,7 +27,7 @@ type Mention struct {
 // Uses .+? (non-greedy) instead of [^\]]* so labels containing square brackets
 // (e.g. "David[TF]") are matched correctly — the ](mention:// anchor is specific
 // enough to prevent over-matching.
-var MentionRe = regexp.MustCompile(`\[@?(.+?)\]\(mention://(member|agent|squad|issue|all)/([0-9a-fA-F-]+|all)\)`)
+var MentionRe = regexp.MustCompile(`\[@?(.+?)\]\(mention://(member|agent|squad|group|issue|all)/([0-9a-fA-F-]+|all)\)`)
 
 var canonicalMentionRe = regexp.MustCompile("^" + MentionRe.String() + "$")
 

@@ -45,6 +45,7 @@ const (
 	AskAddresseeMember = "member"
 	AskAddresseeAgent  = "agent"
 	AskAddresseeRole   = "role"
+	AskAddresseeGroup  = "group" // a role mention group (contango patch 48); any member's reply answers
 	AskRoleOperator    = "operator"
 
 	askSourceCLI = "cli"
@@ -141,7 +142,7 @@ func (in *IssueAskInput) Normalize() error {
 		if in.Kind != AskKindOperator {
 			return askInputErr("an ask to the operator must have kind operator")
 		}
-	case AskAddresseeMember:
+	case AskAddresseeMember, AskAddresseeGroup:
 		if in.Kind == AskKindOperator {
 			return askInputErr("kind operator needs the operator as addressee")
 		}
@@ -154,7 +155,7 @@ func (in *IssueAskInput) Normalize() error {
 		// markers stay comments for now.
 		return askInputErr("asks addressed to an agent are not supported yet; use the agent-to-agent markers")
 	default:
-		return askInputErr("addressee_type must be member or role")
+		return askInputErr("addressee_type must be member, group or role")
 	}
 
 	if len(in.Options) > askMaxOpts {
@@ -213,7 +214,7 @@ func (in *IssueAskInput) Normalize() error {
 // The scripts anchor on this text: the bold tag at the start, one **Field:**
 // per line, the Reply with line as `code` spans, and a default line whose
 // parenthesis is exactly "reversible" when a default applies. handle is the
-// addressee's mention text for a member ask.
+// addressee's mention text for a member or group ask.
 func RenderAskComment(in IssueAskInput, handle string) string {
 	if in.AddresseeType == AskAddresseeRole {
 		return joinAskBlocks(
@@ -254,7 +255,7 @@ func RenderAskComment(in IssueAskInput, handle string) string {
 		askField("Risk", in.Risk),
 		askField("Default if no answer", askDefaultLine(in)),
 		askField("Links", in.Links),
-		fmt.Sprintf("[@%s](mention://member/%s)", handle, in.AddresseeID),
+		fmt.Sprintf("[@%s](mention://%s/%s)", handle, in.AddresseeType, in.AddresseeID),
 	)
 }
 

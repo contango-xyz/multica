@@ -109,6 +109,8 @@ var workspaceDeletionManifest = map[string]workspaceDeleteAction{
 	"workspace_mcp_server":               workspaceDelete,
 	"notification_preference":            workspaceDelete,
 	"member_availability":                workspaceDelete,
+	"member_group":                       workspaceDelete,
+	"member_group_member":                workspaceDelete,
 	"member_time_off":                    workspaceDelete,
 	"personal_access_token":              workspaceDeleteKeep,
 	"push_device":                        workspaceDeleteKeep, // user-owned device tokens, not workspace data

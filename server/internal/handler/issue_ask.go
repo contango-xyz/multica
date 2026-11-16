@@ -236,6 +236,19 @@ func (h *Handler) CreateIssueAsk(w http.ResponseWriter, r *http.Request) {
 // resolveAskAddressee checks the addressee is in the workspace and returns the
 // member's mention handle (the email up to the @, as asks are written today).
 func (h *Handler) resolveAskAddressee(w http.ResponseWriter, r *http.Request, issue db.Issue, in *service.IssueAskInput) (string, bool) {
+	if in.AddresseeType == service.AskAddresseeGroup {
+		groupID, ok := parseUUIDOrBadRequest(w, in.AddresseeID, "addressee_id")
+		if !ok {
+			return "", false
+		}
+		g, err := h.Queries.GetMemberGroup(r.Context(), db.GetMemberGroupParams{ID: groupID, WorkspaceID: issue.WorkspaceID})
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "addressee is not a group in this workspace")
+			return "", false
+		}
+		in.AddresseeID = uuidToString(g.ID)
+		return g.Handle, true
+	}
 	if in.AddresseeType != service.AskAddresseeMember {
 		return "", true
 	}

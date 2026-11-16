@@ -18,7 +18,7 @@ import (
 
 // mention represents a parsed @mention from markdown content (local alias).
 type mention struct {
-	Type string // "member", "agent", "issue", or "all"
+	Type string // "member", "agent", "squad", "group", "issue", or "all"
 	ID   string // user_id, agent_id, issue_id, or "all"
 }
 
@@ -571,10 +571,14 @@ func notifyMentionedMembers(
 	recipientIDs := map[string]bool{}
 
 	hasAll := false
-	var squadIDs []string
+	var squadIDs, groupIDs []string
 	for _, m := range mentions {
 		if m.Type == "all" {
 			hasAll = true
+			continue
+		}
+		if m.Type == "group" {
+			groupIDs = append(groupIDs, m.ID)
 			continue
 		}
 		if m.Type == "member" {
@@ -607,6 +611,11 @@ func notifyMentionedMembers(
 			}
 		}
 	}
+
+	// Contango patch 48: a @group mention reaches the group's people on duty
+	// (time off skipped, then backups, then the fallback). Someone also named
+	// directly keeps the plain mention; the others' items say "via @group".
+	viaGroup := expandGroupMentions(queries, e, issueID, groupIDs, recipientIDs)
 
 	// Contango patch 41 (owner 2026-11-11: an agent's 28 @all comments made 252
 	// inbox notifications): only a member may broadcast. An agent's (or any
@@ -661,7 +670,7 @@ func notifyMentionedMembers(
 			Title:         title,
 			ActorType:     util.StrToText(e.ActorType),
 			ActorID:       optionalUUID(e.ActorID),
-			Details:       details,
+			Details:       withViaGroup(details, viaGroup[id]),
 		})
 		if err != nil {
 			slog.Error("mention inbox creation failed", "mentioned_id", id, "error", err)

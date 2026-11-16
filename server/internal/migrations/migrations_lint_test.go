@@ -20,6 +20,10 @@ var contangoMigrationStems = map[string]bool{
 	"594_push_device_platform_macos":   true,
 	"607_inbox_signal_key_index":       true,
 	"608_github_pull_request_review":   true,
+	// Patch 48: upstream v0.10.0 already uses 628–664.
+	"628_member_group":                 true,
+	"629_member_group_handle_index":    true,
+	"630_issue_ask_addressee_group":    true,
 }
 
 func TestMigrationNumericPrefixesAreUnique(t *testing.T) {

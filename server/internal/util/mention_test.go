@@ -34,6 +34,11 @@ func TestParseMentions(t *testing.T) {
 			},
 		},
 		{
+			name:    "role group mention (contango patch 48)",
+			content: "[@devops](mention://group/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa) can you add the DNS record?",
+			want:    []Mention{{Type: "group", ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},
+		},
+		{
 			name:    "issue mention without @",
 			content: "[MUL-123](mention://issue/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa) is related",
 			want:    []Mention{{Type: "issue", ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}},

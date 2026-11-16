@@ -860,6 +860,46 @@ Files: `packages/views/inbox/components/smart-tabs{,.test}.tsx`, `apps/mobile/co
 Merges approval and post-merge, Everything else) and assert the archive affordance archives that card.
 Rebase check: none beyond patches 43/45. Drop when: fold into patch 43 (web) and 45 (iOS).
 
+### 48. Role mention groups (`@devops`, `@be`, `@fe`, `@ux`, `@dev`)
+
+Owner 2026-11-16 ("go with the patch"): asks for a role go to a named group, not a person, so a holiday or a
+handover is one membership change instead of edits to prompts and scripts. Upstream has no groups of people
+(`@all` is everyone; `@squad` wakes an agent leader).
+
+- **Data:** `member_group` (handle `^[a-z][a-z0-9-]{1,23}$`, name, description, optional fallback person,
+  archived_at) and `member_group_member` (ordered people). Migrations `628_member_group` (tables, no foreign keys),
+  `629_member_group_handle_index` (one concurrent unique index on live handles), `630_issue_ask_addressee_group`
+  (widens `issue_ask`'s addressee checks to `group`). Workspace deletion removes both tables' rows; a person who
+  left the workspace is ignored (duty is computed from current members).
+- **On duty** (`internal/membergroup.OnDuty`, the one rule the server and the API share): members without a full
+  day of time off today (patch 38); else their backups who aren't away; else the fallback; else every member (they
+  see it when back). A half day off still gets the mention.
+- **Mention:** `[@devops](mention://group/<id>)` (`util.MentionRe` gains `group`). `notifyMentionedMembers`
+  expands it next to `@squad`: each person on duty gets an ordinary `mentioned` item whose `details.via_group`
+  is `{id, handle}` (people named directly keep the plain item). Author skip, `mentioned` mute and per-issue dedupe
+  unchanged. Agents may mention a group; like patch 41, a flood is dropped: the same non-member author mentioning
+  the same group on more than 5 cards in 10 minutes notifies nobody for the extra cards (comment kept, logged
+  `dropping @group mention`). `hasMemberMention` counts a group, so a group ask doesn't fall back to the squad
+  leader; a group is never added as an issue subscriber; quick actions refuse group mentions like the others.
+- **Asks:** `multica issue ask create --to @devops` addresses the group (`addressee_type = 'group'`, id = the
+  group); the comment ends with the group mention. Any member's reply in the thread answers it (patch 30's rule).
+- **API:** `GET /api/groups`, `GET /api/groups/{id|handle}`, `GET /api/groups/{ref}/on-duty` (members and agents);
+  admins: `POST /api/groups`, `PATCH /api/groups/{ref}`, `PUT /api/groups/{ref}/members` (ordered `user_ids`),
+  `DELETE` (archives). A handle can't be reserved (`all`, `operator`, …), a person's handle or an agent's name.
+- **CLI:** `multica group list | get | on-duty [--first] | create | update | archive | members set <group> <people…>`.
+- **Clients:** older clients show a group mention as styled text (the markdown fallback for unknown types).
+
+Files: ours `server/internal/membergroup/`, `server/internal/handler/member_group{,_test}.go`,
+`server/cmd/server/contango_group_mention{s,_test}.go`, `server/cmd/multica/cmd_group.go`,
+`server/pkg/db/queries/member_group.sql` (+ generated). Upstream hooks: `util/mention.go` (regex),
+`notification_listeners.go` (expansion + details), `subscriber_listeners.go` (skip), `handler/comment.go`
+(`hasMemberMention`), `handler/squad.go` (`commentMentionsAnyone`), `handler/quick_action.go` (regex),
+`cmd/server/router.go`, `cmd/multica/main.go`, patch 30's `service/issue_ask.go`, `handler/issue_ask.go`,
+`cmd_issue_ask.go`; registries `cmd/migrate/main.go`, `migrations_lint_test.go`,
+`workspace_delete{.sql,_manifest_test.go}`.
+Rebase check: `MentionRe` and the TypeScript copies still list `group`; migrations 628–630 stay exempt (upstream
+v0.10.0 uses 628–664). Drop when: upstream ships mentionable groups of people.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's
