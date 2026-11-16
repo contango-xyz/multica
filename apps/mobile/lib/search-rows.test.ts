@@ -118,3 +118,30 @@ describe("buildSearchRows", () => {
     expect(shape(rows)).toEqual(["#Projects", "p-p1", "#Issues", "i-i1"]);
   });
 });
+
+describe("buildSearchRows find by id (contango patch 50)", () => {
+  const done = { id: "i-2850", identifier: "CTG-2850", number: 2850, title: "Shipped", status: "done" } as Issue;
+
+  it("pins the exact issue first and drops its duplicate from the results", () => {
+    const rows = buildSearchRows({
+      query: "ctg 2850",
+      issues: [issue({ id: "i-28", number: 28 }), issue({ id: "i-2850", number: 2850, status: "cancelled" })],
+      projects: [],
+      recentIssues: [],
+      goTo: { identifier: "CTG-2850", state: "found", issue: done },
+    });
+    expect(rows.slice(0, 2).map((row) => row.key)).toEqual(["h-goto", "goto-CTG-2850"]);
+    expect(rows.filter((row) => row.kind === "issue").map((row) => row.key)).toEqual(["i-i-28"]);
+  });
+
+  it("keeps a missing id's row so the screen can say so", () => {
+    const rows = buildSearchRows({
+      query: "#404",
+      issues: [],
+      projects: [],
+      recentIssues: [],
+      goTo: { identifier: "CTG-404", state: "missing", issue: null },
+    });
+    expect(rows.map((row) => row.kind)).toEqual(["header", "goto"]);
+  });
+});

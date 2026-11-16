@@ -297,5 +297,11 @@
   "summary.chat": "Chat run",
   "summary.direct": "Run",
   "cancel.title": "Cancel run?",
-  "cancel.cancel_task": "Cancel run"
+  "cancel.cancel_task": "Cancel run",
+  "id_jump": {
+    "group": "Go to issue",
+    "looking_up": "Looking up {{identifier}}…",
+    "missing": "{{identifier}} doesn't exist in this workspace",
+    "failed": "Couldn't look up {{identifier}}"
+  }
 }

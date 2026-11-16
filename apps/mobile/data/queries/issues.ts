@@ -7,7 +7,7 @@
  * whole subtree with one call when needed.
  */
 import { queryOptions } from "@tanstack/react-query";
-import { api } from "@/data/api";
+import { api, ApiError } from "@/data/api";
 import { issueKeys } from "./issue-keys";
 
 export { issueKeys } from "./issue-keys";
@@ -17,6 +17,27 @@ export const issueDetailOptions = (wsId: string | null, id: string) =>
     queryKey: issueKeys.detail(wsId, id),
     queryFn: ({ signal }) => api.getIssue(id, { signal }),
     enabled: !!wsId && !!id,
+  });
+
+/**
+ * Find by id (contango patch 50): the issue with this identifier, or null when
+ * it doesn't exist. An exact `GET /api/issues/{identifier}` read through the
+ * unique (workspace_id, number) index, never the full-text search, so it sees
+ * every issue whatever its status.
+ */
+export const issueByIdentifierOptions = (wsId: string | null, identifier: string) =>
+  queryOptions({
+    queryKey: issueKeys.identifier(wsId, identifier),
+    queryFn: async ({ signal }) => {
+      try {
+        return await api.getIssue(identifier, { signal });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
+      }
+    },
+    enabled: !!wsId && !!identifier,
+    staleTime: 5 * 60_000,
   });
 
 /**

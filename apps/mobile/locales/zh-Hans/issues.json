@@ -295,5 +295,11 @@
   "picker.create_label": "创建 \"{{name}}\"",
   "comments.composer_pill": "添加评论，输入 @ 提及...",
   "resources.branch_hint": "运行会从这个分支开始，并针对它创建 Pull Request。留空则使用仓库默认分支。",
-  "resources.commit": "这是提交 ID，不是分支。运行会回传到起始分支。如需一次性修订，请给 multica repo checkout 传入 --ref。"
+  "resources.commit": "这是提交 ID，不是分支。运行会回传到起始分支。如需一次性修订，请给 multica repo checkout 传入 --ref。",
+  "id_jump": {
+    "group": "跳转到任务",
+    "looking_up": "正在查找 {{identifier}}…",
+    "missing": "此工作区中不存在 {{identifier}}",
+    "failed": "无法查找 {{identifier}}"
+  }
 }

@@ -27,6 +27,9 @@ export const issueKeys = {
   ) => [...issueKeys.myAll(wsId), scope, filter] as const,
   detail: (wsId: string | null, id: string) =>
     [...issueKeys.all(wsId), "detail", id] as const,
+  // Exact id lookup ("CTG-2850") for search's pinned Go-to row (contango patch 50).
+  identifier: (wsId: string | null, identifier: string) =>
+    [...issueKeys.all(wsId), "identifier", identifier] as const,
   timeline: (wsId: string | null, id: string) =>
     [...issueKeys.all(wsId), "timeline", id] as const,
   // Currently-running tasks for an issue (queued/dispatched/running). Drives

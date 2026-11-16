@@ -24,7 +24,8 @@ import {
   type ListRenderItem,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { parseIssueRef } from "@multica/core/issues/issue-ref";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import type {
@@ -45,11 +46,12 @@ import {
   selectViewedIssueIds,
   useViewedIssuesStore,
 } from "@/data/viewed-issues-store";
-import { issueDetailOptions } from "@/data/queries/issues";
+import { issueByIdentifierOptions, issueDetailOptions } from "@/data/queries/issues";
+import { workspaceListOptions } from "@/data/queries/workspaces";
 import { issueColumnCategory } from "@/lib/issue-status";
 import { useIssueStatuses } from "@/lib/use-issue-statuses";
 import { projectStatusLabel } from "@/lib/project-status";
-import { buildSearchRows, type RowItem } from "@/lib/search-rows";
+import { buildSearchRows, type GoToIssue, type RowItem } from "@/lib/search-rows";
 
 const DEBOUNCE_MS = 300;
 const ISSUE_LIMIT = 20;
@@ -63,6 +65,7 @@ const SEARCH_HEADER_LABELS: Record<string, string> = {
   "h-projects": "navigation:routes.projects",
   "h-issues": "navigation:routes.issues",
   "h-cancelled": "issues:status.cancelled",
+  "h-goto": "issues:id_jump.group",
 };
 
 // HighlightText — mobile port of web's HighlightText
@@ -300,6 +303,29 @@ function RecentRow({ item, slug }: RecentRowProps) {
   );
 }
 
+// The pinned "Go to CTG-2850" row (contango patch 50): the exact issue the
+// query names, whatever its status, or why there is none.
+function GoToIssueRow({ goTo, slug }: { goTo: GoToIssue; slug: string | null }) {
+  const { t } = useT("issues");
+  if (goTo.state !== "found" || !goTo.issue) {
+    const key =
+      goTo.state === "loading"
+        ? "id_jump.looking_up"
+        : goTo.state === "missing"
+          ? "id_jump.missing"
+          : "id_jump.failed";
+    return (
+      <View className="flex-row items-center gap-3 px-4 py-3">
+        {goTo.state === "loading" ? <ActivityIndicator size="small" color="#71717a" /> : null}
+        <Text className="text-sm text-muted-foreground">
+          {t(key, { identifier: goTo.identifier })}
+        </Text>
+      </View>
+    );
+  }
+  return <RecentRow item={goTo.issue} slug={slug} />;
+}
+
 // Screen
 
 interface SearchResultsState {
@@ -315,6 +341,21 @@ export default function SearchModal() {
   const { t } = useT("issues");
 
   const [query, setQuery] = useState("");
+  // Find by id (contango patch 50): "CTG-2850", "ctg 2850", "#2850", "2850".
+  const { data: workspaces } = useQuery(workspaceListOptions());
+  const issuePrefix = workspaces?.find((ws) => ws.id === wsId)?.issue_prefix;
+  const identifier = wsId ? parseIssueRef(query, issuePrefix) : null;
+  const idLookup = useQuery({
+    ...issueByIdentifierOptions(wsId, identifier ?? ""),
+    enabled: !!wsId && identifier !== null,
+    retry: 1,
+  });
+  const goTo = useMemo<GoToIssue | null>(() => {
+    if (identifier === null) return null;
+    if (idLookup.data) return { identifier, state: "found", issue: idLookup.data };
+    if (idLookup.data === null) return { identifier, state: "missing", issue: null };
+    return { identifier, state: idLookup.isError ? "error" : "loading", issue: null };
+  }, [identifier, idLookup.data, idLookup.isError]);
   const [results, setResults] = useState<SearchResultsState>(EMPTY_RESULTS);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -401,7 +442,7 @@ export default function SearchModal() {
 
   const trimmedQuery = query.trim();
   const hasResults =
-    results.issues.length > 0 || results.projects.length > 0;
+    results.issues.length > 0 || results.projects.length > 0 || goTo !== null;
 
   // Build the FlatList data. One flat array of discriminated rows means a
   // single virtualised list covers Recent (empty-state) and the search results
@@ -414,8 +455,9 @@ export default function SearchModal() {
         issues: results.issues,
         projects: results.projects,
         recentIssues,
+        goTo,
       }),
-    [query, results, recentIssues],
+    [query, results, recentIssues, goTo],
   );
 
   const renderItem = useCallback<ListRenderItem<RowItem>>(
@@ -433,6 +475,8 @@ export default function SearchModal() {
           return <SearchProjectRow item={item.project} query={item.query} slug={slug} />;
         case "recent":
           return <RecentRow item={item.issue} slug={slug} />;
+        case "goto":
+          return <GoToIssueRow goTo={item.goTo} slug={slug} />;
       }
     },
     [slug, t],
@@ -456,6 +500,9 @@ export default function SearchModal() {
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
+            onSubmitEditing={() => {
+              if (goTo?.issue && slug) navigateOnTap(slug, `/${slug}/issue/${goTo.issue.id}`);
+            }}
             clearButtonMode="while-editing"
             className="flex-1 text-base text-foreground"
           />

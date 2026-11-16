@@ -16,7 +16,18 @@ export type RowItem =
   | { kind: "header"; key: string; title: string }
   | { kind: "issue"; key: string; issue: SearchIssueResult; query: string }
   | { kind: "project"; key: string; project: SearchProjectResult; query: string }
-  | { kind: "recent"; key: string; issue: Issue };
+  | { kind: "recent"; key: string; issue: Issue }
+  | { kind: "goto"; key: string; goTo: GoToIssue };
+
+/**
+ * The pinned "Go to CTG-2850" row (contango patch 50): what the query reads
+ * as an issue id of this workspace, and the exact lookup's answer.
+ */
+export interface GoToIssue {
+  identifier: string;
+  state: "loading" | "found" | "missing" | "error";
+  issue: Issue | null;
+}
 
 /**
  * Builds the flat row list. Empty query → the Recent section; otherwise the
@@ -36,11 +47,13 @@ export function buildSearchRows({
   issues,
   projects,
   recentIssues,
+  goTo = null,
 }: {
   query: string;
   issues: SearchIssueResult[];
   projects: SearchProjectResult[];
   recentIssues: Issue[];
+  goTo?: GoToIssue | null;
 }): RowItem[] {
   const trimmedQuery = query.trim();
 
@@ -56,13 +69,18 @@ export function buildSearchRows({
     ];
   }
 
+  const pinnedId = goTo?.issue?.id ?? null;
   const parts = partitionAggregatedSearchResults({
-    issues,
+    issues: pinnedId ? issues.filter((issue) => issue.id !== pinnedId) : issues,
     projects,
     query: trimmedQuery,
   });
 
   const rows: RowItem[] = [];
+  if (goTo) {
+    rows.push({ kind: "header", key: "h-goto", title: "Go to issue" });
+    rows.push({ kind: "goto", key: `goto-${goTo.identifier}`, goTo });
+  }
   if (parts.liveProjects.length > 0) {
     rows.push({ kind: "header", key: "h-projects", title: "Projects" });
     for (const project of parts.liveProjects) {
