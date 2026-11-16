@@ -22,11 +22,11 @@ import { isMentionBoundaryAfter } from "@multica/core/markdown";
 
 const SENTINEL = "⁣";
 
-export type MentionType = "member" | "agent" | "squad" | "all" | "issue";
+export type MentionType = "member" | "agent" | "squad" | "group" | "all" | "issue";
 
 export interface MentionMarker {
   type: MentionType;
-  /** UUID for member/agent/squad/issue, the literal "all" for @all. */
+  /** UUID for member/agent/squad/group/issue, the literal "all" for @all. */
   id: string;
   /** Display name without the leading `@`. For issues this is the
    *  identifier (e.g. "MUL-123"). May contain non-ASCII chars. */

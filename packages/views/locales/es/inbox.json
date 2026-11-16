@@ -98,7 +98,8 @@
     "created_with_agent": "Creada con agente: {{identifier}}",
     "failed_with_detail": "Falló: {{detail}}",
     "autopilot_quota_blocked": "Ejecución bloqueada porque se alcanzó el límite",
-    "children_done_stage": "Sub-tareas de la etapa {{stage}} finalizadas"
+    "children_done_stage": "Sub-tareas de la etapa {{stage}} finalizadas",
+    "mentioned_via_group": "Mención vía @{{handle}}"
   },
   "toasts": {
     "source_context_retry_started": "Reintento iniciado con el contexto original",

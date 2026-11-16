@@ -95,6 +95,12 @@ describe("mention tokenizer", () => {
     expect(token!.attributes.label).toBe("Bot[v2][beta]");
   });
 
+  it("round-trips a role group mention (contango patch 48)", () => {
+    const md = renderMarkdown({ attrs: { id: "g-1", label: "devops", type: "group" } });
+    expect(md).toBe("[@devops](mention://group/g-1)");
+    expect(tokenize(md)!.attributes).toEqual({ label: "devops", type: "group", id: "g-1" });
+  });
+
   it("parses issue mentions without @ prefix", () => {
     const token = tokenize("[MUL-123](mention://issue/aaa-bbb)");
     expect(token).toBeDefined();

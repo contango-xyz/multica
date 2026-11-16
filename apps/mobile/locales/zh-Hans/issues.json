@@ -185,7 +185,10 @@
     "search_members_agents": "搜索成员或智能体",
     "search_people_issues": "搜索成员或任务",
     "reference_issue": "引用任务",
-    "clear": "清除"
+    "clear": "清除",
+    "group": "群组",
+    "groups": "群组",
+    "people_count_other": "{{count}} 人"
   },
   "comments": {
     "reply": "回复",

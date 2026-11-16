@@ -96,7 +96,8 @@
     "created_with_agent": "通过智能体创建：{{identifier}}",
     "failed_with_detail": "失败：{{detail}}",
     "autopilot_quota_blocked": "执行已被阻止：额度已用完",
-    "children_done_stage": "第 {{stage}} 阶段的子任务已全部结束"
+    "children_done_stage": "第 {{stage}} 阶段的子任务已全部结束",
+    "mentioned_via_group": "通过 @{{handle}} 提及了你"
   },
   "toasts": {
     "source_context_retry_started": "已使用原始上下文开始重试",

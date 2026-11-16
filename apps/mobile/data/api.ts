@@ -14,6 +14,7 @@
  *   4. Bearer auth + X-Workspace-Slug — NOT cookie auth (no CSRF, no credentials)
  */
 import type {
+  MemberGroup,
   Agent,
   AgentTask,
   Attachment,
@@ -80,6 +81,8 @@ import {
   ListIssueStatusesResponseSchema,
   TimelineEntriesSchema,
   WorkspaceSubscriptionSummarySchema,
+  MemberGroupListResponseSchema,
+  EMPTY_MEMBER_GROUP_LIST,
 } from "@multica/core/api/schemas";
 import type {
   AppConfigResponse,
@@ -665,6 +668,24 @@ class ApiClient {
     return parseWithFallback(raw, SquadListSchema, EMPTY_SQUAD_LIST, {
       endpoint: "listSquads",
     });
+  }
+
+  /**
+   * Role mention groups (contango patch 48): @devops, @fe, ... Core's pure
+   * schema. A server without the groups patch 404s the route, which means
+   * "no groups" rather than an error the composer would have to show.
+   */
+  async listMemberGroups(opts?: { signal?: AbortSignal }): Promise<MemberGroup[]> {
+    let raw: unknown;
+    try {
+      raw = await this.fetch<unknown>("/api/groups", { signal: opts?.signal });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return [];
+      throw error;
+    }
+    return parseWithFallback(raw, MemberGroupListResponseSchema, EMPTY_MEMBER_GROUP_LIST, {
+      endpoint: "listMemberGroups",
+    }).groups;
   }
 
   // --- Issues ---

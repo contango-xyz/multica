@@ -187,7 +187,11 @@
     "search_members_agents": "Search members or agents",
     "search_people_issues": "Search people or issues",
     "reference_issue": "Reference an issue",
-    "clear": "Clear"
+    "clear": "Clear",
+    "group": "Group",
+    "groups": "Groups",
+    "people_count_one": "{{count}} person",
+    "people_count_other": "{{count}} people"
   },
   "comments": {
     "reply": "Reply",

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { createRef, type ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { workspaceKeys } from "@multica/core/workspace/queries";
+import { memberGroupKeys } from "@multica/core/member-groups/queries";
 import { issueKeys, PAGINATED_CATEGORIES } from "@multica/core/issues/queries";
 import { statusCategoryOfKey } from "@multica/core/issues";
 import { I18nProvider } from "@multica/core/i18n/react";
@@ -121,6 +122,7 @@ function fakeQc(data: {
     leader_id: string;
   }>;
   issues?: Array<{ id: string; identifier: string; title: string; status: string }>;
+  groups?: Array<{ id: string; handle: string; name: string; description: string; members: unknown[] }>;
 }): QueryClient {
   const map = new Map<string, unknown>();
   map.set(JSON.stringify(workspaceKeys.members("ws-1")), data.members ?? []);
@@ -143,6 +145,7 @@ function fakeQc(data: {
   }));
   map.set(JSON.stringify(workspaceKeys.agents("ws-1")), agentsWithPermissions);
   map.set(JSON.stringify(workspaceKeys.squads("ws-1")), data.squads ?? []);
+  if (data.groups) map.set(JSON.stringify(memberGroupKeys.list("ws-1")), data.groups);
   const byStatus: ListIssuesCache["byStatus"] = {};
   for (const status of PAGINATED_CATEGORIES) {
     const bucket = (data.issues ?? []).filter(
@@ -914,6 +917,60 @@ describe("createMentionSuggestion", () => {
 
     expect(squad).toBeDefined();
     expect(squad?.disabledReason).toBeUndefined();
+  });
+
+  describe("role groups (contango patch 48)", () => {
+    const groups = [
+      { id: "g1", handle: "devops", name: "DevOps", description: "Infra and deploys", members: [{}, {}] },
+      { id: "g2", handle: "fe", name: "Frontend", description: "Web and desktop UI", members: [{}] },
+    ];
+
+    it("lists groups after All members and before people", () => {
+      const qc = fakeQc({
+        members: [{ user_id: "u1", name: "Alice", role: "member" }],
+        groups,
+      });
+      const items = createMentionSuggestion(qc).items!(itemArgs("")) as MentionItem[];
+      expect(items.slice(0, 4).map((i) => `${i.type}:${i.id}`)).toEqual([
+        "all:all",
+        "group:g1",
+        "group:g2",
+        "member:u1",
+      ]);
+      expect(items[1]).toMatchObject({ label: "devops", description: "DevOps", memberCount: 2 });
+    });
+
+    it.each([
+      ["devo", ["g1"]],
+      ["frontend", ["g2"]],
+      ["deploys", ["g1"]],
+      ["nobody", []],
+    ])("matches %j on handle, name or description", (query, ids) => {
+      const qc = fakeQc({ groups });
+      const items = createMentionSuggestion(qc).items!(itemArgs(query)) as MentionItem[];
+      expect(items.filter((i) => i.type === "group").map((i) => i.id)).toEqual(ids);
+    });
+
+    it("offers no groups when the cache is cold or the server has none", () => {
+      const items = createMentionSuggestion(fakeQc({})).items!(itemArgs("")) as MentionItem[];
+      expect(items.some((i) => i.type === "group")).toBe(false);
+    });
+
+    it("renders @handle, name, size and a Group badge, and selects a group mention", () => {
+      const command = vi.fn<(item: MentionItem) => void>();
+      const group: MentionItem = { id: "g1", label: "devops", type: "group", description: "DevOps", memberCount: 2 };
+      render(
+        <I18nWrapper>
+          <MentionList items={[group]} query="" command={command} />
+        </I18nWrapper>,
+      );
+      expect(screen.getByText("@devops")).toBeInTheDocument();
+      expect(screen.getByText("DevOps")).toBeInTheDocument();
+      expect(screen.getByText("2 people")).toBeInTheDocument();
+      expect(screen.getByText("Group")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("@devops"));
+      expect(command).toHaveBeenCalledWith(expect.objectContaining({ type: "group", id: "g1", label: "devops" }));
+    });
   });
 
   it("returns no squads when the squads cache is empty (not yet fetched)", () => {

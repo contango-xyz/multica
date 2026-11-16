@@ -110,7 +110,10 @@
     "group_current": "Page actuelle",
     "group_recent": "Consultés récemment",
     "group_search": "Résultats de recherche",
-    "group_cancelled": "Annulés"
+    "group_cancelled": "Annulés",
+    "group_badge": "Groupe",
+    "group_people_count_one": "{{count}} personne",
+    "group_people_count_other": "{{count}} personnes"
   },
   "slash_command": {
     "no_skills_configured": "Aucun skill configuré",

@@ -887,7 +887,12 @@ handover is one membership change instead of edits to prompts and scripts. Upstr
   admins: `POST /api/groups`, `PATCH /api/groups/{ref}`, `PUT /api/groups/{ref}/members` (ordered `user_ids`),
   `DELETE` (archives). A handle can't be reserved (`all`, `operator`, …), a person's handle or an agent's name.
 - **CLI:** `multica group list | get | on-duty [--first] | create | update | archive | members set <group> <people…>`.
-- **Clients:** older clients show a group mention as styled text (the markdown fallback for unknown types).
+- **Clients (web/desktop/iOS):** `GET /api/groups` through a zod schema (404 from an older server = no groups);
+  the @ picker lists groups after "All members" and before people (`@handle`, name, "N people", Group badge;
+  matched on handle, name and description) and inserts `[@handle](mention://group/<id>)`; a group mention renders
+  as a mention chip with a people icon; a `mentioned` inbox row with `details.via_group` reads "Mentioned via
+  @handle" (Classic and Smart lists; a mention folded into a Smart signal keeps the signal's text). iOS offers
+  groups in the composer suggestion bar and the mention picker. Older clients show a group mention as styled text.
 
 Files: ours `server/internal/membergroup/`, `server/internal/handler/member_group{,_test}.go`,
 `server/cmd/server/contango_group_mention{s,_test}.go`, `server/cmd/multica/cmd_group.go`,
@@ -897,6 +902,16 @@ Files: ours `server/internal/membergroup/`, `server/internal/handler/member_grou
 `cmd/server/router.go`, `cmd/multica/main.go`, patch 30's `service/issue_ask.go`, `handler/issue_ask.go`,
 `cmd_issue_ask.go`; registries `cmd/migrate/main.go`, `migrations_lint_test.go`,
 `workspace_delete{.sql,_manifest_test.go}`.
+Clients: ours `packages/core/member-groups/queries.ts`, `packages/core/inbox/via-group{,.test}.ts`,
+`packages/core/api/member-groups.test.ts`, `packages/views/common/group-mention-chip.tsx`,
+`apps/mobile/data/queries/member-groups.ts`, `apps/mobile/lib/mention-groups{,.test}.ts`. Upstream hooks:
+core `api/client.ts`, `api/schemas.ts`, `types/api.ts`, `package.json`, `issues/comment-trigger-outcomes.ts` (regex);
+ui `markdown/Markdown.tsx` (regex); views `editor/extensions/mention-suggestion.tsx`, `mention-view.tsx`,
+`editor/content-editor.tsx` (warms the groups cache), `rich-content/rich-content.tsx`,
+`inbox/components/inbox-detail-label.tsx`, locales `editor.json` + `inbox.json`; mobile `data/api.ts`,
+`lib/mention-serialize.ts`, `data/stores/mention-draft-store.ts`, `components/issue/{mention-suggestion-bar,
+composer-attachment-row}.tsx`, `components/issue/pickers/mention-picker-body.tsx`, `lib/markdown/markdown.tsx`,
+locales `issues.json`.
 Rebase check: `MentionRe` and the TypeScript copies still list `group`; migrations 628–630 stay exempt (upstream
 v0.10.0 uses 628–664). Drop when: upstream ships mentionable groups of people.
 

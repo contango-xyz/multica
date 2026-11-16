@@ -146,6 +146,7 @@ export function Markdown({
       //   mention://member/<uuid>  → no-op (no member profile screen yet)
       //   mention://agent/<uuid>   → no-op (no agent profile screen yet)
       //   mention://squad/<uuid>   → no-op (no squad profile screen yet)
+      //   mention://group/<uuid>   → no-op (role group, contango patch 48)
       //   mention://all/all        → no-op (semantic only — "everyone")
       //   anything malformed       → no-op
       if (url.startsWith("mention://")) {

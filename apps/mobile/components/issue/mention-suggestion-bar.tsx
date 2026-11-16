@@ -7,9 +7,11 @@
  * `comment` sections:
  *   1. `@all` (single static row; visible when query matches "all"
  *      prefix or is empty)
- *   2. Members — sorted alphabetically
- *   3. Agents — sorted alphabetically
- *   4. Squads — sorted alphabetically (archived hidden). Selecting a squad
+ *   2. Role groups (contango patch 48) — server order; selecting one emits
+ *      `mention://group/<uuid>` and the server notifies whoever is on duty
+ *   3. Members — sorted alphabetically
+ *   4. Agents — sorted alphabetically
+ *   5. Squads — sorted alphabetically (archived hidden). Selecting a squad
  *      emits `mention://squad/<uuid>`; backend wakes the squad's leader
  *      agent (server/internal/handler/comment.go:444).
  *
@@ -24,8 +26,9 @@
  */
 import { useMemo } from "react";
 import { FlatList, Pressable, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import type { Agent, Issue, MemberWithUser, Squad } from "@multica/core/types";
+import type { Agent, Issue, MemberGroup, MemberWithUser, Squad } from "@multica/core/types";
 import { canAssignAgentToIssue } from "@multica/core/permissions";
 import { Text } from "@/components/ui/text";
 import { ActorAvatar } from "@/components/ui/actor-avatar";
@@ -40,6 +43,8 @@ import { useT } from "@/lib/i18n";
 import { memberListOptions } from "@/data/queries/members";
 import { agentListOptions } from "@/data/queries/agents";
 import { squadListOptions } from "@/data/queries/squads";
+import { memberGroupListOptions } from "@/data/queries/member-groups";
+import { matchMentionGroups } from "@/lib/mention-groups";
 import { issueDetailOptions } from "@/data/queries/issues";
 import { myIssueListOptions } from "@/data/queries/my-issues";
 import { useAuthStore } from "@/data/auth-store";
@@ -50,6 +55,8 @@ import {
 } from "@/data/viewed-issues-store";
 import type { MentionMarker } from "@/lib/mention-serialize";
 import { cn } from "@/lib/utils";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { THEME } from "@/lib/theme";
 import { isAgentRuntimeBound } from "@/lib/is-agent-runtime-bound";
 
 type Mode = "comment" | "chat";
@@ -57,6 +64,7 @@ type Mode = "comment" | "chat";
 type Row =
   | { kind: "all" }
   | { kind: "section"; label: string }
+  | { kind: "group"; group: MemberGroup }
   | { kind: "member"; member: MemberWithUser }
   | { kind: "agent"; agent: Agent }
   | { kind: "squad"; squad: Squad }
@@ -87,6 +95,8 @@ export function MentionSuggestionBar({
   // status's identity here. (MUL-6243)
   const catalog = useIssueStatuses();
   const { t } = useT("issues");
+  const { colorScheme } = useColorScheme();
+  const mutedColor = THEME[colorScheme].mutedForeground;
 
   // Comment-mode data — disabled in chat mode to avoid wasted fetches.
   const { data: members = [] } = useQuery({
@@ -99,6 +109,10 @@ export function MentionSuggestionBar({
   });
   const { data: squads = [] } = useQuery({
     ...squadListOptions(wsId),
+    enabled: !isChat && !!wsId,
+  });
+  const { data: groups = [] } = useQuery({
+    ...memberGroupListOptions(wsId),
     enabled: !isChat && !!wsId,
   });
 
@@ -199,8 +213,14 @@ export function MentionSuggestionBar({
       )
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    const matchedGroups = matchMentionGroups(groups, q);
+
     const out: Row[] = [];
     if (showAll) out.push({ kind: "all" });
+    if (matchedGroups.length > 0) {
+      out.push({ kind: "section", label: t("picker.groups") });
+      for (const g of matchedGroups) out.push({ kind: "group", group: g });
+    }
     if (matchedMembers.length > 0) {
       out.push({ kind: "section", label: t("picker.people") });
       for (const m of matchedMembers) out.push({ kind: "member", member: m });
@@ -215,7 +235,7 @@ export function MentionSuggestionBar({
     }
     if (out.length === 0) out.push({ kind: "empty" });
     return out;
-  }, [isChat, query, recentIssues, myIssuesAll, members, agents, squads, userId, t]);
+  }, [isChat, query, recentIssues, myIssuesAll, members, agents, squads, groups, userId, t]);
 
   if (!visible) return null;
 
@@ -238,7 +258,9 @@ export function MentionSuggestionBar({
             ? "row:all"
             : row.kind === "section"
               ? `row:section:${row.label}`
-              : row.kind === "member"
+              : row.kind === "group"
+                ? `row:g:${row.group.id}`
+                : row.kind === "member"
                 ? `row:m:${row.member.user_id}`
                 : row.kind === "agent"
                   ? `row:a:${row.agent.id}`
@@ -285,6 +307,35 @@ export function MentionSuggestionBar({
                   {t("suggestions.everyone")}
                 </Text>
                 <Badge label={t("suggestions.all")} />
+              </Pressable>
+            );
+          }
+          if (item.kind === "group") {
+            return (
+              <Pressable
+                onPress={() =>
+                  onSelect({
+                    type: "group",
+                    id: item.group.id,
+                    name: item.group.handle,
+                  })
+                }
+                className="flex-row items-center gap-3 px-3 py-2 active:bg-secondary"
+              >
+                <View className="size-7 rounded-full bg-secondary items-center justify-center">
+                  <Ionicons name="people" size={14} color={mutedColor} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm text-foreground" numberOfLines={1}>
+                    @{item.group.handle}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                    {item.group.name
+                      ? `${item.group.name} · ${t("picker.people_count", { count: item.group.members.length })}`
+                      : t("picker.people_count", { count: item.group.members.length })}
+                  </Text>
+                </View>
+                <Badge label={t("picker.group")} tone="outline" />
               </Pressable>
             );
           }

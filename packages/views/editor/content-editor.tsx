@@ -47,6 +47,8 @@ import { useWorkspaceSlug } from "@multica/core/paths";
 import { useQueryClient } from "@tanstack/react-query";
 import { issueIdentifierOptions } from "@multica/core/issues/queries";
 import { workspaceListOptions } from "@multica/core/workspace/queries";
+import { memberGroupListOptions } from "@multica/core/member-groups/queries";
+import { getCurrentWsId } from "@multica/core/platform";
 import { isIssueIdentifier } from "@multica/ui/markdown";
 import type { Attachment } from "@multica/core/types";
 import {
@@ -517,6 +519,15 @@ const ContentEditor = forwardRef<ContentEditorRef, ContentEditorProps>(
     flushPendingOnUnmountRef.current = flushPendingOnUnmount;
 
     const queryClient = useQueryClient();
+
+    // Role mention groups (contango patch 48) are read from the cache by the
+    // @ picker, which runs outside React; warm them so @devops is offered on
+    // the first keystroke.
+    useEffect(() => {
+      if (disableMentions) return;
+      const wsId = getCurrentWsId();
+      if (wsId) void queryClient.prefetchQuery(memberGroupListOptions(wsId));
+    }, [queryClient, disableMentions]);
 
     // Linear-style bare identifier autolink resolver. Fully lazy — it runs only
     // on user input, never on render, so it adds no query hook to this widely

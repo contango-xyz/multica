@@ -106,7 +106,9 @@
     "group_current": "當前頁面",
     "group_recent": "最近瀏覽",
     "group_search": "搜尋結果",
-    "group_cancelled": "已取消"
+    "group_cancelled": "已取消",
+    "group_badge": "群組",
+    "group_people_count_other": "{{count}} 人"
   },
   "slash_command": {
     "no_skills_configured": "暫無配置的技能",

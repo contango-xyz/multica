@@ -8,10 +8,11 @@
  *
  * Sections (alphabetical within each):
  *   1. `@all` (pinned top, filtered by query)
- *   2. People
- *   3. Agents
- *   4. Squads (archived hidden)
- *   5. Issues (server-side `api.searchIssues`, debounced 200ms; empty
+ *   2. Role groups (contango patch 48; server order)
+ *   3. People
+ *   4. Agents
+ *   5. Squads (archived hidden)
+ *   6. Issues (server-side `api.searchIssues`, debounced 200ms; empty
  *      query → no issues section, matching web's mention-suggestion.tsx)
  *
  * Mobile is the iOS-native equivalent of shadcn's `CommandDialog` — search
@@ -27,6 +28,7 @@ import { useColorScheme } from "nativewind";
 import type {
   Agent,
   Issue,
+  MemberGroup,
   MemberWithUser,
   Squad,
 } from "@multica/core/types";
@@ -38,6 +40,8 @@ import { useIssueStatuses } from "@/lib/use-issue-statuses";
 import { memberListOptions } from "@/data/queries/members";
 import { agentListOptions } from "@/data/queries/agents";
 import { squadListOptions } from "@/data/queries/squads";
+import { memberGroupListOptions } from "@/data/queries/member-groups";
+import { matchMentionGroups } from "@/lib/mention-groups";
 import { api } from "@/data/api";
 import { useWorkspaceStore } from "@/data/workspace-store";
 import {
@@ -56,6 +60,7 @@ const AVATAR_SIZE = 36;
 type Row =
   | { kind: "section"; label: string }
   | { kind: "all" }
+  | { kind: "group"; group: MemberGroup }
   | { kind: "member"; member: MemberWithUser }
   | { kind: "agent"; agent: Agent }
   | { kind: "squad"; squad: Squad }
@@ -79,6 +84,10 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
   const { data: members = [] } = useQuery(memberListOptions(wsId));
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
   const { data: squads = [] } = useQuery(squadListOptions(wsId));
+  const { data: groups = [] } = useQuery({
+    ...memberGroupListOptions(wsId),
+    enabled: mode === "comment" && !!wsId,
+  });
   const runnableAgentIds = useMemo(
     () =>
       new Set(
@@ -136,6 +145,7 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
   const isSelected = (row: Row): boolean => {
     if (row.kind === "section") return false;
     if (row.kind === "all") return isSelectedKey("all", "all");
+    if (row.kind === "group") return isSelectedKey("group", row.group.id);
     if (row.kind === "member")
       return isSelectedKey("member", row.member.user_id);
     if (row.kind === "agent") return isSelectedKey("agent", row.agent.id);
@@ -156,6 +166,12 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
     if (mode === "comment") {
       if (!q || "all".includes(q)) {
         out.push({ kind: "all" });
+      }
+      const groupRows = matchMentionGroups(groups, q).map(
+        (g): Row => ({ kind: "group", group: g }),
+      );
+      if (groupRows.length > 0) {
+        out.push({ kind: "section", label: t("picker.groups") }, ...groupRows);
       }
       const memberRows = [...members]
         .filter((m) => matchName(m.name))
@@ -187,11 +203,13 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
       }
     }
     return out;
-  }, [mode, members, agents, squads, issueResults, query, t]);
+  }, [mode, members, agents, squads, groups, issueResults, query, t]);
 
   const pick = (row: Row) => {
     let chip: MentionChipDraft | null = null;
     if (row.kind === "all") chip = { type: "all", id: "all", name: "all" };
+    else if (row.kind === "group")
+      chip = { type: "group", id: row.group.id, name: row.group.handle };
     else if (row.kind === "member")
       chip = {
         type: "member",
@@ -225,6 +243,7 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
       keyExtractor={(row, idx) => {
         if (row.kind === "section") return `section:${row.label}:${idx}`;
         if (row.kind === "all") return "all";
+        if (row.kind === "group") return `g:${row.group.id}`;
         if (row.kind === "member") return `m:${row.member.user_id}`;
         if (row.kind === "agent") return `a:${row.agent.id}`;
         if (row.kind === "squad") return `s:${row.squad.id}`;
@@ -253,7 +272,7 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
               needsRuntime && "opacity-50",
             )}
           >
-            {item.kind === "all" ? (
+            {item.kind === "all" || item.kind === "group" ? (
               <View
                 className="rounded-full bg-primary/10 items-center justify-center"
                 style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
@@ -295,6 +314,17 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
                   {item.issue.title}
                 </Text>
               </View>
+            ) : item.kind === "group" ? (
+              <View className="flex-1">
+                <Text className="text-base text-foreground" numberOfLines={1}>
+                  @{item.group.handle}
+                </Text>
+                {item.group.name ? (
+                  <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                    {item.group.name}
+                  </Text>
+                ) : null}
+              </View>
             ) : (
               <Text className="flex-1 text-base text-foreground">
                 {item.kind === "all"
@@ -306,7 +336,11 @@ export function MentionPickerBody({ query, mode = "comment" }: Props) {
                       : item.squad.name}
               </Text>
             )}
-            {item.kind === "agent" ? (
+            {item.kind === "group" ? (
+              <Text className="text-sm text-muted-foreground">
+                {t("picker.people_count", { count: item.group.members.length })}
+              </Text>
+            ) : item.kind === "agent" ? (
               <Text className="text-sm text-muted-foreground">
                 {isAgentRuntimeBound(item.agent)
                   ? t("picker.agent")

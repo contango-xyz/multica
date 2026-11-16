@@ -185,3 +185,22 @@ describe("InboxDetailLabel smart-inbox signals", () => {
     expect(container.textContent).toBe(en.smart.sections.alert);
   });
 });
+
+describe("InboxDetailLabel role group mentions (contango patch 48)", () => {
+  it("names the group a mention came through", () => {
+    const { container } = render(
+      <InboxDetailLabel
+        item={item({
+          type: "mentioned",
+          details: { via_group: { id: "g1", handle: "devops" } } as unknown as Record<string, string>,
+        })}
+      />,
+    );
+    expect(container.textContent).toBe("Mentioned via @devops");
+  });
+
+  it("keeps the plain label for a direct mention", () => {
+    const { container } = render(<InboxDetailLabel item={item({ type: "mentioned", details: { comment_id: "c1" } })} />);
+    expect(container.textContent).toBe("Mentioned");
+  });
+});

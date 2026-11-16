@@ -752,3 +752,32 @@ export interface AvailabilityResponse {
   today: string;
   members: MemberAvailability[];
 }
+
+// Contango fork (patch 48): role mention groups (@devops, @fe, ...).
+
+/** "members" | "backups" | "fallback" | "away_members" | "nobody"; unknown values pass through. */
+export type MemberGroupOnDutyVia = string;
+
+export interface MemberGroupPerson {
+  user_id: string;
+  name: string;
+  email: string;
+  handle: string;
+  away: boolean;
+  backup_user_id: string | null;
+}
+
+/** One entry of GET /api/groups. Mention markdown: `[@handle](mention://group/<id>)`. */
+export interface MemberGroup {
+  id: string;
+  handle: string;
+  name: string;
+  description: string;
+  fallback_user_id: string | null;
+  members: MemberGroupPerson[];
+  on_duty: string[];
+  on_duty_via: MemberGroupOnDutyVia;
+  mention: string;
+  created_at: string;
+  updated_at: string;
+}

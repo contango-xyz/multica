@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tokenAtCursor } from "./mention-serialize";
+import { insertMention, serializeMentions, tokenAtCursor } from "./mention-serialize";
 
 // The mobile half of the shared boundary rule. The rule's own matrix lives in
 // packages/core/markdown/mention-boundary.test.ts; this covers the wiring — that
@@ -44,5 +44,20 @@ describe("tokenAtCursor boundary", () => {
 
   it("still returns the query when the cursor is mid-token", () => {
     expect(tokenAtCursor("你好@Mi", 5)).toEqual({ start: 2, query: "Mi" });
+  });
+});
+
+describe("role group mentions (contango patch 48)", () => {
+  it("serializes a group picked from the suggestions as mention://group", () => {
+    const text = "ping @dev";
+    const token = tokenAtCursor(text, text.length)!;
+    const { newText, marker } = insertMention(
+      text,
+      { start: token.start, queryLength: token.query.length },
+      { type: "group", id: "g-1", name: "devops" },
+    );
+    expect(serializeMentions(`${newText}please`, [marker])).toBe(
+      "ping [@devops](mention://group/g-1) please",
+    );
   });
 });

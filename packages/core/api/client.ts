@@ -17,6 +17,7 @@ import type {
   IssueDuplicates,
   DependencyGraph,
   AvailabilityResponse,
+  MemberGroup,
   GroupedIssuesResponse,
   ListIssuesResponse,
   SearchIssuesResponse,
@@ -285,6 +286,8 @@ import {
   IssueDuplicatesResponseSchema,
   DependencyGraphResponseSchema,
   AvailabilityResponseSchema,
+  MemberGroupListResponseSchema,
+  EMPTY_MEMBER_GROUP_LIST,
   ChildIssueProgressResponseSchema,
   CommentsListSchema,
   CommentTriggerPreviewSchema,
@@ -1632,6 +1635,21 @@ export class ApiClient {
     return parseWithFallback(raw, AvailabilityResponseSchema, { from: "", to: "", today: "", members: [] }, {
       endpoint: "GET /api/availability",
     }) as AvailabilityResponse;
+  }
+
+  // Contango fork (patch 48): role mention groups. A backend predating the
+  // groups patch 404s this route; that means "no groups", not an error.
+  async listMemberGroups(): Promise<MemberGroup[]> {
+    let raw: unknown;
+    try {
+      raw = await this.fetch<unknown>("/api/groups");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return [];
+      throw error;
+    }
+    return parseWithFallback(raw, MemberGroupListResponseSchema, EMPTY_MEMBER_GROUP_LIST, {
+      endpoint: "GET /api/groups",
+    }).groups;
   }
 
   async updateMyAvailability(input: { backup_user_id?: string; personal_ical_url?: string }): Promise<void> {

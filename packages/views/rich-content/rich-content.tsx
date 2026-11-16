@@ -59,6 +59,7 @@ import {
 import { IssueMentionCard } from "../issues/components/issue-mention-card";
 import { useResolveIssueIdentifier } from "../issues/hooks";
 import { ProjectMentionCard } from "../projects/components/project-mention-card";
+import { GroupMentionChip } from "../common/group-mention-chip";
 import { useLinkHover, LinkHoverCard } from "../editor/link-hover-card";
 import {
   openLink,
@@ -269,7 +270,7 @@ function RichLink({ href, children }: { href?: string; children?: ReactNode }) {
     : undefined;
 
   if (isMentionHref(href)) {
-    const match = href.match(/^mention:\/\/(member|agent|issue|project|all)\/(.+)$/);
+    const match = href.match(/^mention:\/\/(member|agent|group|issue|project|all)\/(.+)$/);
     if (match?.[1] === "issue" && match[2]) {
       // A bare identifier (from the autolink preprocessor) is carried as the id
       // segment; a real mention carries a UUID. Dispatch on the id shape.
@@ -285,6 +286,9 @@ function RichLink({ href, children }: { href?: string; children?: ReactNode }) {
     }
     if (match?.[1] === "project" && match[2]) {
       return <ProjectMentionLink projectId={match[2]} label={childrenToLabel(children)} />;
+    }
+    if (match?.[1] === "group") {
+      return <GroupMentionChip>{children}</GroupMentionChip>;
     }
     // Member / agent / all mentions
     return <span className="mention">{children}</span>;

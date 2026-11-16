@@ -16,6 +16,7 @@ import { flattenIssueBuckets, issueKeys } from "@multica/core/issues/queries";
 import { issueStatusCategory } from "@multica/core/issues";
 import { useIssueStatuses } from "@multica/core/issue-statuses/hooks";
 import { workspaceKeys } from "@multica/core/workspace/queries";
+import { memberGroupKeys } from "@multica/core/member-groups/queries";
 import { useAuthStore } from "@multica/core/auth";
 import { canAssignAgentToIssue } from "@multica/core/permissions";
 import { isAgentRuntimeBound } from "@multica/core/agents";
@@ -32,8 +33,9 @@ import type {
   MemberWithUser,
   Agent,
   Squad,
+  MemberGroup,
 } from "@multica/core/types";
-import { ListTodo } from "@multica/ui/icons";
+import { ListTodo, Users } from "@multica/ui/icons";
 import { ActorAvatar } from "../../common/actor-avatar";
 import { StatusIcon } from "../../issues/components/status-icon";
 import { ProjectIcon } from "../../projects/components/project-icon";
@@ -71,7 +73,7 @@ import { blockedReasonLabel } from "../../issues/blocked-trigger-copy";
 export interface MentionItem {
   id: string;
   label: string;
-  type: "member" | "agent" | "squad" | "issue" | "project" | "all";
+  type: "member" | "agent" | "squad" | "group" | "issue" | "project" | "all";
   /** Optional grouping hint for injected context items. */
   group?: "current" | "recent" | "search";
   /** Secondary text shown beside the label (e.g. issue title) */
@@ -89,6 +91,8 @@ export interface MentionItem {
   icon?: string | null;
   /** Project status snapshot for recent/current project rendering */
   projectStatus?: ProjectStatus;
+  /** Role group (contango patch 48): how many people the group lists. */
+  memberCount?: number;
   /** Present when the target should remain discoverable but cannot be selected. */
   disabledReason?: "agent_runtime_required";
 }
@@ -616,6 +620,36 @@ function MentionRow({
     );
   }
 
+  if (item.type === "group") {
+    // Role group (contango patch 48): @handle, the group's name, its size.
+    return (
+      <button
+        type="button"
+        ref={buttonRef}
+        className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-caption transition-colors ${
+          selected ? "bg-accent" : "hover:bg-accent/50"
+        }`}
+        onClick={onSelect}
+      >
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Users className="size-3.5" />
+        </span>
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium">@{item.label}</span>
+          {item.description && (
+            <span className="ml-1.5 text-muted-foreground">{item.description}</span>
+          )}
+        </span>
+        <span className="shrink-0 text-muted-foreground">
+          {t(($) => $.mention.group_people_count, { count: item.memberCount ?? 0 })}
+        </span>
+        <Badge variant="outline" className="text-micro h-4 px-1.5">
+          {t(($) => $.mention.group_badge)}
+        </Badge>
+      </button>
+    );
+  }
+
   const disabledMessage = item.disabledReason
     ? blockedReasonLabel(item.disabledReason, issuesT)
     : null;
@@ -809,6 +843,25 @@ export function createMentionSuggestion(
             : undefined,
       }));
 
+    // Role groups (contango patch 48) sit between @all and people: a fixed,
+    // short list, matched on handle, name and description, and never
+    // reordered by recency so @devops stays where people expect it.
+    const groups: MemberGroup[] = qc.getQueryData(memberGroupKeys.list(wsId)) ?? [];
+    const groupItems: MentionItem[] = groups
+      .filter(
+        (g) =>
+          g.handle.toLowerCase().includes(q) ||
+          g.name.toLowerCase().includes(q) ||
+          g.description.toLowerCase().includes(q),
+      )
+      .map((g) => ({
+        id: g.id,
+        label: g.handle,
+        type: "group" as const,
+        description: g.name || undefined,
+        memberCount: g.members.length,
+      }));
+
     // Members and agents share a single ranked list — recently mentioned
     // targets come first regardless of type, with an alphabetical fallback
     // for everyone the user hasn't mentioned yet on this device.
@@ -828,7 +881,7 @@ export function createMentionSuggestion(
       )
       .map(issueToMention);
 
-    return [...allItem, ...userItems, ...issueItems];
+    return [...allItem, ...groupItems, ...userItems, ...issueItems];
   }
 
   return {

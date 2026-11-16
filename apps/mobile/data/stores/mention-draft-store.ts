@@ -18,7 +18,7 @@
  */
 import { create } from "zustand";
 
-export type MentionTargetType = "member" | "agent" | "squad" | "all" | "issue";
+export type MentionTargetType = "member" | "agent" | "squad" | "group" | "all" | "issue";
 
 export interface MentionChipDraft {
   type: MentionTargetType;

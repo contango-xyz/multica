@@ -101,6 +101,7 @@ import type {
   User,
   WebhookDelivery,
   WorkspaceMcpServer,
+  MemberGroup,
 } from "../types";
 import type { CloudRuntimeNode } from "../runtimes/cloud-runtime";
 import type { CreateFeedbackResponse } from "../feedback/types";
@@ -4161,3 +4162,56 @@ export const AvailabilityResponseSchema = z
       .default([]),
   })
   .loose();
+
+// Contango fork: GET /api/groups (patch 48). A group without an id or handle
+// cannot be mentioned, so the list drops it instead of failing the response.
+const MemberGroupPersonSchema = z
+  .object({
+    user_id: z.string(),
+    name: z.string().catch(""),
+    email: z.string().catch(""),
+    handle: z.string().catch(""),
+    away: z.boolean().catch(false),
+    backup_user_id: z.string().nullable().catch(null),
+  })
+  .loose();
+
+export const MemberGroupSchema = z
+  .object({
+    id: z.string().min(1),
+    handle: z.string().min(1),
+    name: z.string().catch(""),
+    description: z.string().catch(""),
+    fallback_user_id: z.string().nullable().catch(null),
+    members: z
+      .array(z.unknown())
+      .catch([])
+      .transform((rows) =>
+        rows.flatMap((row) => {
+          const parsed = MemberGroupPersonSchema.safeParse(row);
+          return parsed.success ? [parsed.data] : [];
+        }),
+      ),
+    on_duty: z.array(z.string()).catch([]),
+    on_duty_via: z.string().catch("members"),
+    mention: z.string().catch(""),
+    created_at: z.string().catch(""),
+    updated_at: z.string().catch(""),
+  })
+  .loose();
+
+export const MemberGroupListResponseSchema = z
+  .object({
+    groups: z
+      .array(z.unknown())
+      .catch([])
+      .transform((rows) =>
+        rows.flatMap((row) => {
+          const parsed = MemberGroupSchema.safeParse(row);
+          return parsed.success ? [parsed.data] : [];
+        }),
+      ),
+  })
+  .loose();
+
+export const EMPTY_MEMBER_GROUP_LIST: { groups: MemberGroup[] } = { groups: [] };

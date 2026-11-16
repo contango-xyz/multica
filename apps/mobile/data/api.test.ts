@@ -207,3 +207,33 @@ describe("api.getInboxSquad", () => {
     await expect(api.getInboxSquad()).resolves.toMatchObject({ snapshot: null, inbox_load: [] });
   });
 });
+
+describe("api.listMemberGroups (contango patch 48)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("parses the groups from /api/groups", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ groups: [{ id: "g1", handle: "devops", name: "DevOps", members: [{ user_id: "u1" }] }, { id: "bad" }] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const groups = await api.listMemberGroups();
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith("https://api.example.test/api/groups", expect.any(Object));
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ handle: "devops", description: "", members: [{ user_id: "u1", away: false }] });
+  });
+
+  it("treats a malformed body or a 404 from an older server as no groups", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json("nope")));
+    await expect(api.listMemberGroups()).resolves.toEqual([]);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "not found" }, { status: 404 })));
+    await expect(api.listMemberGroups()).resolves.toEqual([]);
+  });
+});

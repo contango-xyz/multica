@@ -5,6 +5,7 @@ import { formatDateOnly } from "@multica/core/issues/date";
 import { useActorName } from "@multica/core/workspace/hooks";
 import { StatusIcon, PriorityIcon } from "../../issues/components";
 import { signalDetails } from "@multica/core/inbox/smart";
+import { viaGroupHandle } from "@multica/core/inbox/via-group";
 import type { InboxItem, InboxItemType, IssueStatus, IssuePriority } from "@multica/core/types";
 import { getQuickCreateOutcomeDetail } from "./inbox-display";
 import { useLocale, useT } from "../../i18n";
@@ -120,6 +121,12 @@ export function InboxDetailLabel({
     }
     case "new_comment": {
       if (item.body) return <span>{item.body}</span>;
+      return <span>{typeLabels[item.type]}</span>;
+    }
+    case "mentioned": {
+      // Contango patch 48: a mention of a role group (@devops) reached the reader.
+      const handle = viaGroupHandle(item);
+      if (handle) return <span>{t(($) => $.labels.mentioned_via_group, { handle })}</span>;
       return <span>{typeLabels[item.type]}</span>;
     }
     case "reaction_added": {

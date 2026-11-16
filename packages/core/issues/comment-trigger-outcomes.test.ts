@@ -62,6 +62,11 @@ describe("mentionLabelsByTarget", () => {
     expect(labels.get("squad:cafef00d-0002")).toBe("Design Squad");
   });
 
+  it("reads a role group mention (contango patch 48)", () => {
+    const labels = mentionLabelsByTarget("[@devops](mention://group/0a1b2c3d-0003) please");
+    expect(labels.get("group:0a1b2c3d-0003")).toBe("devops");
+  });
+
   it("correlates a blocked outcome to its label, undefined when absent", () => {
     const labels = mentionLabelsByTarget("[@Go](mention://agent/deadbeef-0001)");
     expect(

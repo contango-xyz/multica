@@ -37,7 +37,7 @@ import { useT } from "@/lib/i18n";
 
 /** Mention chip data — composer-local state. No store, no cross-route
  *  sharing. The composer owns the array and passes it in. */
-export type MentionChipType = "member" | "agent" | "squad" | "all" | "issue";
+export type MentionChipType = "member" | "agent" | "squad" | "group" | "all" | "issue";
 
 export interface MentionChip {
   type: MentionChipType;
@@ -134,10 +134,10 @@ function MentionChipView({
   const { colorScheme } = useColorScheme();
   const theme = THEME[colorScheme];
 
-  // Icon picks: @all → people; issue → git-branch (matches web's status icon
-  // styling for issue mentions); else single-person glyph.
+  // Icon picks: @all and role groups → people; issue → git-branch (matches
+  // web's status icon styling for issue mentions); else single-person glyph.
   const iconName =
-    mention.type === "all"
+    mention.type === "all" || mention.type === "group"
       ? "people"
       : mention.type === "issue"
         ? "git-branch-outline"
