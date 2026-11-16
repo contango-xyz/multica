@@ -1818,5 +1818,15 @@
       "empty_title": "还没有保存的视图",
       "empty_description": "在任务列表里调好筛选和显示方式，然后另存为视图。"
     }
+  },
+  "id_jump": {
+    "placeholder": "按编号跳转…",
+    "go_to": "跳转到 {{identifier}}",
+    "open": "打开",
+    "looking_up": "正在查找 {{identifier}}…",
+    "missing": "此工作区中不存在 {{identifier}}",
+    "failed": "无法查找 {{identifier}}",
+    "hint": "输入任务编号，例如 {{example}}",
+    "group": "跳转到任务"
   }
 }

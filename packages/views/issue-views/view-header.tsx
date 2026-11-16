@@ -86,6 +86,7 @@ import { IssueDisplayControls, IssueFilterMenu } from "../issues/components/issu
 import { ChipSpan, useFilterChips, type FilterChip } from "../issues/components/filter-chips-bar";
 import { useViewBaseline } from "../issues/surface/view-baseline-context";
 import { WorkspaceAgentWorkingChip } from "../issues/components/workspace-agent-working-chip";
+import { IssueIdJumpInput } from "../issues/components/issue-ref-jump";
 import type { IssueSurfaceController } from "../issues/surface/use-issue-surface-controller";
 import { useT } from "../i18n";
 import { useMyIssuesScope } from "../my-issues/use-my-issues-scope";
@@ -535,6 +536,8 @@ export function IssueViewHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          {/* The table has its own search box, which also finds by id. */}
+          {controller.viewMode !== "table" && <IssueIdJumpInput className="mr-1" />}
           {showAgentsChip && (
             <WorkspaceAgentWorkingChip
               value={agentRunningFilter}

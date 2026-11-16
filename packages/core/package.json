@@ -45,6 +45,7 @@
     "./issues/batch": "./issues/batch.ts",
     "./issues/read-state": "./issues/read-state.ts",
     "./issues/canonical-id": "./issues/canonical-id.ts",
+    "./issues/issue-ref": "./issues/issue-ref.ts",
     "./issues/queries": "./issues/queries.ts",
     "./issues/wakeups": "./issues/wakeups.ts",
     "./issues/mutations": "./issues/mutations.ts",

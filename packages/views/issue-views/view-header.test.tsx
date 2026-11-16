@@ -49,6 +49,10 @@ vi.mock("../issues/components/issues-header", () => ({
   ),
 }));
 
+vi.mock("../issues/components/issue-ref-jump", () => ({
+  IssueIdJumpInput: () => <input role="searchbox" aria-label="Go to ID…" />,
+}));
+
 const adapterFor = (pathname: string, search = ""): NavigationAdapter => ({
   pathname,
   searchParams: new URLSearchParams(search),
@@ -175,5 +179,24 @@ describe("IssueViewHeader setup of a new view", () => {
     renderHeader("workspace", "header-setup-defined");
 
     expect(screen.queryByTestId("view-setup-bar")).toBeNull();
+  });
+});
+
+describe("IssueViewHeader find by id (contango patch 50)", () => {
+  it("offers the Go to ID box, except in the table, which has its own search", () => {
+    const view = renderHeader("workspace", "issues_find_by_id");
+    expect(screen.getByRole("searchbox", { name: "Go to ID…" })).toBeInTheDocument();
+
+    view.rerender(
+      <NavigationProvider value={adapterFor("/acme/issues")}>
+        <ViewStoreProvider store={getIssueSurfaceViewStore("issues_find_by_id")}>
+          <IssueViewHeader
+            controller={{ ...controller, viewMode: "table" } as IssueSurfaceController}
+            base={{ kind: "workspace" }}
+          />
+        </ViewStoreProvider>
+      </NavigationProvider>,
+    );
+    expect(screen.queryByRole("searchbox", { name: "Go to ID…" })).toBeNull();
   });
 });

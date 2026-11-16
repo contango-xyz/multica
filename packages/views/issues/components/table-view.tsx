@@ -164,6 +164,7 @@ import {
 } from "./table-view-model";
 import type { ChildProgress } from "./list-row";
 import { ListLoadMoreFooter } from "./list-load-more-footer";
+import { IssueRefJump } from "./issue-ref-jump";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
 import { IssueDuplicateOfMarker } from "./issue-duplicates";
 
@@ -2460,12 +2461,14 @@ export function TableView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
-        <TableIssueSearch
-          value={search}
-          onChange={onSearchChange}
-          placeholder={t(($) => $.table.search_placeholder)}
-          clearLabel={t(($) => $.table.search_clear)}
-        />
+        <IssueRefJump query={search}>
+          <TableIssueSearch
+            value={search}
+            onChange={onSearchChange}
+            placeholder={t(($) => $.table.search_placeholder)}
+            clearLabel={t(($) => $.table.search_clear)}
+          />
+        </IssueRefJump>
         <span className="mr-auto" />
         <DropdownMenu>
           <DropdownMenuTrigger

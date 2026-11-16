@@ -1890,5 +1890,15 @@
     "empty": "Aún no hay dependencias entre issues abiertas.",
     "critical_one": "{{count}} tarjeta espera por esta",
     "critical_other": "{{count}} tarjetas esperan por esta"
+  },
+  "id_jump": {
+    "placeholder": "Ir a ID…",
+    "go_to": "Ir a {{identifier}}",
+    "open": "Abrir",
+    "looking_up": "Buscando {{identifier}}…",
+    "missing": "{{identifier}} no existe en este espacio de trabajo",
+    "failed": "No se pudo buscar {{identifier}}",
+    "hint": "Escribe un ID de tarea, como {{example}}",
+    "group": "Ir a la tarea"
   }
 }

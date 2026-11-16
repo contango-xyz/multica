@@ -15,6 +15,7 @@ import { WorkspaceAvatar } from "../workspace/workspace-avatar";
 import { useT } from "../i18n";
 import { HighlightText } from "./highlight-text";
 import { useIssueTargetWriter } from "./issue-target";
+import { useIssueRefLookup, type IssueRefLookup } from "../issues/hooks/use-issue-ref-lookup";
 import { usePalette } from "./palette-context";
 import { CommandGroupView, CommandRow, PaletteGroup, ROW_CLASS, ROW_ICON_CLASS, RowHint } from "./rows";
 import { ActorRow, AgentPresenceText, IssueResultRow, ObjectRow, ProjectResultRow } from "./result-rows";
@@ -61,8 +62,13 @@ export function RootView({
   const p = useWorkspacePaths();
   const { data: unreadSummary = EMPTY_UNREAD_SUMMARY } = useQuery(inboxUnreadSummaryOptions());
   const unreadWsIds = unreadWorkspaceIds(unreadSummary);
-  const { server, partitioned, objects, text } = model;
+  const { server, objects, text } = model;
   const query = text;
+  // Find by id (contango patch 50): an exact indexed lookup pinned above
+  // everything, independent of the full-text results below.
+  const idLookup = useIssueRefLookup(model.scope === "all" || model.scope === "issues" ? text : "");
+  const pinnedId = idLookup.state === "found" ? idLookup.issue.id : null;
+  const partitioned = pinnedId ? withoutIssue(model.partitioned, pinnedId) : model.partitioned;
 
   if (!rawQuery.trim()) {
     return <EmptyState model={model} />;
@@ -357,10 +363,11 @@ export function RootView({
     (a, b) => b.score - a.score || TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type),
   );
 
-  const nothing = !model.hasResults && !model.delegate && !best;
+  const nothing = !model.hasResults && !model.delegate && !best && idLookup.state === "none";
 
   return (
     <>
+      <IssueRefGroup lookup={idLookup} onOpen={(identifier) => palette.navigate(p.issueDetail(identifier))} />
       {model.delegate && (
         <DelegateGroup
           prompt={model.delegate.prompt}
@@ -704,3 +711,53 @@ function EmptyState({ model }: { model: RootModel }) {
   );
 }
 
+function withoutIssue(partitioned: RootModel["partitioned"], issueId: string): RootModel["partitioned"] {
+  const liveIssues = partitioned.liveIssues.filter((issue) => issue.id !== issueId);
+  const cancelledIssues = partitioned.cancelledIssues.filter((issue) => issue.id !== issueId);
+  return {
+    ...partitioned,
+    liveIssues,
+    cancelledIssues,
+    hasCancelled: cancelledIssues.length > 0 || partitioned.cancelledProjects.length > 0,
+  };
+}
+
+/** The pinned "Go to CTG-2850" row, first in the list so Enter opens it. */
+function IssueRefGroup({ lookup, onOpen }: { lookup: IssueRefLookup; onOpen: (identifier: string) => void }) {
+  const { t } = useT("issues");
+  if (lookup.state === "none") return null;
+  return (
+    <PaletteGroup heading={t(($) => $.id_jump.group)}>
+      {lookup.state === "found" ? (
+        <IssueResultRow
+          issue={lookup.issue}
+          query=""
+          value={`goto:${lookup.identifier}`}
+          onSelect={() => onOpen(lookup.identifier)}
+          trailing={<RowHint>{t(($) => $.id_jump.open)}</RowHint>}
+        />
+      ) : (
+        // Same cmdk value in every state: the row is first from the keystroke
+        // on, so cmdk selects it then and keeps it selected when the lookup
+        // lands. Enter while it loads opens the id's page all the same.
+        <CommandPrimitive.Item
+          value={`goto:${lookup.identifier}`}
+          disabled={lookup.state !== "loading"}
+          onSelect={() => onOpen(lookup.identifier)}
+          className={ROW_CLASS}
+        >
+          {lookup.state === "loading" ? (
+            <Loader2 className={`${ROW_ICON_CLASS} animate-spin`} />
+          ) : null}
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            {lookup.state === "loading"
+              ? t(($) => $.id_jump.looking_up, { identifier: lookup.identifier })
+              : lookup.state === "missing"
+                ? t(($) => $.id_jump.missing, { identifier: lookup.identifier })
+                : t(($) => $.id_jump.failed, { identifier: lookup.identifier })}
+          </span>
+        </CommandPrimitive.Item>
+      )}
+    </PaletteGroup>
+  );
+}

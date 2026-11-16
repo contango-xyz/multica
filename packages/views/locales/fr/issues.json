@@ -1890,5 +1890,15 @@
       "empty_title": "Aucune vue enregistrée pour l'instant",
       "empty_description": "Réglez les filtres et l'affichage d'une liste de tâches, puis enregistrez-les comme vue."
     }
+  },
+  "id_jump": {
+    "placeholder": "Aller à l'ID…",
+    "go_to": "Aller à {{identifier}}",
+    "open": "Ouvrir",
+    "looking_up": "Recherche de {{identifier}}…",
+    "missing": "{{identifier}} n'existe pas dans cet espace de travail",
+    "failed": "Impossible de rechercher {{identifier}}",
+    "hint": "Saisissez un identifiant de tâche, comme {{example}}",
+    "group": "Aller à la tâche"
   }
 }

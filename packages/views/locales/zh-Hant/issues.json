@@ -1818,5 +1818,15 @@
     "only_critical": "僅關鍵路徑",
     "empty": "未完成的事項之間還沒有依賴關係。",
     "critical_other": "{{count}} 個事項在等待"
+  },
+  "id_jump": {
+    "placeholder": "依編號跳轉…",
+    "go_to": "跳轉到 {{identifier}}",
+    "open": "開啟",
+    "looking_up": "正在查找 {{identifier}}…",
+    "missing": "此工作區中不存在 {{identifier}}",
+    "failed": "無法查找 {{identifier}}",
+    "hint": "輸入任務編號，例如 {{example}}",
+    "group": "跳轉到任務"
   }
 }

@@ -942,6 +942,33 @@ export), `packages/views/inbox/components/smart-tabs{,.test}.tsx`, `apps/mobile/
 web 7 + mobile 3), `docs/contango/SMART-INBOX.md`.
 Rebase check: none beyond patches 43/45. Drop when: fold into patch 43 (web) and 45 (iOS).
 
+### 50. Find an issue by id on the Issues screen, the ⌘K palette and iOS search
+
+Owner 2026-11-16: "on the issue screen I need a way to find an issue by id". Before: board/list/swimlane had no search
+box at all; the table's box matched `CTG-2850`/`2850` only inside the view's filters (a done card under a "not done"
+filter stayed hidden) and treated `ctg 2850`/`#2850` as title words; the palette and iOS search found ids only through
+the full-text search (2-3 s on live with closed cards) and missed `ctg 2850`; an unknown id just showed "No results".
+
+- `parseIssueRef(text, prefix)` (core `issues/issue-ref.ts`): `CTG-2850`, `ctg-2850`, `ctg 2850`, `CTG2850`, `#2850`,
+  `2850` and pasted issue links → `CTG-2850`; other prefixes, out-of-int4 numbers and words → null.
+- The lookup is the autolink's exact `GET /api/issues/{identifier}` (`issueIdentifierOptions`, unique
+  `(workspace_id, number)` index), never `/api/issues/search`: instant, any status. No server change.
+- Issues screen: a "Go to ID…" box in the view header (board/list/swimlane/gantt; never filters) and the table's own
+  search box show a pinned row under the box: the issue (status icon, id, title, "Open ↵"), "Looking up…", or
+  "CTG-2850 doesn't exist in this workspace". Enter opens it (Cmd/Ctrl+Enter or Cmd-click: new desktop tab).
+- ⌘K palette: a first "Go to issue" group with the same row (cmdk value `goto:<id>`, selectable while loading so
+  Enter opens it at once); the issue is dropped from the full-text groups below. Works in `#` issue scope too.
+- iOS search: same pinned row first (`issueByIdentifierOptions`, key `issues/<ws>/identifier/<id>`), return key opens.
+
+Files: `packages/core/issues/issue-ref{,.test}.ts` (+ `package.json` export),
+`packages/views/issues/hooks/use-issue-ref-lookup.ts`, `packages/views/issues/components/issue-ref-jump{,.test}.tsx`,
+`packages/views/issues/components/table-view.tsx`, `packages/views/issue-views/view-header.tsx`,
+`packages/views/search/root-view.tsx`, `packages/views/search/search-command.test.tsx`, locales `issues.json`
+(`id_jump`, web 7 + mobile 3), `apps/mobile/app/(app)/[workspace]/search.tsx`, `apps/mobile/lib/search-rows{,.test}.ts`,
+`apps/mobile/data/queries/{issues,issue-keys}.ts`.
+Rebase check: `TableIssueSearch` placement in `table-view.tsx`, `IssueViewHeader` right-hand cluster, palette
+`RootView` group order. Drop when: upstream ships go-to-by-id in issue search.
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

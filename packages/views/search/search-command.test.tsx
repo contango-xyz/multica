@@ -6,7 +6,7 @@ import { buildIssueStatusCatalog } from "@multica/core/issue-statuses/queries";
 import { useCommandBarContextStore, type CommandBarContext } from "@multica/core/command-bar";
 import { inboxUnreadSummaryOptions } from "@multica/core/inbox/queries";
 import { I18nProvider } from "@multica/core/i18n/react";
-import { issueDetailOptions, issueTimelineOptions } from "@multica/core/issues/queries";
+import { issueDetailOptions, issueIdentifierOptions, issueTimelineOptions } from "@multica/core/issues/queries";
 import { WORKSPACE_PAGES } from "@multica/core/paths";
 import type { Issue } from "@multica/core/types";
 import {
@@ -177,7 +177,7 @@ vi.mock("@multica/core/paths", async (importOriginal) => {
   return {
     ...actual,
     useWorkspacePaths: () => actual.paths.workspace("ws-test"),
-    useCurrentWorkspace: () => ({ id: "ws-test", slug: "ws-test", name: "Test Workspace" }),
+    useCurrentWorkspace: () => ({ id: "ws-test", slug: "ws-test", name: "Test Workspace", issue_prefix: "MUL" }),
   };
 });
 
@@ -599,6 +599,36 @@ describe("SearchCommand", () => {
 
       await waitFor(() => expect(renderedValues()).toEqual(["issue-settings"]), { timeout: 2000 });
       expect(api("searchProjects")).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("find by id (contango patch 50)", () => {
+    it("pins the exact issue first for an id typed any way, once, and Enter opens it", async () => {
+      const user = userEvent.setup();
+      const done = makeIssue({ id: "issue-7", number: 7, identifier: "MUL-7", title: "Shipped thing", status: "done" });
+      seed(issueIdentifierOptions("ws-test", "MUL-7"), done);
+      api("searchIssues").mockResolvedValue({
+        issues: [makeIssue({ id: "issue-70", number: 70, identifier: "MUL-70", title: "Mentions mul 7" }), done],
+        total: 2,
+      });
+      renderSearch();
+      await user.type(input(), "mul 7");
+
+      await waitFor(() => expect(renderedValues()).toContain("issue-70"), { timeout: 2000 });
+      expect(renderedValues()[0]).toBe("goto:MUL-7");
+      expect(renderedHeadings()[0]).toBe("Go to issue");
+      expect(renderedValues()).not.toContain("issue-7");
+      fireEvent.keyDown(input(), { key: "Enter" });
+      expect(mockPush).toHaveBeenCalledWith("/ws-test/issues/MUL-7");
+    });
+
+    it("says an id doesn't exist", async () => {
+      const user = userEvent.setup();
+      seed(issueIdentifierOptions("ws-test", "MUL-404"), null);
+      renderSearch();
+      await user.type(input(), "#404");
+
+      expect(await screen.findByText("MUL-404 doesn't exist in this workspace")).toBeInTheDocument();
     });
   });
 

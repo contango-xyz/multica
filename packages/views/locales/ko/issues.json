@@ -1818,5 +1818,15 @@
       "empty_title": "아직 저장된 뷰가 없습니다",
       "empty_description": "태스크 목록에서 필터와 표시 방식을 맞춘 뒤 뷰로 저장하세요."
     }
+  },
+  "id_jump": {
+    "placeholder": "ID로 이동…",
+    "go_to": "{{identifier}}(으)로 이동",
+    "open": "열기",
+    "looking_up": "{{identifier}} 찾는 중…",
+    "missing": "{{identifier}}이(가) 이 워크스페이스에 없습니다",
+    "failed": "{{identifier}}을(를) 찾을 수 없습니다",
+    "hint": "{{example}} 같은 태스크 ID를 입력하세요",
+    "group": "태스크로 이동"
   }
 }

@@ -1890,5 +1890,15 @@
       "empty_title": "No saved views yet",
       "empty_description": "Set up filters and display options in an issue list, then save them as a view."
     }
+  },
+  "id_jump": {
+    "placeholder": "Go to ID…",
+    "go_to": "Go to {{identifier}}",
+    "open": "Open",
+    "looking_up": "Looking up {{identifier}}…",
+    "missing": "{{identifier}} doesn't exist in this workspace",
+    "failed": "Couldn't look up {{identifier}}",
+    "hint": "Type an issue ID, like {{example}}",
+    "group": "Go to issue"
   }
 }

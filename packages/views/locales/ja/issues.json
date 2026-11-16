@@ -1818,5 +1818,15 @@
       "empty_title": "保存したビューはまだありません",
       "empty_description": "タスク一覧でフィルターと表示方法を調整し、ビューとして保存します。"
     }
+  },
+  "id_jump": {
+    "placeholder": "ID へ移動…",
+    "go_to": "{{identifier}} へ移動",
+    "open": "開く",
+    "looking_up": "{{identifier}} を検索中…",
+    "missing": "{{identifier}} はこのワークスペースに存在しません",
+    "failed": "{{identifier}} を検索できませんでした",
+    "hint": "{{example}} のようなタスク ID を入力",
+    "group": "タスクへ移動"
   }
 }
