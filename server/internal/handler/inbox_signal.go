@@ -33,11 +33,14 @@ const (
 	signalKeyMaxLen     = 200
 	signalTitleMaxLen   = 60
 	signalSummaryMaxLen = 140
-	signalBodyMaxLen    = 600
-	signalMaxActions    = 3
-	signalLabelMaxLen   = 40
-	signalURLMaxLen     = 2000
-	signalMaxBlocks     = 10000
+	// Patch 51: the body is Markdown rendered like a comment (issue chips
+	// [CTG-N](mention://issue/<uuid>) included); 8000 runes fits a full
+	// roll-up of every card on Today.
+	signalBodyMaxLen  = 8000
+	signalMaxActions  = 3
+	signalLabelMaxLen = 40
+	signalURLMaxLen   = 2000
+	signalMaxBlocks   = 10000
 	// One-tap answers (patch 18): at most 2 replies, each a short literal
 	// answer such as "agree" or "approve pairing".
 	signalMaxReplies  = 2
@@ -215,7 +218,7 @@ func (req *upsertSignalRequest) validate() string {
 	case runeLen(req.Summary) > signalSummaryMaxLen:
 		return "summary is too long (max 140 characters)"
 	case runeLen(req.Body) > signalBodyMaxLen:
-		return "body is too long (max 600 characters)"
+		return "body is too long (max 8000 characters)"
 	case len(req.Actions) > signalMaxActions:
 		return "at most 3 actions"
 	case req.Rank.Blocks < 0 || req.Rank.Blocks > signalMaxBlocks:

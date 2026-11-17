@@ -28,6 +28,10 @@ vi.mock("./inbox-list-item", () => ({
 }));
 // The compact row menu is Classic's (inbox-row-menu); its actions come from the page's provider.
 vi.mock("./inbox-row-menu", () => ({ InboxRowMenu: () => <span data-testid="row-menu" /> }));
+// Patch 51: the body renderer is RichContent (signal-body.test.tsx); here a stand-in keeps the body's text.
+vi.mock("./signal-body", () => ({
+  SignalBody: ({ body }: { body: string }) => <div data-testid="signal-body">{body}</div>,
+}));
 vi.mock("./signal-reply-button", () => ({
   SignalReplyButton: ({ reply }: { reply: { label: string } }) => <button type="button">{reply.label}</button>,
 }));
@@ -187,6 +191,7 @@ describe("InboxTabsView", () => {
     const notice = screen.getByTestId("inbox-notice");
     expect(notice).toHaveTextContent("2 asks waiting on you");
     expect(notice).toHaveTextContent("CTG-2386: Decide: MVP scope review");
+    expect(within(notice).getByTestId("signal-body")).toHaveTextContent("Still open:");   // Markdown (patch 51)
     expect(within(notice).getByRole("button", { name: "Open CTG-2612" })).toHaveAttribute(
       "href", "https://multica.example/contango/issues/CTG-2612",
     );
@@ -397,6 +402,30 @@ describe("SquadScreen", () => {
     expect(screen.getAllByText("Alfredo").length).toBeGreaterThan(1);
     expect(screen.getByText("CTG-2643")).toBeInTheDocument();
     expect(screen.getByText("135")).toBeInTheDocument();
+  });
+
+  // Patch 51 (owner 2026-11-17): the MVP driver's group report lives here now, not on Today.
+  it("shows each person's MVP holds and oldest wait, most MVP first", () => {
+    render(
+      <SquadScreen
+        data={{
+          snapshot: {
+            generated_at: "2026-11-17T09:07:00Z", buckets: {}, people: [], people_via_blocked: [],
+            mvp_holds: [{ user_id: "b", name: "Berta", asks: 2, mvp: 7, oldest_h: 30.4 }],
+          },
+          received_at: "2026-11-17T09:08:00Z",
+          inbox_load: [
+            { user_id: "a", name: "Alfredo", decisions: 11, merges: 9, everything_else: 15, new_asks_7d: 135 },
+            { user_id: "b", name: "Berta", decisions: 2, merges: 0, everything_else: 1, new_asks_7d: 4 },
+          ],
+        }}
+      />,
+    );
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.querySelector("td")?.textContent)).toEqual(["Berta", "Alfredo"]);
+    expect([...rows[0]!.querySelectorAll("td")].slice(1, 3).map((c) => c.textContent)).toEqual(["7", "smart.tabs.hours_value"]);
+    expect([...rows[1]!.querySelectorAll("td")].slice(1, 3).map((c) => c.textContent)).toEqual(["—", "—"]);
+    expect(screen.getByText("smart.tabs.mvp_note")).toBeInTheDocument();
   });
 
   it("says when there is no data yet", () => {

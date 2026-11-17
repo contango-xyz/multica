@@ -21,7 +21,7 @@
   "severity": "action_required|attention|info", "issue_id": "uuid|null",
   "title": "Approve merge #3204",                       // line 1: what you need to do (<= 60 chars)
   "summary": "CTG-1718 · blocks 3 cards · waiting 6 h",  // line 2: why it's here
-  "body": "short self-contained context (<= 600 chars, markdown-lite)",
+  "body": "self-contained context (<= 8000 chars, Markdown; issue chips as [CTG-N](mention://issue/<uuid>))",
   "actions": [{"label": "Open PR", "url": "https://github.com/..."}],
   "rank": {"priority": "urgent|high|medium|low|none", "blocks": 3, "since": "RFC3339"},
   "push": true }
@@ -45,8 +45,8 @@
 - **Responses:** upsert → 201 (created) / 200 (updated) with `{item, created, pushed}`; resolve → 200
   `{item}`, or 204 for an unknown/already resolved key. Flag off for the recipient → 204 on both,
   nothing stored. Validation errors → 400 (checked before the flag, so feeder bugs show up).
-- **Validation / defaults:** `key` 1–200 chars; `title` 1–60; `summary` ≤ 140; `body` ≤ 600 (stored
-  as plain text, rendered as plain text with line breaks); ≤ 3 `actions`, label 1–40, absolute
+- **Validation / defaults:** `key` 1–200 chars; `title` 1–60; `summary` ≤ 140; `body` ≤ 8000 (stored
+  as text, rendered as Markdown like a comment since patch 51: issue chips, links, lists, line breaks); ≤ 3 `actions`, label 1–40, absolute
   `http(s)` URL ≤ 2000; `group` enum; `severity` defaults to `attention`; `rank.priority` defaults to
   `none`; `rank.blocks` 0–10000; `rank.since` RFC3339, defaults to the previous value on update, else
   now. `issue_id` must be an issue in the workspace. `push` omitted = true on create.
@@ -218,7 +218,7 @@ themselves: "Approve: agree" posts `agree` on the card, as a reply to the ask, f
   list's last refresh). Unflagged users keep Classic, where a signal-only card shows
   "Group · summary" and a card with a mention shows the mention (as web).
 - **Detail:** tapping a signal opens the inbox sheet with its brief: group, summary, the reason
-  (priority · blocks · wait), the body as plain text, then the one-tap replies (first one primary),
+  (priority · blocks · wait), the body as Markdown (patch 51), then the one-tap replies (first one primary),
   the link actions, "Open CTG-N" and Archive. A reply asks "Post “agree” on CTG-123?" in a native
   alert, then calls `signal-reply`; on success the sheet closes (the server archived the card); a 404
   says the ask is no longer in your inbox, a 409 shows the server's reason. Actions that link to a

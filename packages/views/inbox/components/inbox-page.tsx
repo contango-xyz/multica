@@ -127,6 +127,7 @@ import { InboxTabsView } from "./smart-tabs";
 import { buildSmartRows, smartRowUnreadIds } from "@multica/core/inbox/smart-fold";
 import { useT } from "../../i18n";
 import { useIssueLimitUpgradePrompt } from "../../modals/use-issue-limit-upgrade-prompt";
+import { SignalBody } from "./signal-body";
 
 
 const MARK_READ_BATCH = 4;
@@ -1075,6 +1076,8 @@ export function InboxPage({
           item={detailItem}
           onOpenRecovery={showAutopilotQuotaRecoveryPrompt}
         />
+      ) : detailItem.body && detailItem.type === "signal" ? (
+        <SignalBody body={detailItem.body} className="mt-4 text-body text-foreground" />
       ) : detailItem.body ? (
         <div className="mt-4 whitespace-pre-wrap text-body leading-relaxed text-foreground">
           {detailItem.body}

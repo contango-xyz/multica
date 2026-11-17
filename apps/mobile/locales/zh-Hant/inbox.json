@@ -176,6 +176,7 @@
       "hold_line_other": "等待 {{human}} · {{hours}} 卡片小時 · 後面有 {{count}} 張卡片",
       "inbox_load": "每人當前收件箱負載",
       "load_line": "{{decisions}} 決策 · {{merges}} 合併 · {{other}} 其他",
+      "load_mvp": "卡住 {{mvp}} 個 MVP · 最久 {{hours}} 小時",
       "else_empty": "沒有其他內容",
       "mark_tab_read": "將{{tab}}標為已讀",
       "archive_tab_other": "歸檔{{tab}}（{{count}} 張卡片）",

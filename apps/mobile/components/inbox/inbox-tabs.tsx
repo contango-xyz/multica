@@ -32,12 +32,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import type { SmartEntry } from "@multica/core/inbox/smart";
-import { SQUAD_BUCKETS, type InboxSquad } from "@multica/core/inbox/squad";
+import { SQUAD_BUCKETS, squadLoadRows, type InboxSquad } from "@multica/core/inbox/squad";
 import type { InboxItem } from "@multica/core/types";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
 import { SwipeableInboxRow } from "@/components/inbox/swipeable-inbox-row";
 import { inboxSquadOptions } from "@/data/queries/inbox";
+import { Markdown } from "@/lib/markdown";
 import { useWorkspaceStore } from "@/data/workspace-store";
 import { useColorScheme } from "@/lib/use-color-scheme";
 import { THEME } from "@/lib/theme";
@@ -369,11 +370,7 @@ function NoticeCard({ entry, actions }: { entry: SmartEntry; actions: TabActions
               </Text>
             ) : null}
           </Pressable>
-          {entry.item.body ? (
-            <Text selectable className="text-sm leading-5 text-foreground">
-              {entry.item.body}
-            </Text>
-          ) : null}
+          {entry.item.body ? <Markdown content={entry.item.body} compact /> : null}
           {links.length > 0 ? (
             <View className="flex-row flex-wrap gap-2">
               {links.map((a, i) => (
@@ -651,7 +648,7 @@ export function SquadScreen({ data, now }: { data: InboxSquad; now: number }) {
   const people = [...(snap?.people ?? [])].filter((p) => p.hours > 0).sort((a, b) => b.hours - a.hours);
   const maxHours = Math.max(1, ...people.map((p) => p.hours));
   const holds = [...(snap?.people_via_blocked ?? [])].sort((a, b) => b.hours - a.hours).slice(0, 5);
-  const load = [...data.inbox_load].sort((a, b) => b.decisions + b.merges - (a.decisions + a.merges));
+  const load = squadLoadRows(data);
   const pct = (share: number) => `${Math.round(share * 100)}%`;
   return (
     <>
@@ -721,13 +718,20 @@ export function SquadScreen({ data, now }: { data: InboxSquad; now: number }) {
       {load.length > 0 ? (
         <SquadCard title={t("smart.tabs.inbox_load")}>
           {load.map((r) => (
-            <View key={r.user_id} className="flex-row items-center gap-2">
-              <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
-                {r.name}
-              </Text>
-              <Text className="text-xs tabular-nums text-muted-foreground">
-                {t("smart.tabs.load_line", { decisions: r.decisions, merges: r.merges, other: r.everything_else })}
-              </Text>
+            <View key={r.user_id} className="gap-0.5">
+              <View className="flex-row items-center gap-2">
+                <Text className="flex-1 text-sm text-foreground" numberOfLines={1}>
+                  {r.name}
+                </Text>
+                <Text className="text-xs tabular-nums text-muted-foreground">
+                  {t("smart.tabs.load_line", { decisions: r.decisions, merges: r.merges, other: r.everything_else })}
+                </Text>
+              </View>
+              {r.mvp ? (
+                <Text className="text-xs tabular-nums text-muted-foreground">
+                  {t("smart.tabs.load_mvp", { mvp: r.mvp.mvp, hours: Math.round(r.mvp.oldest_h) })}
+                </Text>
+              ) : null}
             </View>
           ))}
         </SquadCard>

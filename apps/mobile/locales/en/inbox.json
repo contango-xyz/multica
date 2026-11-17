@@ -173,6 +173,7 @@
       "hold_line_other": "waiting on {{human}} · {{hours}} card-hours · {{count}} cards behind",
       "inbox_load": "Inbox load per person, open now",
       "load_line": "{{decisions}} decisions · {{merges}} merges · {{other}} else",
+      "load_mvp": "holds {{mvp}} MVP · oldest ask {{hours}} h",
       "else_empty": "Nothing else",
       "mark_tab_read": "Mark {{tab}} read",
       "archive_tab_one": "Archive {{tab}} ({{count}} card)",

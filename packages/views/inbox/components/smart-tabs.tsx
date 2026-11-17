@@ -30,9 +30,10 @@ import {
   type InboxTab,
   type TabRow,
 } from "@multica/core/inbox/smart-tabs";
-import { SQUAD_BUCKETS, type InboxSquad } from "@multica/core/inbox/squad";
+import { SQUAD_BUCKETS, squadLoadRows, type InboxSquad } from "@multica/core/inbox/squad";
 import type { InboxItem } from "@multica/core/types";
 import { IconButton } from "@multica/ui/components/common/icon-button";
+import { SignalBody } from "./signal-body";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -472,7 +473,7 @@ function NoticeCard({ entry, onSelect, actions }: { entry: SmartEntry; onSelect:
         </button>
         <RowArchive item={entry.item} onArchive={() => actions.onArchive(entry.item.id)} />
       </div>
-      {entry.item.body && <p className="whitespace-pre-wrap break-words text-caption">{entry.item.body}</p>}
+      {entry.item.body && <SignalBody body={entry.item.body} className="text-caption" />}
       {links.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {links.map((a, i) => (
@@ -553,7 +554,7 @@ function BriefBody({ entry }: { entry: SmartEntry }) {
   const { t } = useT("inbox");
   const brief = entry.signal?.brief;
   if (!brief) {
-    return entry.item.body ? <p className="whitespace-pre-wrap break-words text-body">{entry.item.body}</p> : null;
+    return entry.item.body ? <SignalBody body={entry.item.body} className="text-body" /> : null;
   }
   const field = (label: string, value: ReactNode, className?: string) => (
     <div className={className}>
@@ -753,7 +754,7 @@ export function SquadScreen({ data }: { data: InboxSquad }) {
   const people = [...(snap?.people ?? [])].sort((a, b) => b.hours - a.hours).filter((p) => p.hours > 0);
   const maxHours = Math.max(1, ...people.map((p) => p.hours));
   const holds = [...(snap?.people_via_blocked ?? [])].sort((a, b) => b.hours - a.hours).slice(0, 5);
-  const load = [...data.inbox_load].sort((a, b) => b.decisions + b.merges - (a.decisions + a.merges));
+  const load = squadLoadRows(data);
   const pct = (share: number) => `${Math.round(share * 100)}%`;
   const th = "px-2 py-1.5 text-right text-micro font-semibold uppercase tracking-wide text-muted-foreground first:text-left";
   const td = "whitespace-nowrap border-t px-2 py-1.5 text-right tabular-nums first:text-left";
@@ -839,6 +840,8 @@ export function SquadScreen({ data }: { data: InboxSquad }) {
               <thead>
                 <tr>
                   <th className={th}>{t(($) => $.smart.tabs.col_person)}</th>
+                  <th className={th}>{t(($) => $.smart.tabs.col_holds_mvp)}</th>
+                  <th className={th}>{t(($) => $.smart.tabs.col_oldest_wait)}</th>
                   <th className={th}>{t(($) => $.smart.tabs.decisions)}</th>
                   <th className={th}>{t(($) => $.smart.tabs.merges)}</th>
                   <th className={th}>{t(($) => $.smart.tabs.else)}</th>
@@ -849,6 +852,8 @@ export function SquadScreen({ data }: { data: InboxSquad }) {
                 {load.map((r) => (
                   <tr key={r.user_id}>
                     <td className={td}>{r.name}</td>
+                    <td className={td}>{r.mvp ? r.mvp.mvp : "—"}</td>
+                    <td className={td}>{r.mvp ? t(($) => $.smart.tabs.hours_value, { hours: Math.round(r.mvp.oldest_h) }) : "—"}</td>
                     <td className={td}>{r.decisions}</td>
                     <td className={td}>{r.merges}</td>
                     <td className={td}>{r.everything_else}</td>
@@ -859,6 +864,7 @@ export function SquadScreen({ data }: { data: InboxSquad }) {
             </table>
           </div>
           <p className="text-caption text-muted-foreground">{t(($) => $.smart.tabs.load_note)}</p>
+          <p className="text-caption text-muted-foreground">{t(($) => $.smart.tabs.mvp_note)}</p>
         </Card>
       )}
     </>

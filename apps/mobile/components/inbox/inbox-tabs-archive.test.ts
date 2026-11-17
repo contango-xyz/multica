@@ -25,6 +25,7 @@ vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (key: string) => key }) }));
 vi.mock("@/components/ui/text", () => ({ Text: "Text" }));
 vi.mock("@/components/ui/button", () => ({ Button: "Button" }));
 vi.mock("@/components/inbox/swipeable-inbox-row", () => ({ SwipeableInboxRow: "SwipeableInboxRow" }));
+vi.mock("@/lib/markdown", () => ({ Markdown: "Markdown" }));
 vi.mock("./use-signal-reply", () => ({ useSignalReply: () => ({ confirm: vi.fn(), busy: false }) }));
 
 

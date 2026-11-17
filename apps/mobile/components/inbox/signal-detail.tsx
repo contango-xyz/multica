@@ -4,7 +4,7 @@
  * (packages/views/inbox/components/smart-inbox.tsx) and, since patch 45, the
  * tabs' brief (packages/views/inbox/components/smart-tabs.tsx BriefBody and
  * MergeCard): summary and why it ranks here; then the feeder's brief (What's
- * going on / We recommend / If you say nothing) or the body as plain text; a
+ * going on / We recommend / If you say nothing) or the body as Markdown (patch 51); a
  * merge ask's facts (why it needs you, CI, agent review, size).
  *
  * The answers sit in a footer below the scrolling text, within thumb reach:
@@ -21,6 +21,7 @@ import { signalDetails } from "@multica/core/inbox/smart";
 import type { InboxItem } from "@multica/core/types";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
+import { Markdown } from "@/lib/markdown";
 import { issueDetailOptions } from "@/data/queries/issues";
 import { useArchiveInbox, useMarkInboxRead } from "@/data/mutations/inbox";
 import { useWorkspaceStore } from "@/data/workspace-store";
@@ -131,9 +132,8 @@ export function SignalDetail({ item }: { item: InboxItem }) {
             />
           </View>
         ) : item.body ? (
-          <Text selectable className="text-base leading-6 text-foreground">
-            {item.body}
-          </Text>
+          // Markdown (contango patch 51): roll-ups list cards as [CTG-N](mention://issue/<uuid>) links.
+          <Markdown content={item.body} />
         ) : null}
 
         {merge && !merge.postMerge ? (

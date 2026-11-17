@@ -274,7 +274,7 @@ func TestInboxSignalValidation(t *testing.T) {
 		"missing key":        {"key": " "},
 		"long title":         {"title": strings.Repeat("x", 61)},
 		"long summary":       {"summary": strings.Repeat("x", 141)},
-		"long body":          {"body": strings.Repeat("x", 601)},
+		"long body":          {"body": strings.Repeat("x", 8001)},
 		"javascript url":     {"actions": []map[string]any{{"label": "x", "url": "javascript:alert(1)"}}},
 		"relative url":       {"actions": []map[string]any{{"label": "x", "url": "/issues/1"}}},
 		"empty label":        {"actions": []map[string]any{{"label": "", "url": "https://a.b"}}},
@@ -294,6 +294,20 @@ func TestInboxSignalValidation(t *testing.T) {
 	}
 	if n := dbfx.Count(t, `SELECT count(*) FROM inbox_item WHERE workspace_id = $1`, f.workspaceID); n != 0 {
 		t.Fatalf("inbox rows = %d, want 0", n)
+	}
+}
+
+// Patch 51: a roll-up body of up to 8000 runes (multi-byte included) is
+// accepted and stored whole.
+func TestInboxSignalAcceptsLongMarkdownBody(t *testing.T) {
+	f := newSignalFixture(t)
+	body := strings.Repeat("é", 8000-len("[CTG-1](mention://issue/x)")) + "[CTG-1](mention://issue/x)"
+	var out signalUpsertResponse
+	testutil.Call(t, signalHandler(testHandler.UpsertInboxSignal),
+		signalRequest("/api/inbox/signals", f.botUserID, f.workspaceID, f.body(map[string]any{"key": "rollup", "body": body}))).
+		Want(http.StatusCreated).JSON(&out)
+	if out.Item.Body == nil || *out.Item.Body != body {
+		t.Fatalf("stored body differs (len %d)", len(body))
 	}
 }
 

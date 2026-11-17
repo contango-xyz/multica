@@ -969,6 +969,32 @@ Files: `packages/core/issues/issue-ref{,.test}.ts` (+ `package.json` export),
 Rebase check: `TableIssueSearch` placement in `table-view.tsx`, `IssueViewHeader` right-hand cluster, palette
 `RootView` group order. Drop when: upstream ships go-to-by-id in issue search.
 
+### 51. Inbox signal bodies render as Markdown (issue chips); MVP holds on the Squad tab
+
+Owner 2026-11-17 ("1. go 2. yes"): the Today roll-ups (the feeders' MVP digest) should list every card as Multica's
+issue chip, showing its current status, instead of a capped plain-text list; and the MVP driver's "who is blocking
+what" card belongs on the Squad tab.
+
+- Server: `signalBodyMaxLen` 600 → 8000 runes (`inbox_signal.go`; error text and validation test, plus an 8000-rune
+  multi-byte body that is stored whole).
+- Web: a signal's body renders through `RichContent` (`SignalBody`, compact density) in Today's notices, the Decisions
+  brief's body fallback, the sections view's signal brief and Classic's card-less detail (signals only; other card-less
+  types keep plain text). `[CTG-N](mention://issue/<uuid>)` is the issue chip (status icon, id, title; hover card);
+  plain-text bodies keep their line breaks (remark-breaks).
+- iOS: the notice banner and the signal detail sheet render the body with `@/lib/markdown` (mention links open the
+  issue; mobile shows them as links, not status chips: no chip renderer in the native Markdown).
+- Squad tab: the feeder's snapshot may carry `mvp_holds` `[{user_id, name, asks, mvp, oldest_h}]` (claude-sandbox
+  `inbox-signals.py`, from the MVP driver's facts); `squadLoadRows` joins it to the inbox load by user id. Web: two
+  columns, Holds MVP and Oldest wait (most MVP first, then open asks); iOS: a second line per person. Optional field:
+  an older feeder or a bad value shows "—". No server change (the snapshot is opaque JSON).
+
+Files: `server/internal/handler/inbox_signal{,_test}.go`, `packages/views/inbox/components/signal-body{,.test}.tsx`,
+`smart-tabs{,.test}.tsx`, `smart-inbox{,.test}.tsx`, `inbox-page.tsx`, `packages/core/inbox/squad{,.test}.ts`, locales
+`inbox.json` (`col_holds_mvp`, `col_oldest_wait`, `mvp_note`: web 7; `load_mvp`: mobile 3),
+`apps/mobile/components/inbox/{inbox-tabs,signal-detail}.tsx`, `inbox-tabs-archive.test.ts`, `docs/contango/SMART-INBOX.md`.
+Rebase check: none beyond patches 14/43/45 (signal API, tabs, iOS tabs). Drop when: fold into patch 14 (body limit and
+renderer) and 43/45 (Squad columns).
+
 ## Last rebase
 
 **2026-11-06, v0.7.0 → v0.8.1** (branch `contango/rebase-v0.8.1`). Motivation: upstream's

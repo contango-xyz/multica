@@ -65,6 +65,10 @@ vi.mock("./smart-dashboard", () => ({
     <div data-testid="dashboard" data-compact={String(!!compact)} data-sections={sections.length} />
   ),
 }));
+// Patch 51: the body renderer is RichContent (signal-body.test.tsx); here a stand-in keeps the body's text.
+vi.mock("./signal-body", () => ({
+  SignalBody: ({ body }: { body: string }) => <div data-testid="signal-body">{body}</div>,
+}));
 vi.mock("./signal-reply-button", () => ({
   SignalReplyButton: ({ reply, variant }: { reply: { index: number; label: string }; variant?: string }) => (
     <button type="button" data-testid={`reply-${reply.index}`} data-variant={variant}>
@@ -328,6 +332,7 @@ describe("SmartInboxPage", () => {
     expect(markRead.mutate).toHaveBeenCalledWith("sig");
     expect(screen.getByRole("heading", { level: 1, name: "Approve merge #3204" })).toBeInTheDocument();
     expect(screen.getByText("Context for the merge.")).toBeInTheDocument();
+    expect(screen.getByText("Context for the merge.")).toHaveAttribute("data-testid", "signal-body");   // patch 51
     fireEvent.click(screen.getByRole("button", { name: "smart.open_issue" }));
     expect(push).toHaveBeenCalledWith("/acme/issues/issue-1");
     fireEvent.click(screen.getByRole("button", { name: "detail.archive" }));

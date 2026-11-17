@@ -26,6 +26,7 @@ import { useWorkspaceId } from "@multica/core/hooks";
 import { useWorkspacePaths } from "@multica/core/paths";
 import { inboxListOptions, useInboxUnreadCount } from "@multica/core/inbox/queries";
 import { buildSmartRows, smartRowUnreadIds } from "@multica/core/inbox/smart-fold";
+import { SignalBody } from "./signal-body";
 import {
   useArchiveAllInbox,
   useArchiveAllReadInbox,
@@ -616,7 +617,7 @@ export function SignalBrief({
         <p className="break-words text-body text-muted-foreground">{line2(entry)}</p>
         <p className="text-caption text-muted-foreground">{reasonText(entry)}</p>
       </header>
-      {body && <p className="whitespace-pre-wrap break-words text-body">{body}</p>}
+      {body && <SignalBody body={body} className="text-body" />}
       {signal && (signal.actions.length > 0 || replies.length > 0) && (
         <div className={cn("flex gap-2", compact ? "flex-row flex-wrap" : "flex-col sm:flex-row sm:flex-wrap")}>
           {/* One-tap answers first: the recommended reply is the primary button. */}
